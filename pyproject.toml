@@ -12,6 +12,8 @@ license = { text = "MIT" }
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.11",
+    "utide>=0.4",
+    "mhkit>=3; python_version<'3.12'",
 ]
 
 [project.optional-dependencies]

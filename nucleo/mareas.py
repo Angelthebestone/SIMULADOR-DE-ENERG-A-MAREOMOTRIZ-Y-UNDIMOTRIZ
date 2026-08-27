@@ -375,50 +375,45 @@ def _cargar_tesoro() -> tuple[np.ndarray, np.ndarray, str, str] | None:
 def _intentar_utide(
     t_s: np.ndarray, nivel_m: np.ndarray, estacion: str, periodo: str
 ) -> AjusteMareal | None:
-    try:
-        from utide import solve  # type: ignore[import-untyped]
-    except ImportError:
-        return None
-    try:
-        t0 = datetime.datetime(2000, 1, 1)
-        fechas = np.array([t0 + datetime.timedelta(seconds=float(s)) for s in t_s])
-        coef = solve(
-            fechas,
-            nivel_m,
-            lat=4.0,
-            constit=["M2", "S2", "N2", "K1", "O1"],
-            method="ols",
-            conf_int="none",
-        )
-        nombres = [str(n).strip() for n in coef["name"]]
-        amps = coef["A"]
-        fases = coef["g"]
-        out: list[Constituyente] = []
-        for idx, nombre in enumerate(nombres):
-            if nombre not in FRECUENCIAS_HZ:
-                continue
-            out.append(
-                Constituyente(
-                    nombre=nombre,
-                    amplitud_m=float(amps[idx]),
-                    fase_rad=math.radians(float(fases[idx])),
-                    frecuencia_hz=FRECUENCIAS_HZ[nombre],
-                    estacion=estacion,
-                    periodo_ajuste=periodo,
-                    metodo="UTide",
-                )
+    from utide import solve  # type: ignore[import-untyped]
+
+    t0 = datetime.datetime(2000, 1, 1)
+    fechas = np.array([t0 + datetime.timedelta(seconds=float(s)) for s in t_s])
+    coef = solve(
+        fechas,
+        nivel_m,
+        lat=4.0,
+        constit=["M2", "S2", "N2", "K1", "O1"],
+        method="ols",
+        conf_int="none",
+    )
+    nombres = [str(n).strip() for n in coef["name"]]
+    amps = coef["A"]
+    fases = coef["g"]
+    out: list[Constituyente] = []
+    for idx, nombre in enumerate(nombres):
+        if nombre not in FRECUENCIAS_HZ:
+            continue
+        out.append(
+            Constituyente(
+                nombre=nombre,
+                amplitud_m=float(amps[idx]),
+                fase_rad=math.radians(float(fases[idx])),
+                frecuencia_hz=FRECUENCIAS_HZ[nombre],
+                estacion=estacion,
+                periodo_ajuste=periodo,
+                metodo="UTide",
             )
-        if not out:
-            return None
-        return AjusteMareal(
-            constituyentes=tuple(out),
-            estacion=estacion,
-            periodo_ajuste=periodo,
-            metodo="UTide",
-            nivel_aprobacion="Preliminar (900)",
         )
-    except Exception:
+    if not out:
         return None
+    return AjusteMareal(
+        constituyentes=tuple(out),
+        estacion=estacion,
+        periodo_ajuste=periodo,
+        metodo="UTide",
+        nivel_aprobacion="Preliminar (900)",
+    )
 
 
 def _escalar_a_rango(

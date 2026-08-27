@@ -2,5 +2,25 @@
 /.commandcode
 /.pytest_cache
 /.ruff_cache
-/datos
-/documentacion
+
+# Python bytecode / caches — nunca trackear
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.venv/
+venv/
+env/
+
+# Datos: NO ignorar — los JSON del simulador son parte del repo
+!datos/
+!datos/**/*.json
+!datos/**/*.csv
+datos/__pycache__/
+# Documentacion: mantener ignorada (es fuente, no codigo)
+# /documentacion

@@ -44,9 +44,9 @@ def test_8_03_niveles_mismo_resultado():
 
     r = AbsorbedorPuntual().resolver({"hm0": 1.5, "te": 6}, ContextoRecurso())
     g = GestorNiveles(r)
-    v1 = g.cambiar_nivel("ver").produccion_mwh
-    v2 = g.cambiar_nivel("calcular").produccion_mwh
-    assert v1 == v2
+    vals = [g.cambiar_nivel(n).produccion_mwh for n in ("ver", "comparar", "calcular", "disenar")]
+    assert len(set(vals)) == 1
+    assert g.produccion_identica_en_todos()
 
 
 def test_8_04_formato_espanol():
@@ -86,13 +86,15 @@ def test_8_07_animacion_muestrea_serie():
 
 
 def test_8_08_escenarios_roundtrip():
-    from app.escenarios import cargar_escenario, guardar_escenario
+    from app.escenarios import cargar_escenario, guardar_escenario, verificar_reproducible
 
     with tempfile.TemporaryDirectory() as td:
         p = pathlib.Path(td) / "esc.json"
         guardar_escenario(str(p), {"hm0": 1.5}, {"dummy": 1})
         rec = cargar_escenario(str(p))
         assert rec["parametros"]["hm0"] == 1.5
+        assert "hash" in rec and "version_datos" in rec
+        assert verificar_reproducible(str(p))
 
 
 def test_8_09_export_csv():
@@ -123,6 +125,7 @@ def test_8_14_tesis():
 
 
 def test_8_13_dato_pendiente_bloquea():
+    from app.procedencia import exigir_dato, listar_pendientes
     from nucleo.dato import Dato, DatoPendienteError
 
     d = Dato(valor=1.0, unidad="m", fuente="pendiente", estado="pendiente")
@@ -131,3 +134,12 @@ def test_8_13_dato_pendiente_bloquea():
         assert False
     except DatoPendienteError:
         pass
+    with tempfile.TemporaryDirectory() as td:
+        p = pathlib.Path(td) / "sitio.json"
+        p.write_text('{"x": {"valor": 1, "unidad": "m", "fuente": "f", "estado": "pendiente"}}', encoding="utf-8")
+        assert "x" in listar_pendientes(str(p))
+        try:
+            exigir_dato(str(p), "x")
+            assert False
+        except DatoPendienteError:
+            pass

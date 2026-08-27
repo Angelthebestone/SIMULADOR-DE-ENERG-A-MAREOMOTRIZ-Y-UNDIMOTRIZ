@@ -42,7 +42,9 @@ def test_7_04_balance_volumen_embalse():
 
     r = EmbalseMareal().resolver({"rango_m": 3.28}, ContextoRecurso())
     err = r.eslabones[0].detalle.get("balance_err_m3", 0)
+    vol = r.eslabones[0].detalle.get("vol_turbinado_m3", 0)
     assert math.isfinite(err)
+    assert abs(err) / max(abs(vol), 1) < 1e-6 or abs(err) < 1e3
 
 
 def test_7_05_integrador_converge():
@@ -96,11 +98,17 @@ def test_7_09_orbital_o2():
 
 
 def test_7_10_reconstruccion_marea_caribe():
-    from nucleo.mareas import ajustar_constituyentes, cociente_sicigia_cuadratura, generar_serie_mareal
+    from nucleo.mareas import (
+        ajustar_constituyentes,
+        cociente_sicigia_cuadratura,
+        rango_reconstruido_vs_medido,
+    )
 
     ajuste = ajustar_constituyentes(oceano="caribe")
     assert ajuste is not None
     assert cociente_sicigia_cuadratura(ajuste.constituyentes) > 1.5
+    comp = rango_reconstruido_vs_medido("caribe")
+    assert comp["error_relativo"] < 0.15
 
 
 def test_7_11_nucleo_no_importa_interfaz():
@@ -148,10 +156,21 @@ def test_7_14_energia_integrada_mayor():
 def test_7_15_jonswap_gamma1_pierson():
     import numpy as np
 
-    from nucleo.espectros import espectro_jonswap, espectro_pierson_moskowitz
+    from nucleo.espectros import (
+        espectro_jonswap,
+        espectro_jonswap_para_hm0_te,
+        espectro_pierson_moskowitz,
+        parametros_desde_espectro,
+    )
 
     omega = np.linspace(0.2, 2, 500)
     wp = 2 * math.pi / 8
     pm = espectro_pierson_moskowitz(omega, wp)
     jm = espectro_jonswap(omega, wp, gamma=1.0)
     assert np.max(np.abs(pm - jm)) / np.max(pm) < 0.01
+    hm0, te = 2.0, 8.0
+    omega2 = np.linspace(0.05, 3, 800)
+    s = espectro_jonswap_para_hm0_te(omega2, hm0, te, gamma=1.0)
+    rec = parametros_desde_espectro(omega2, s)
+    assert abs(rec.hm0 - hm0) / hm0 < 0.01
+    assert abs(rec.te - te) / te < 0.01

@@ -13,19 +13,6 @@ JONSWAP_GAMMA_DEFECTO: float = 3.3
 JONSWAP_SIGMA_BAJO: float = 0.07
 JONSWAP_SIGMA_ALTO: float = 0.09
 
-_MHKIT_DISPONIBLE: bool = False
-try:
-    import mhkitoolkit  # noqa: F401
-
-    _MHKIT_DISPONIBLE = True
-except ImportError:
-    try:
-        import mhkit  # noqa: F401
-
-        _MHKIT_DISPONIBLE = True
-    except ImportError:
-        _MHKIT_DISPONIBLE = False
-
 
 @dataclass(frozen=True, slots=True)
 class ParametrosEspectrales:

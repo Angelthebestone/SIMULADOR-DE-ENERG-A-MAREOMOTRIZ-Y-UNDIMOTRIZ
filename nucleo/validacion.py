@@ -33,26 +33,9 @@ def acotar(parametro: str, valor: float) -> tuple[float, Acotacion | None]:
     if minimo <= valor <= maximo:
         return valor, None
     acotado = min(max(valor, minimo), maximo)
-    motivo = f"{parametro}={valor} fuera de rango [{minimo}, {maximo}]; acotado a {acotado}"
     return acotado, Acotacion(
         valor_acotado=acotado,
         valor_original=valor,
-        motivo=motivo,
+        motivo=f"{parametro}={valor} fuera de [{minimo}, {maximo}]; acotado a {acotado}",
         rango=(minimo, maximo),
     )
-
-
-def validar_rango(parametro: str, valor: float) -> Acotacion | None:
-    _, acotacion = acotar(parametro, valor)
-    return acotacion
-
-
-def es_disruptivo(valor: float, parametro: str) -> bool:
-    if parametro not in RANGOS:
-        return False
-    minimo, maximo = RANGOS[parametro]
-    return not (minimo <= valor <= maximo)
-
-
-def explicar_invariante_roto(invariante: str, detalle: str) -> str:
-    return f"Invariante roto [{invariante}]: {detalle}"

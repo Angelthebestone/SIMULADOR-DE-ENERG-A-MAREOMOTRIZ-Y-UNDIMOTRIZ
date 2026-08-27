@@ -6,15 +6,6 @@ from typing import Any
 
 from nucleo.resultado import Resultado
 
-try:
-    from PySide6.QtCore import QThread, Signal  # type: ignore[import-not-found]
-
-    _QTHREAD_DISPONIBLE = True
-except ImportError:
-    _QTHREAD_DISPONIBLE = False
-    QThread = object  # type: ignore[assignment]
-    Signal = object  # type: ignore[assignment]
-
 
 class Trabajo:
     def __init__(
