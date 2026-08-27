@@ -1,0 +1,23 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Python 3.11+, PySide6 (Qt6), NumPy, SciPy, Matplotlib, MHKiT, UTide
+  Proyecto de aula FCN030 Introducción a la Ingeniería, UTS 2026-2 — simulador educativo undimotriz y mareomotriz (escritorio, offline, español).
+  Tesis: energía marina en Colombia marginal vs SIN, competitiva vs diésel en ZNI.
+  Emplazamiento por defecto: Isla Fuerte (8,9 kW/m Ortega et al. 2013, revisado por pares).
+  Datos congelados en datos/ (IDEAM preliminar 900, ERA5-Ocean, GMRT, RUNAP, Superservicios ZNI). El simulador nunca consulta red en ejecución.
+  Convenciones: formato numérico español (coma decimal), etiquetas [L]/[V]/[I], trazabilidad obligatoria valor/unidad/fuente/estado.
+
+rules:
+  proposal:
+    - Mantener tesis del proyecto visible y contraste 8,9 vs 40 kW/m en pantalla de inicio
+  tasks:
+    - "Orden de construcción: núcleo → invariantes → nivel Ver → resto (bloques A→B→C→D de tasks.md)"
+  specs:
+    - Toda cifra lleva fuente y estado (verificado/inferido/pendiente); pendiente no entra a cálculo
+
+operations:
+  apply:
+    guidance:
+      - Validar invariantes físicos antes de tocar UI
+      - Declarar limitaciones en pantalla (oleaje omnidireccional, coeficientes de literatura, sin BEM)
