@@ -3,8 +3,8 @@
 La versión anterior de este delta daba por hecho que el único código acoplado a la presentación estaba en `interfaz/` y que las pruebas de física y datos no se veían afectadas. Comprobado el repositorio, ninguna de las dos cosas es cierta:
 
 - `interfaz/calculo.py` (348 de las 2.652 líneas) declara en su cabecera «Aquí no hay Qt» y contiene `Parametros`, `simular()`, `_matriz_potencia`, `_aep_matriz`, `serie_oleaje()` y el registro `DISPOSITIVOS`. Es la capa de servicio, no la presentación, y sin ella no hay aplicación.
-- De las nueve suites de `pruebas/`, seis mencionan `interfaz` o `PySide6`: además de las dos de interfaz (61 casos), `test_stress_core.py`, `test_stress_datos.py` y `test_stress_rendimiento.py` importan la capa de servicio, y `test_core_invariantes.py` la menciona como cadena literal en su prueba de aislamiento.
-- Las dos primeras usan `pytest.importorskip("PySide6")`. Al desaparecer la dependencia, se saltan sin avisar: una casilla verde que no ha ejecutado nada.
+- `pruebas/` recoge 222 casos en 160 funciones, nueve suites. Las dos de presentación suman 76 casos. Otras tres suites contadas como de física y datos —`test_stress_core` (74), `test_stress_datos` (22), `test_stress_rendimiento` (10), 106 casos— importan hoy la capa de servicio o módulos de la presentación. `test_core_invariantes` no la importa, pero la menciona como cadena literal en su prueba de aislamiento.
+- Dos de esas tres usan `pytest.importorskip("PySide6")`. Al desaparecer la dependencia, sus 32 casos se saltan sin avisar: una casilla verde que no ha ejecutado nada. La tercera importa sin condición y sí fallaría, así que el agujero es parcial y por eso pasa desapercibido.
 
 Estos tres hechos obligan a una fase intermedia y a endurecer los requisitos siguientes.
 

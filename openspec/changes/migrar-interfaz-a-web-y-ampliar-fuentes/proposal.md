@@ -17,7 +17,7 @@ Los dos problemas se resuelven juntos porque comparten una pieza: el mapa nuevo 
 **Fase 0.5 — Reubicar la capa de servicio antes de retirar nada**
 
 - `interfaz/calculo.py` no es interfaz: su cabecera declara que no contiene Qt y aloja `Parametros`, `simular()`, la matriz de potencia, la lectura de series de oleaje y el registro de dispositivos. Se traslada a la capa de servicio y se actualizan sus importadores.
-- Las tres suites de física y datos que hoy importan `interfaz/` (`test_stress_core`, `test_stress_datos`, `test_stress_rendimiento`, 49 casos) se reencaminan al servicio y se libera su acoplamiento a la presentación, para que ninguna de ellas dependa de la capa que se va a retirar.
+- Las tres suites de física y datos que hoy importan `interfaz/` (`test_stress_core`, `test_stress_datos`, `test_stress_rendimiento`: 106 casos entre las tres) se reencaminan al servicio y se libera su acoplamiento a la presentación, para que ninguna de ellas dependa de la capa que se va a retirar.
 - Se elimina la omisión condicional por dependencia ausente en `pruebas/`: hoy dos de esas suites usan `importorskip("PySide6")` y, al irse PySide6, dejarían de ejecutarse en silencio mientras la casilla de «no regresión» sigue en verde.
 
 **Fase 1 — Ingesta de fuentes nuevas**
@@ -39,7 +39,7 @@ Los dos problemas se resuelven juntos porque comparten una pieza: el mapa nuevo 
 - Comprobación del motor de renderizado al arrancar, con su directorio de datos dentro del espacio de la aplicación. Su ausencia y su falta de permisos de escritura son modos de fallo del arranque que hoy ningún spec contempla.
 - Los defectos de presentación ya registrados en `.commandcode/design/review-report.md` (foco visible, affordance del mapa, valor visible en cada control, control de la animación, navegación del nivel Diseñar) pasan a ser requisitos y casos de prueba de la capa nueva, no memoria de la capa vieja.
 - **BREAKING**: se retira la parte de `interfaz/` que sí es presentación en PySide6, y la dependencia `PySide6` de `pyproject.toml`. El empaquetado pasa de `--onefile` a `--onedir` porque el artefacto crece con los rásteres y el basemap.
-- Las pruebas de interfaz pasan de Qt a Playwright, con el recuento de casos comparado respecto a los 61 anteriores.
+- Las pruebas de interfaz pasan de Qt a Playwright, con el recuento de casos comparado respecto a los 76 anteriores.
 
 `nucleo/` y `analisis/` no cambian de física. Dos piezas sí se tocan, y conviene decirlo aquí en lugar de descubrirlo en la fase 2: `nucleo/resultado.py` se extiende para que el contrato transporte series, unidades, fuentes y estados (`to_dict()` pierde hoy el campo `series`, que es el que necesita la animación), y `app/formulas.py` pasa a entregar la expresión junto con su sustitución y su resultado en lugar de una sola cadena de texto.
 
@@ -66,8 +66,8 @@ Los dos problemas se resuelven juntos porque comparten una pieza: el mapa nuevo 
 Contado sobre el repositorio, no sobre la memoria del plan:
 
 - `interfaz/` son 2.652 líneas, de las cuales **2.304 son presentación en PySide6** (`app.py`, `paneles.py`, `mapa.py`, `graficas.py`, `estilo.py`, `sankey.py`) y **348 son la capa de servicio** (`calculo.py`), que no importa Qt y se reubica en la fase 0.5. Retirar el directorio entero se llevaría el cálculo por delante.
-- `pruebas/` tiene 160 casos en nueve suites. Las dos de interfaz suman 61 y se reescriben sobre Playwright. De las otras siete, **49 casos de tres suites importan ya `interfaz/`** y hay que reencaminarlos; los 50 restantes sí son de física y datos puros. La cifra de «~89 pruebas intocables» con la que el plan justifica su riesgo no sale: son 50 intactas, 49 reencaminadas y 61 reescritas.
-- Dos de esas suites condicionan su ejecución a la presencia de PySide6, así que sin intervención se saltarían en silencio justo cuando la retirada los pone a prueba.
+- `pruebas/` recoge **222 casos en 160 funciones**, en nueve suites. Contados por lo que la migración toca: **76 casos** de presentación (`test_interfaz_bloqueC` 24 y `test_stress_interfaz` 52) se reescriben sobre Playwright; el «61 pruebas» del plan era un recuento de funciones, y son 61 funciones pero 76 casos. De las otras siete suites, **106 casos de tres importan ya `interfaz/`** y hay que reencaminarlos, y solo **40 casos** son de física y datos puros. La cifra de «~89 pruebas intocables» con la que el plan justifica su riesgo no sale por ningún lado.
+- De esos 106 casos, `test_stress_core` (74) fallará ruidosamente al retirar la capa, pero `test_stress_datos` (22) y `test_stress_rendimiento` (10) usan `importorskip("PySide6")` y **se saltarán en silencio**: 32 casos de la verificación de no regresión desaparecen sin que nada lo avise.
 - `nucleo/` no cambia de física; `nucleo/resultado.py` se extiende para el contrato. `app/formulas.py` se extiende para emitir expresión, sustitución y resultado juntos. `analisis/` no se modifica.
 - `datos/` gana subdirectorios, scripts de descarga y un manifiesto con hashes. Hoy no está versionado: `git ls-files -- datos` devuelve 0 archivos, así que el requisito de «archivos versionados dentro de la distribución» empieza de cero y hay que decidir la política para los 62,5 MB de series CSV de marea e IDEAM que ya contiene.
 

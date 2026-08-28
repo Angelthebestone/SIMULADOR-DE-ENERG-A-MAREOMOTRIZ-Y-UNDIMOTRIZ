@@ -11,7 +11,11 @@ Tres hechos del código actual determinan el coste real de esta migración y con
 Y dos correcciones a lo que este documento daba por cierto:
 
 - El acoplamiento a Qt **no** está confinado a `interfaz/` en el sentido de que todo lo que hay en `interfaz/` sea presentación. De sus 2.652 líneas, 348 son `calculo.py`: la cabecera del archivo declara «Aquí no hay Qt» y contiene `Parametros`, `simular()`, `_matriz_potencia`, `serie_oleaje()` y el registro `DISPOSITIVOS`. Es la capa de servicio y hay que reubicarla antes de retirar nada (D12).
-- El recuento de pruebas no es «61 de interfaz y ~89 intactas». Son 160 casos en nueve suites: 61 de interfaz, **49 casos de tres suites que ya importan `interfaz/`** (`test_stress_core`, `test_stress_datos`, `test_stress_rendimiento`) y 50 que sí son independientes. Dos de esas tres condicionan su ejecución a que PySide6 esté instalado, de modo que al retirar la dependencia se saltan en silencio y la casilla de no regresión queda vacía.
+- El recuento de pruebas no es «61 de interfaz y ~89 intactas». Medido con `pytest --collect-only`: **222 casos en 160 funciones, nueve suites**. Repartido por lo que la migración toca de verdad:
+  - **76 casos** en las dos suites de presentación (`test_interfaz_bloqueC` 24, `test_stress_interfaz` 52). Son los 61 que contaba el plan, que eran funciones y no casos.
+  - **106 casos** en tres suites contadas como de física y datos que importan la capa retirada: `test_stress_core` 74, `test_stress_datos` 22, `test_stress_rendimiento` 10.
+  - **40 casos** en cuatro suites que sí son independientes de la presentación.
+- Y de esos 106, el fallo se reparte en dos sabores distintos: `test_stress_core` importa el servicio sin condiciones, así que al retirar la capa **falla ruidosamente**; las otras dos usan `pytest.importorskip("PySide6")`, de modo que sus **32 casos se saltan en silencio** y la casilla de no regresión queda vacía y verde. Corregido: el riesgo no es uno, son dos, y solo uno se ve.
 
 Restricciones que gobiernan todas las decisiones siguientes: arranque sin conexión, entrega ejecutable sin intérprete instalado y sin permisos de administrador, y demostración en vivo sobre proyector.
 
@@ -348,7 +352,7 @@ Y el factor llega a los tres subsistemas por su propio mecanismo: la raíz del d
 
 **Se introduce una cadena de construcción de frontend** → Su salida son archivos estáticos, de modo que el equipo donde se ejecuta el paquete no la necesita. El coste queda confinado al entorno de desarrollo y así se especifica.
 
-**61 pruebas de interfaz se reescriben, y 49 pruebas de física y datos se reencaminan** → Es trabajo real, no evitable, y mayor de lo que el plan admitía. El riesgo no es el coste sino el silencio: dos de las suites reencaminadas se saltan si falta la dependencia retirada, así que la verificación de no regresión quedaría vacía y en verde si no se elimina esa omisión condicional.
+**76 pruebas de interfaz se reescriben, y 106 de física y datos se reencaminan** → Es trabajo real, no evitable, y mayor de lo que el plan admitía. El riesgo no es el coste sino el silencio: dos de las suites reencaminadas se saltan si falta la dependencia retirada, así que 32 de sus casos dejarían de ejecutarse mientras la verificación de no regresión sigue en verde. No se arregla solo si no se elimina esa omisión condicional antes de retirar nada.
 
 **El arbitraje de la discrepancia de Isla Fuerte puede no cerrarla** → El spec exige presentarla, no resolverla. Si el tercer valor no la explica, el resultado sigue siendo válido: tres valores visibles con sus resoluciones son mejor material de discusión que dos.
 

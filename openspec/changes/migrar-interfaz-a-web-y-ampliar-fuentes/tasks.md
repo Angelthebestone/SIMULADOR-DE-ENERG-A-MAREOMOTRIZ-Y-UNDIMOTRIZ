@@ -46,7 +46,7 @@ Cuatro fases secuenciales. La fase 2 no empieza hasta que la 1 tiene los product
 
 ## 6. Cierre de la fase 0
 
-- [ ] 6.1 Ejecutar la suite completa y registrar el recuento real de casos ejecutados, omitidos y fallidos por suite. Las siete suites que no son de interfaz suman 99 casos, de los cuales 49 ya importan la capa que se va a retirar. [arquitectura-y-calidad]
+- [ ] 6.1 Ejecutar la suite completa y registrar el recuento real de casos, omitidos y fallidos por suite. Son 222 casos en 160 funciones; las siete suites que no son de presentación suman 146, de los cuales 106 ya importan la capa que se va a retirar. [arquitectura-y-calidad]
 - [ ] 6.2 Verificar que el grafo de imports de `nucleo/`, `analisis/`, `app/` e `interfaz/` no contiene MHKiT ni wavespectra, con la prueba automatizada que lo comprueba. [validacion-referencia]
 
 ---
@@ -57,11 +57,11 @@ Cuatro fases secuenciales. La fase 2 no empieza hasta que la 1 tiene los product
 
 - [ ] 7.1 Clasificar los nueve módulos de `interfaz/` entre código acoplado a la biblioteca gráfica y código que no lo está, y registrar el resultado aquí. `calculo.py` declara en su propia cabecera que no contiene Qt y aloja `Parametros`, `simular()`, la matriz de potencia, la lectura de series y el registro de dispositivos. [arquitectura-y-calidad]
 - [ ] 7.2 Mover el servicio de cálculo a su capa definitiva sin cambiar ninguna fórmula, y actualizar los importadores. [arquitectura-y-calidad]
-- [ ] 7.3 Reencaminar `test_stress_core.py`, `test_stress_datos.py` y `test_stress_rendimiento.py` al servicio reubicado. Suman 49 casos y hoy dependen de la capa que la fase 2 retira. [arquitectura-y-calidad]
+- [ ] 7.3 Reencaminar `test_stress_core.py`, `test_stress_datos.py` y `test_stress_rendimiento.py` al servicio reubicado. Suman 106 casos y hoy dependen de la capa que la fase 2 retira. [arquitectura-y-calidad]
 - [ ] 7.4 Separar en esas suites lo que prueba cálculo de lo que prueba ventana: hoy alcanzan a `interfaz.paneles`, `interfaz.app`, `interfaz.graficas` e `interfaz.mapa` desde archivos que el plan cuenta como de física y datos. [arquitectura-y-calidad]
-- [ ] 7.5 Eliminar la omisión condicional por dependencia ausente en `pruebas/` y sustituirla por un fallo con motivo legible. Escribir la prueba que recorre las suites y falla si alguna vuelve a condicionar su ejecución a una dependencia instalada. [arquitectura-y-calidad]
+- [ ] 7.5 Eliminar la omisión condicional por dependencia ausente en `pruebas/` y sustituirla por un fallo con motivo legible: hoy `test_stress_datos` y `test_stress_rendimiento` la usan y sus 32 casos se saltarían sin avisar al irse PySide6, mientras los 74 de `test_stress_core` fallan ruidosamente por importar el servicio sin condición. Escribir la prueba que recorre las suites y falla si alguna vuelve a condicionar su ejecución a una dependencia instalada. [arquitectura-y-calidad]
 - [ ] 7.6 Hacer que la prueba de aislamiento del núcleo lea la lista de capas vetadas desde un único punto de declaración, en lugar de buscar cadenas de una tecnología concreta. Verificar que falla al introducir una violación a propósito y que no vale una versión que solo busque el nombre de la biblioteca gráfica actual. [arquitectura-y-calidad]
-- [ ] 7.7 Registrar el recuento base: 50 casos de física y datos independientes, 49 reencaminados, 61 de interfaz pendientes de reescritura. Ese es el número que la fase 2 debe poder justificar. [arquitectura-y-calidad]
+- [ ] 7.7 Registrar el recuento base: 40 casos de física y datos independientes, 106 reencaminados, 76 de presentación pendientes de reescritura. Ese es el número que la fase 2 debe poder justificar. [arquitectura-y-calidad]
 - [ ] 7.8 Verificar que la aplicación completa sigue funcionando tras el movimiento y que la suite ejecuta todos sus casos sin omitir ninguno. [arquitectura-y-calidad]
 
 ---
@@ -236,7 +236,7 @@ Están documentados en `.commandcode/design/review-report.md` contra la capa ant
 - [ ] 24.4 Escribir la prueba que observa el tráfico durante una sesión completa que recorre los cuatro niveles, el mapa y una exportación, y falla si registra alguna petición atribuible a la aplicación. [interfaz-web] [trazabilidad-datos]
 - [ ] 24.5 Escribir la prueba de recorrido por teclado y foco visible. [interfaz-web]
 - [ ] 24.6 Comparar el recuento de casos entre la suite antigua y la nueva, declarar los abandonados y justificarlos. [interfaz-web]
-- [ ] 24.7 Verificar que los 50 casos independientes y los 49 reencaminados ejecutan todos sus casos antes de tocar nada para retirar. [arquitectura-y-calidad]
+- [ ] 24.7 Verificar que los 40 casos independientes y los 106 reencaminados ejecutan todos sus casos antes de tocar nada para retirar. [arquitectura-y-calidad]
 
 ## 25. Empaquetado y verificación en equipo limpio
 
