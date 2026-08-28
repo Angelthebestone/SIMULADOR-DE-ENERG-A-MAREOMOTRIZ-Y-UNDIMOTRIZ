@@ -1,7 +1,5 @@
 import math
 
-import numpy as np
-
 
 def test_dispersion_convergencia():
     from nucleo.olas import numero_onda

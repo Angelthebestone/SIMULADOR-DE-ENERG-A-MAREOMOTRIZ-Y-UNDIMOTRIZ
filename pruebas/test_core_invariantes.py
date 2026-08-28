@@ -80,7 +80,10 @@ def test_7_07_factor_planta_coherente():
     from nucleo.dispositivos.base import ContextoRecurso
 
     r = AbsorbedorPuntual().resolver({"hm0": 2.0, "te": 8.0}, ContextoRecurso())
-    assert abs(r.factor_planta - (r.produccion_anual_mwh * 1e6 / (r.potencia_nominal_w * 8766.0))) < 1e-9
+    assert (
+        abs(r.factor_planta - (r.produccion_anual_mwh * 1e6 / (r.potencia_nominal_w * 8766.0)))
+        < 1e-9
+    )
 
 
 def test_7_08_handbook_999():

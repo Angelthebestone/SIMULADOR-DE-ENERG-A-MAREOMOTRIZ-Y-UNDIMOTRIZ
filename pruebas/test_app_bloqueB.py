@@ -136,7 +136,10 @@ def test_8_13_dato_pendiente_bloquea():
         pass
     with tempfile.TemporaryDirectory() as td:
         p = pathlib.Path(td) / "sitio.json"
-        p.write_text('{"x": {"valor": 1, "unidad": "m", "fuente": "f", "estado": "pendiente"}}', encoding="utf-8")
+        p.write_text(
+            '{"x": {"valor": 1, "unidad": "m", "fuente": "f", "estado": "pendiente"}}',
+            encoding="utf-8",
+        )
         assert "x" in listar_pendientes(str(p))
         try:
             exigir_dato(str(p), "x")
