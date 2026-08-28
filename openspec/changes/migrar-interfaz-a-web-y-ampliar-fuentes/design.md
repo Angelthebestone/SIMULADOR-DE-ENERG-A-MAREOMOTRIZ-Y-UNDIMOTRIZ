@@ -129,7 +129,7 @@ La fase 0 blinda el núcleo con oráculos antes de que empiece a moverse nada a 
 
 *Motivo:* la primera alternativa funciona pero deja el directorio retirado con un nombre dentro que no describe lo que hay, que es exactamente el estado que produjo este error de planificación. La segunda rompe el invariante de un único motor de cálculo. La tercera contradice la D1. Reubicar cuesta una tarea de mover y renombrar; no hacerlo cuesta la aplicación.
 
-Consecuencia sobre el plan: esto abre una fase 0.5 entre los oráculos y la ingesta, porque el oráculo de la matriz de potencia (tarea 3.2) apunta a `interfaz/calculo.py::_matriz_potencia` y no puede anclarse a una ruta que una fase posterior mueve.
+Consecuencia sobre el plan: esto abre una fase 0.5 entre los oráculos y la ingesta, porque el oráculo de la matriz de potencia (tarea 4.2) apunta hoy a `interfaz/calculo.py::_matriz_potencia` y no puede anclarse a una ruta que una fase posterior mueve.
 
 ### D13. El aislamiento de red se impone con política de origen y se verifica por separado
 
