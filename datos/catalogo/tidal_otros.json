@@ -1,0 +1,22 @@
+{
+  "id": "tidal_otros",
+  "familia": "mareomotriz_corriente",
+  "nombre": "Otros diseños de corriente mareal",
+  "principio": "Disenos unicos o sin informacion suficiente para clasificar",
+  "simulable": false,
+  "cp_tipico": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Sin valor tipico - categoria cajon",
+    "estado": "pendiente"
+  },
+  "cp_betz": {
+    "valor": 0.5926,
+    "unidad": "adimensional",
+    "fuente": "Betz aplica flujo libre",
+    "estado": "verificado"
+  },
+  "ejemplos": "Wave Rotor y unicos",
+  "desenlace_comercial": "Categoria EMEC otros",
+  "fuente_taxonomia": "EMEC other"
+}

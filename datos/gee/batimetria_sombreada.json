@@ -1,0 +1,37 @@
+{
+  "id": "batimetria_sombreada",
+  "coleccion": "GEBCO/GEBCO_2023",
+  "descripcion": "Batimetria GEBCO 2023 sombreada, intervalo 15 arcsec (~450 m)",
+  "recorte": {
+    "lon_min": -82.6,
+    "lon_max": -70.8,
+    "lat_min": 0.8,
+    "lat_max": 15.2
+  },
+  "resolucion_m": 450,
+  "rango": "2023",
+  "licencia": "GEBCO Compilation Group (2023), CC BY 4.0",
+  "niveles": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "zoom_max": 8,
+  "fuente": "GEBCO/GEBCO_2023 via Google Earth Engine",
+  "estimacion_plano": {
+    "ancho_m": 1300792,
+    "alto_m": 1591776,
+    "nx_pixeles": 2891,
+    "ny_pixeles": 3537,
+    "megapixeles": 10.2,
+    "mb_rgb8": 29.3,
+    "mosaicos_z10": 168
+  },
+  "procedimiento": "geemap Export.image.toDrive + gdal2tiles piramidacion XYZ 256px; ver descargar_rasteres.py"
+}

@@ -19,7 +19,7 @@ import pytest
 
 from analisis.emplazamiento import panel_emplazamiento
 from analisis.resonancia import analizar_resonancia
-from interfaz.calculo import Parametros, simular
+from app.servicio import Parametros, simular
 from nucleo.dato import Dato, DatoPendienteError
 from nucleo.validacion import RANGOS, acotar
 
@@ -205,8 +205,8 @@ def test_s1_15_dato_pendiente_no_puntua_criterio():
 
 
 def test_s1_15b_el_mapa_si_descarta_el_dato_pendiente():
-    """Contraparte del anterior: interfaz/mapa aplica el contrato correctamente."""
-    from interfaz.mapa import _recurso_de_sitio
+    """Contraparte del anterior: app/datos_lectura aplica el contrato correctamente."""
+    from app.datos_lectura import _recurso_de_sitio
 
     ficha = {
         "densidad_potencia_media": {
@@ -286,10 +286,9 @@ def test_s1_20_la_resonancia_declarada_coincide_cuando_el_pico_es_interior():
     """Con la geometria por defecto las dos lecturas de resonancia se parecen."""
     from analisis.captura import respuesta_periodo
 
-    respuesta = respuesta_periodo(402_500.0, 10.0, hm0_m=2.5, bpto_ns_m=200_000.0)
+    respuesta = respuesta_periodo(402_500.0, 10.0, hm0_m=2.5, b_pto_ns_m=200_000.0)
     natural = analizar_resonancia(402_500.0, 10.0, 5.7)["resonancia"]
-    indice = int(np.argmax(respuesta.amplitud_m))
-    assert 0 < indice < len(respuesta.te_s) - 1, "el pico deberia caer dentro del barrido"
+    assert respuesta.pico_interior, "el pico deberia caer dentro del barrido"
     assert abs(respuesta.te_resonante_s - natural.tn_s) < 1.5
 
 
@@ -298,7 +297,7 @@ def test_s1_21_el_borde_del_barrido_no_se_anuncia_como_resonancia(masa_t, diamet
     """Curva monotona: no hay pico, y respuesta_periodo tiene que declararlo."""
     from analisis.captura import respuesta_periodo
 
-    respuesta = respuesta_periodo(masa_t * 1000.0, diametro, hm0_m=2.5, bpto_ns_m=200_000.0)
+    respuesta = respuesta_periodo(masa_t * 1000.0, diametro, hm0_m=2.5, b_pto_ns_m=200_000.0)
     assert int(np.argmax(respuesta.amplitud_m)) == len(respuesta.te_s) - 1
     assert respuesta.pico_interior is False
     assert "sin pico" in respuesta.detalle

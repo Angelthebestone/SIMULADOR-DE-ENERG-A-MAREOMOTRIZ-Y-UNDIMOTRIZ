@@ -3,6 +3,18 @@
 /.pytest_cache
 /.ruff_cache
 
+# Transcripciones de sesiones de Command Code (volcados .jsonl)
+*.jsonl
+/*-*-*-*-*-*.jsonl
+
+# Scratchpads y outputs efimeros de la sesion
+salidas/
+scratchpad_*.py
+
+# Web frontend: dependencias npm y build output
+web/node_modules/
+web/dist/
+
 # Python bytecode / caches — nunca trackear
 __pycache__/
 *.py[cod]

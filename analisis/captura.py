@@ -43,6 +43,19 @@ class ResultadoBarrido:
 
 
 @dataclass(frozen=True, slots=True)
+class RespuestaPeriodo:
+    """Curva de respuesta en periodo de la boya absorbente."""
+
+    te_s: np.ndarray
+    amplitud_m: np.ndarray
+    potencia_w: np.ndarray
+    omega_natural_rad_s: float
+    te_resonante_s: float
+    pico_interior: bool
+    detalle: str
+
+
+@dataclass(frozen=True, slots=True)
 class CotaFalnes:
     p_abs_w: float
     p_max_w: float
@@ -279,3 +292,85 @@ def barrido_bpto(
         restringido_por_carrera=restringido,
         avisos=avisos,
     )
+
+
+def respuesta_periodo(
+    masa_kg: float,
+    diametro_m: float,
+    hm0_m: float = 1.0,
+    b_pto_ns_m: float = 80_000.0,
+    k_pto_n_m: float = 0.0,
+    te_rango: tuple[float, float] = (3.0, 18.0),
+    n_puntos: int = 60,
+) -> "RespuestaPeriodo":
+    """Curva de respuesta en periodo Te de la boya absorbente.
+
+    Modelo de 1 GDL con rigidez hidrostatica: el pico aparece cerca del
+    periodo natural Tn = 2*pi*sqrt((m + a(omega))/Kh). Se barre en periodos
+    sobre el rango declarado, y se declara si el maximo cae dentro del
+    barrido o en uno de los bordes (caso monotono).
+    """
+    if masa_kg <= 0 or diametro_m <= 0:
+        raise ValueError("masa y diametro deben ser positivos")
+    kh = rigidez_hidrostatica(diametro_m)
+    omega_n = math.sqrt(kh / masa_kg)
+    tn_natural = 2.0 * math.pi / omega_n
+    # El barrido se centra en Tn y se extiende a la mitad del ancho del
+    # rango declarado. Si Tn esta claramente dentro, hay pico interior;
+    # si esta claramente fuera (Tn < te_min o Tn > te_max + un margen),
+    # la curva es monotona en todo el barrido.
+    ancho = te_rango[1] - te_rango[0]
+    margen = ancho / 2.0
+    if tn_natural < te_rango[0] - margen * 0.1 or tn_natural > te_rango[1] + margen * 0.1:
+        # Tn fuera: barrido monotono en el rango pedido
+        te_min, te_max = te_rango
+    else:
+        # Tn dentro: centrar el barrido para capturar el pico
+        te_min = max(te_rango[0], tn_natural - margen)
+        te_max = min(te_rango[1], tn_natural + margen)
+    te_vals = np.linspace(te_min, te_max, n_puntos)
+    amp = np.zeros_like(te_vals)
+    pot = np.zeros_like(te_vals)
+    for i, te in enumerate(te_vals):
+        omega = 2.0 * math.pi / te
+        impedancia = complex(b_pto_ns_m, omega * masa_kg - kh / omega)
+        if abs(impedancia) <= 0:
+            continue
+        amp[i] = (hm0_m / 2.0) / abs(impedancia)
+        pot[i] = 0.5 * b_pto_ns_m * (omega * amp[i]) ** 2
+    indice_pico = int(np.argmax(amp))
+    amp_pico = float(amp[indice_pico])
+    amp_borde_min = float(amp[0])
+    amp_borde_max = float(amp[-1])
+    # El pico se declara interior solo si la amplitud en el maximo es
+    # notablemente mayor que en los extremos del barrido. Sin esa
+    # prominencia, una resonancia debil o un Tn justo en el centro
+    # producen curvas casi planas que se confunden con monotonias.
+    # Factor 1.05 = 5% por encima de la media de los bordes.
+    prominencia = amp_pico / max(0.5 * (amp_borde_min + amp_borde_max), 1e-30)
+    pico_interior = (
+        1 <= indice_pico <= len(te_vals) - 2
+        and prominencia > 1.05
+    )
+    te_resonante = float(te_vals[indice_pico])
+    if pico_interior:
+        detalle = (
+            f"pico interior en Te={te_resonante:.2f}s "
+            f"(Tn natural={tn_natural:.2f}s, omega_n={omega_n:.3f} rad/s, prominencia {prominencia:.2f})"
+        )
+    else:
+        detalle = (
+            f"sin pico interior — amplitud monotona o sin prominencia, "
+            f"maximo en Te={te_resonante:.2f}s, "
+            f"Tn natural={tn_natural:.2f}s"
+        )
+    return RespuestaPeriodo(
+        te_s=te_vals,
+        amplitud_m=amp,
+        potencia_w=pot,
+        omega_natural_rad_s=omega_n,
+        te_resonante_s=te_resonante,
+        pico_interior=pico_interior,
+        detalle=detalle,
+    )
+

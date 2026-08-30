@@ -1,0 +1,67 @@
+{
+  "id": "san_andres",
+  "nombre": "San Andrés",
+  "descripcion": "Archipiélago, Reserva de Biosfera Seaflower - restringido, escenario secundario",
+  "latitud": {
+    "valor": 12.569,
+    "unidad": "grados",
+    "fuente": "Coordenada solicitada ERA5 - datos/oleaje/resumen_oleaje_era5.json",
+    "estado": "verificado"
+  },
+  "longitud": {
+    "valor": -81.701,
+    "unidad": "grados",
+    "fuente": "Coordenada solicitada ERA5",
+    "estado": "verificado"
+  },
+  "estado_legal": "restringido",
+  "area_protegida": "Seaflower (Reserva de Biosfera) + Jhonny Cay - Area Marina Protegida - datos/runap/areas_marinas_protegidas_atributos.json y documentacion/areas_marinas_protegidas.md",
+  "densidad_potencia_media": {
+    "valor": 8.26,
+    "unidad": "kW/m",
+    "fuente": "ERA5-Ocean via Open-Meteo, rejilla 0,5° (12,5N -81,5W ~23 km), 2015-2024, 87672 registros, datos/oleaje/resumen_oleaje_era5.json",
+    "estado": "inferido",
+    "resolucion": "0,5° (~55 km)",
+    "resolucion_km": 55.0,
+    "distancia_celda_km": 23.0
+  },
+  "densidad_potencia_publicada": {
+    "valor": 0.0,
+    "unidad": "kW/m",
+    "fuente": "Tesis Uninorte Evaluacion potencial undimotriz San Andres - texto completo no accesible, resumen indica supera 2 kW/m sin cifra, pendiente verificacion - especificacion 6.2 y documentacion/fuentes_datos_oleaje.md",
+    "estado": "pendiente"
+  },
+  "rango_mareal_medio": {
+    "valor": 0.31,
+    "unidad": "m",
+    "fuente": "IDEAM DHIME Escuela Naval CIOH Cartagena [14019030] como sustituta Caribe 0,31 m, estado Preliminar 900, sin mareografo propio en San Andres",
+    "estado": "inferido"
+  },
+  "regimen_marea": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Mixta semidiurna en San Andres - especificacion e investigacion_convertidores_marinos.md 7.1, cualitativo sin cifra",
+    "estado": "pendiente"
+  },
+  "gradiente_termico": {
+    "valor": 22.0,
+    "unidad": "grados C",
+    "fuente": "Gradiente OTEC San Andres 22-24 C hasta 1000 m a menos de 2,5 km costa - investigacion_convertidores_marinos.md 7.3",
+    "estado": "verificado"
+  },
+  "corriente_maxima_ms": {
+    "valor": 0.28,
+    "unidad": "m/s",
+    "fuente": "Copernicus Marine GLORYS12 1/12° GLOBAL_MULTIYEAR_PHY_001_030, celda 12,58N -81,67W ~4,1 km, mediana 2015-2024, datos/cmems/resumen_corrientes_glorys.json - pendiente reemplazo por serie descargada",
+    "estado": "inferido",
+    "resolucion": "1/12° (~9 km)",
+    "resolucion_km": 9.0,
+    "distancia_celda_km": 4.06
+  },
+  "costo_unitario_zni_cop_kwh": {
+    "valor": 0.0,
+    "unidad": "COP/kWh",
+    "fuente": "Superservicios conjunto 5cvc-m38t San Andres no buscado individualmente por id_empresa, pendiente extraccion",
+    "estado": "pendiente"
+  }
+}

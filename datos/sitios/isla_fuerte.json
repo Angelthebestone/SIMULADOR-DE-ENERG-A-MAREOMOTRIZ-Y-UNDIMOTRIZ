@@ -1,0 +1,182 @@
+{
+  "id": "isla_fuerte",
+  "nombre": "Isla Fuerte",
+  "descripcion": "Emplazamiento por defecto - Bolivar, ZNI, 2000 habitantes, 11 km del continente",
+  "latitud": {
+    "valor": 9.39,
+    "unidad": "grados",
+    "fuente": "Coordenada solicitada ERA5 - documentacion/fuentes_datos_oleaje.md",
+    "estado": "verificado"
+  },
+  "longitud": {
+    "valor": -76.18,
+    "unidad": "grados",
+    "fuente": "Coordenada solicitada ERA5 - documentacion/fuentes_datos_oleaje.md",
+    "estado": "verificado"
+  },
+  "estado_legal": "utilizable",
+  "area_protegida": "ninguna en 5 km - libre (RUNAP 37 areas marinas, 305335 km2 - datos/runap/areas_marinas_protegidas_atributos.json y documentacion/areas_marinas_protegidas.md)",
+  "densidad_potencia_media": {
+    "valor": 8.9,
+    "unidad": "kW/m",
+    "fuente": "Ortega et al. 2013, Renewable Energy 57, 240-248 - Isla Fuerte 8,9 kW/m revisado por pares",
+    "estado": "verificado",
+    "resolucion": "publicacion puntual",
+    "distancia_celda_km": 0.0
+  },
+  "densidad_potencia_era5": {
+    "valor": 1.96,
+    "unidad": "kW/m",
+    "fuente": "ERA5-Ocean via Open-Meteo, rejilla 0,5° (celda 9,5N -76,0W ~23 km), 2015-2024, 87672 registros, datos/oleaje/resumen_oleaje_era5.json",
+    "estado": "inferido",
+    "resolucion": "0,5° (~55 km)",
+    "resolucion_km": 55.0,
+    "distancia_celda_km": 23.0
+  },
+  "densidad_potencia_cmems": {
+    "valor": 2.25,
+    "unidad": "kW/m",
+    "fuente": "Copernicus Marine GLOBAL_ANALYSISFORECAST_WAV_001_027 1/12° (~9 km), celda 9,42N -76,17W ~3,3 km, 2015-2024, datos/cmems/resumen_oleaje_cmems.json - pendiente reemplazo por serie descargada",
+    "estado": "inferido",
+    "resolucion": "1/12° (~9 km)",
+    "resolucion_km": 9.0,
+    "distancia_celda_km": 3.31
+  },
+  "discrepancia_densidad": {
+    "valores_kw_m": [8.9, 1.96, 2.25],
+    "fuentes": ["Ortega et al. 2013 verificado", "ERA5-Ocean 0,5° inferido", "CMEMS 1/12° inferido"],
+    "valor_diseno_kw_m": 8.9,
+    "valor_diseno_fuente": "Ortega et al. 2013 verificado - no desplazado por inferidos",
+    "magnitud_diferencia": "8,9 vs 1,96 factor 4,5x; 8,9 vs 2,25 factor 4,0x; 2,25 vs 1,96 factor 1,15x",
+    "explicaciones_candidatas": [
+      "Resolucion de rejilla: ERA5 0,5° (~55 km, 23 km desplazamiento) suaviza picos costeros; CMEMS 1/12° (~9 km, 3,3 km) mejor pero aun promedia",
+      "Posicion del punto de Ortega: costa expuesta al Caribe abierto vs centroide de celda en golfo de Morrosquillo mas resguardado",
+      "Modelo WAM vs observacion: periodo y altura modelados, no medidos in situ"
+    ],
+    "estado_arbitraje": "abierta - CMEMS 1/12° no cierra la discrepancia; tercer valor 2,25 kW/m sigue 4x por debajo del verificado",
+    "conclusion": "Presentar los tres valores juntos con fuente/resolucion/distancia; no promediar ni ocultar"
+  },
+  "energia_anual_lineal": {
+    "valor": 78.0,
+    "unidad": "MWh/m",
+    "fuente": "Ortega et al. 2013 - 78 MWh/m al ano, derivado de 8,9 kW/m * 8766 h",
+    "estado": "verificado"
+  },
+  "hm0_media_era5": {
+    "valor": 0.756,
+    "unidad": "m",
+    "fuente": "ERA5-Ocean via Open-Meteo, Isla Fuerte, media 2015-2024, datos/oleaje/resumen_oleaje_era5.json",
+    "estado": "inferido"
+  },
+  "te_media_era5": {
+    "valor": 5.39,
+    "unidad": "s",
+    "fuente": "ERA5-Ocean via Open-Meteo, Isla Fuerte, Te = m-1/m0 (Tm-1 documentacion ECMWF), datos/oleaje/resumen_oleaje_era5.json",
+    "estado": "inferido"
+  },
+  "rango_mareal_medio": {
+    "valor": 0.31,
+    "unidad": "m",
+    "fuente": "IDEAM DHIME Escuela Naval CIOH Cartagena [14019030], 2016-01-01 a 2024-08-01, 2003 dias, nivel max-min diario, datos/ideam/dhime_escuela_naval_cioh_nivel_max_min_diario_2016-2024.csv, nivel aprobacion Preliminar (900), documentacion/fuentes_datos_ideam.md",
+    "estado": "verificado"
+  },
+  "rango_mareal_p95": {
+    "valor": 0.44,
+    "unidad": "m",
+    "fuente": "IDEAM DHIME Escuela Naval CIOH, percentil 95, mismo origen",
+    "estado": "verificado"
+  },
+  "rango_mareal_maximo": {
+    "valor": 0.81,
+    "unidad": "m",
+    "fuente": "IDEAM DHIME Escuela Naval CIOH, maximo observado",
+    "estado": "verificado"
+  },
+  "profundidad_30m_km_nw": {
+    "valor": 5.41,
+    "unidad": "km",
+    "fuente": "GMRT Lamont-Doherty, transecto radial Isla Fuerte, datos/batimetria/resumen_batimetria_isla_fuerte.json y transecto_isla_fuerte_gmrt.csv, documentacion/fuentes_datos_oleaje.md",
+    "estado": "verificado"
+  },
+  "profundidad_60m_km_nw": {
+    "valor": 10.0,
+    "unidad": "km",
+    "fuente": "GMRT, mismo transecto, rumbo NW 10 km a 60 m",
+    "estado": "verificado"
+  },
+  "profundidad_30m_rango_km": {
+    "valor": 3.0,
+    "unidad": "km",
+    "fuente": "GMRT - minima distancia a 30 m en 11 rumbos es 3,0 km (NNE), maxima 17,5 km (NE)",
+    "estado": "verificado"
+  },
+  "profundidad_60m_rango_km": {
+    "valor": 24.25,
+    "unidad": "km",
+    "fuente": "GMRT - distancia a 60 m entre 10 y 24,25 km segun rumbo, sin cruzar a S/E/SE",
+    "estado": "verificado"
+  },
+  "distancia_continente_km": {
+    "valor": 11.0,
+    "unidad": "km",
+    "fuente": "Especificacion simulador energia marina, seccion 6 - Isla Fuerte a 11 km del continente",
+    "estado": "verificado"
+  },
+  "poblacion": {
+    "valor": 2000.0,
+    "unidad": "habitantes",
+    "fuente": "Especificacion, Isla Fuerte ~2000 habitantes, ZNI",
+    "estado": "verificado"
+  },
+  "corriente_maxima_ms": {
+    "valor": 0.31,
+    "unidad": "m/s",
+    "fuente": "Copernicus Marine GLORYS12 1/12° GLOBAL_MULTIYEAR_PHY_001_030, celda 9,42N -76,17W ~3,3 km, mediana 2015-2024, datos/cmems/resumen_corrientes_glorys.json - pendiente reemplazo por serie descargada",
+    "estado": "inferido",
+    "resolucion": "1/12° (~9 km)",
+    "resolucion_km": 9.0,
+    "distancia_celda_km": 3.31
+  },
+  "costo_unitario_zni_cop_kwh": {
+    "valor": 1000.5,
+    "unidad": "COP/kWh",
+    "fuente": "Superservicios SOLING DEL SINU S.A.S. E.S.P., conjunto 5cvc-m38t, enero-junio 2023, promedio 6 meses 979,5-1012,7, datos/zni/costo_unitario_zni_soling_isla_fuerte_2023.csv, documentacion/fuentes_datos_economicos.md",
+    "estado": "verificado"
+  },
+  "costo_sin_promedio_cop_kwh": {
+    "valor": 686.0,
+    "unidad": "COP/kWh",
+    "fuente": "Superservicios conjunto td8k-vhq9, SIN 2023, promedio 686,0 (variante 628,0-658,6 segun filtro 9999/99), datos/zni/costo_unitario_sin_nacional_2023.csv, documentacion/fuentes_datos_economicos.md",
+    "estado": "verificado"
+  },
+  "costo_sin_rango_min_cop_kwh": {
+    "valor": 628.0,
+    "unidad": "COP/kWh",
+    "fuente": "Superservicios td8k-vhq9, todos los registros SIN 2023, media con rellenos 9999/99",
+    "estado": "inferido"
+  },
+  "costo_sin_rango_max_cop_kwh": {
+    "valor": 658.6,
+    "unidad": "COP/kWh",
+    "fuente": "Superservicios td8k-vhq9, solo ano 2023 declarado (1222 registros)",
+    "estado": "inferido"
+  },
+  "demanda_mensual_max_kwh_mes": {
+    "valor": 73290.0,
+    "unidad": "kWh/mes",
+    "fuente": "Superservicios conjunto 3ebi-d83g, Isla Fuerte septiembre 2023, datos/zni/demanda_isla_fuerte_2020-2025.csv",
+    "estado": "verificado"
+  },
+  "precio_bolsa_xm_cop_kwh": {
+    "valor": 0.0,
+    "unidad": "COP/kWh",
+    "fuente": "XM API_XM EquipoAnaliticaXM pydataxm MIT https://github.com/EquipoAnaliticaXM/API_XM, metrica PrecBolsNaci horaria 2023 8760 filas, datos/xm/resumen_xm.json, pendiente - requiere calculo de promedio horario no incorporado",
+    "estado": "pendiente"
+  },
+  "consumo_residencial_medio_kwh_mes": {
+    "valor": 0.0,
+    "unidad": "kWh/mes",
+    "fuente": "Superservicios comercial_residencial_isla_fuerte_2022.csv - promedio consumo_basico facturas 2022 requiere calculo, no verificado como cifra unica",
+    "estado": "pendiente"
+  }
+}

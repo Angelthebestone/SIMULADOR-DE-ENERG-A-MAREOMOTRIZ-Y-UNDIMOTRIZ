@@ -1,0 +1,15 @@
+{
+  "id": "pelamis_p2",
+  "nombre": "Pelamis P2",
+  "tipo": "Atenuador",
+  "potencia_nominal_kw": 750.0,
+  "dimensiones": "180 m largo, 4 m diametro, 1350 t, 5 secciones",
+  "pto": "Cilindros hidraulicos + acumuladores + motores hidraulicos + generadores",
+  "origen": "investigacion_convertidores_marinos.md 3.1 y especificacion 5 - PRIMRE https://openei.org/wiki/PRIMRE/Databases/Projects_Database/Devices/Pelamis_P2",
+  "año_fin": 2014,
+  "estado": "Inactivo desde 2014",
+  "causa": "Economica - coste por MWh incompatible con mercado, agotamiento capital riesgo. Entro en administracion noviembre 2014, activos a Wave Energy Scotland. No fallo por fisica imposible.",
+  "origen_causa": "En.wikipedia Pelamis Wave Power",
+  "coste_hundido": "Propiedad intelectual y activos transferidos a Wave Energy Scotland - coste varado publico escoces, sin cifra 27M especifica (Annapolis es el caso 27M CAD regulador)",
+  "destino_coste": "Asumido por sector publico escoces via Wave Energy Scotland"
+}

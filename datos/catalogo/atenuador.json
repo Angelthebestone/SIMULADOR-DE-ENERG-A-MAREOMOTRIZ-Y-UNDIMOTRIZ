@@ -1,0 +1,36 @@
+{
+  "id": "atenuador",
+  "familia": "undimotriz",
+  "nombre": "Atenuador",
+  "principio": "Flotante paralelo al oleaje, cabalga olas; captura por movimiento relativo entre secciones",
+  "simulable": false,
+  "cwr_media_handbook": {
+    "valor": 0.06,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 1 - atenuador no listado directo, Babarit 2015 atenuador 5-7% (ancho 150 m)",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_min": {
+    "valor": 0.05,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 Renew. Energy, via Coastal Wiki - atenuador 5-7% B~150 m",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_max": {
+    "valor": 0.07,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 max atenuador 7%",
+    "estado": "verificado"
+  },
+  "cwr_handbook_vs_babarit": "Peor CWR de las familias (5-7%) pero mayor recorrido comercial - Pelamis llego mas lejos que nadie con peor eficiencia. Discrepancia mostrada, no promediada.",
+  "eficiencia_cadena": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Sin cadena unica - PTO hidraulico 0,65 Handbook cap 1 tabla 4, pendiente cadena especifica",
+    "estado": "pendiente"
+  },
+  "ejemplos": "Pelamis P1/P2 (750 kW, 180 m, 1350 t)",
+  "desenlace_comercial": "Pelamis Wave Power administracion noviembre 2014, activos a Wave Energy Scotland - pese a peor CWR, mayor despliegue comercial undimotriz. Fuente: investigacion_convertidores_marinos.md 3.1",
+  "fuente_taxonomia": "EMEC https://www.emec.org.uk/marine-energy/wave-devices/ - atenuador",
+  "nota": "Leccion: eficiencia hidrodinamica no decide, decide coste por MWh"
+}

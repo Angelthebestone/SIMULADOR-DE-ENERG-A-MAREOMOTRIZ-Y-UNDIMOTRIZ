@@ -1,0 +1,226 @@
+// AnimacionCanvas — transfiere series UNA vez por simulación, muestreo sin recalcular física.
+// D4/Movimiento: superficie eta(x,t) = (Hm0/2)*cos(k*x - omega*t), omega=2*pi/Te, k de nucleo.olas.numero_onda
+// PROFUNDIDAD_M = 30 usada para k y lambda = 2*pi/k. Amplitud boya disminuye si Bpto aumenta (m*z''+b*z'+k*z = F).
+// lambda = 2 * Math.PI / k  — 2*Math.PI/k
+
+export const PROFUNDIDAD_M = 30;
+
+type Series = { t_s: number[]; z_m: number[] };
+
+export class AnimacionCanvas {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  series: { t_s: number[]; z_m: number[] } | null = null;
+  k: number = 0; // de nucleo.olas.numero_onda
+  Hm0: number = 1.5; // m
+  Te: number = 7.0; // s
+  Bpto: number = 80_000; // Ns/m
+  lambda: number = 0; // 2*pi/k
+  pausado: boolean = false;
+  private rafId: number | null = null;
+  private t0: number | null = null;
+  private dispositivo = "desconocido";
+  private profundidad: number = PROFUNDIDAD_M;
+  private sinSerieMsg = "";
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2D no disponible");
+    this.ctx = ctx;
+    // respeta prefers-reduced-motion
+    if (typeof window !== "undefined" && window.matchMedia) {
+      const m = window.matchMedia("(prefers-reduced-motion: reduce)");
+      if (m.matches) this.pausado = true;
+      // escuchar cambios
+      m.addEventListener?.("change", (e) => {
+        if (e.matches) this.pausar();
+      });
+    }
+    this.ajustarDPR();
+  }
+
+  private ajustarDPR() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width === 0) return;
+    this.canvas.width = rect.width * dpr;
+    this.canvas.height = rect.height * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Contrato: una transferencia por simulación. No llamar por fotograma.
+  cargarSimulacion(payload: {
+    series: { t_s: number[]; z_m: number[] } | null;
+    k: number;
+    Hm0: number;
+    Te: number;
+    Bpto: number;
+    dispositivo: string;
+    profundidad_m?: number;
+  }) {
+    this.Hm0 = payload.Hm0;
+    this.Te = payload.Te;
+    this.Bpto = payload.Bpto;
+    this.k = payload.k;
+    this.lambda = this.k > 0 ? 2 * Math.PI / this.k : 0;
+    this.dispositivo = payload.dispositivo || "desconocido";
+    this.profundidad = payload.profundidad_m ?? PROFUNDIDAD_M;
+
+    if (!payload.series || !payload.series.t_s || !payload.series.z_m) {
+      this.series = null;
+      this.sinSerieMsg = `sin serie de posición — dispositivo ${this.dispositivo}`;
+      return;
+    }
+    // declarar ausencia sin sintetizar: si z_m es null/undefined -> mensaje, sin serie sintética
+    const hasT = Array.isArray(payload.series.t_s) && payload.series.t_s.length > 0;
+    const hasZ = Array.isArray(payload.series.z_m) && payload.series.z_m.length > 0;
+    if (!hasT || !hasZ) {
+      this.series = null;
+      this.sinSerieMsg = `sin serie de posición — dispositivo ${this.dispositivo}`;
+      return;
+    }
+    this.series = { t_s: [...payload.series.t_s], z_m: [...payload.series.z_m] };
+    this.sinSerieMsg = "";
+    this.t0 = null;
+  }
+
+  // Muestrea serie ya calculada — no recalcula física por fotograma, solo interpola.
+  private muestrearSerie(t: number): number | null {
+    if (!this.series) return null;
+    const { t_s, z_m } = this.series;
+    // envolver tiempo de animación sobre duración de serie
+    const tDur = t_s[t_s.length - 1] - t_s[0];
+    if (tDur <= 0) return z_m[0];
+    const tLoop = t_s[0] + (t % tDur);
+    // búsqueda lineal binaria simple
+    let lo = 0,
+      hi = t_s.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (tLoop < t_s[mid]) hi = mid;
+      else lo = mid;
+    }
+    const t0 = t_s[lo],
+      t1 = t_s[hi],
+      z0 = z_m[lo],
+      z1 = z_m[hi];
+    if (t1 === t0) return z0;
+    return z0 + ((z1 - z0) * (tLoop - t0)) / (t1 - t0);
+  }
+
+  private token(nombre: string, fallback: string): string {
+    try {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(nombre).trim();
+      return v || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  // Dibuja un instante t (segundos de animación). No comunica con núcleo.
+  dibujar(t: number) {
+    const w = this.canvas.getBoundingClientRect().width;
+    const h = this.canvas.getBoundingClientRect().height;
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, w, h);
+
+    // si no hay serie -> declarar ausencia, sin sintetizar
+    if (!this.series) {
+      ctx.fillStyle = this.token("--tenue", "oklch(0.495 0.017 245)");
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(this.sinSerieMsg || `sin serie de posición — dispositivo ${this.dispositivo}`, w / 2, h / 2);
+      return;
+    }
+
+    const omega = 2 * Math.PI / this.Te; // omega=2*pi/Te
+    const k = this.k;
+    const Hm0 = this.Hm0;
+    // Amplitud boyas implícita en serie: coherente con m*z''+b*z'+k*z = F => a mayor Bpto menor amplitud
+    const boyaZ = this.muestrearSerie(t);
+    // Dominio espacial: 2 lambda para ver cambio con profundidad
+    const dominioM = this.lambda > 0 ? 2 * this.lambda : 120;
+    const nivel = h * 0.52;
+
+    // eta(x,t) = (Hm0/2)*cos(k*x - omega*t)
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const x = (px / w) * dominioM;
+      const eta = (Hm0 / 2) * Math.cos(k * x - omega * t);
+      const y = nivel - eta * (h * 0.18); // escala visual arbitraria, no física nueva
+      if (px === 0) ctx.moveTo(px, y);
+      else ctx.lineTo(px, y);
+    }
+    ctx.strokeStyle = this.token("--rol-recurso", "oklch(0.532 0.131 244)");
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // relleno bajo ola
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fillStyle = "oklch(0.532 0.131 244 / 0.12)";
+    ctx.fill();
+
+    // boyA: posición sale de serie integrada (muestreo), no de eta
+    if (boyaZ !== null) {
+      const xBoya = this.lambda > 0 ? Math.min(this.lambda, dominioM * 0.5) : dominioM * 0.3;
+      const pxBoya = (xBoya / dominioM) * w;
+      // dibujar boya en su z muestreadA
+      const yBoya = nivel - boyaZ * (h * 0.18);
+      ctx.beginPath();
+      ctx.arc(pxBoya, yBoya, 9, 0, Math.PI * 2);
+      ctx.fillStyle = this.token("--conf-inferido", "oklch(0.638 0.138 070)");
+      ctx.fill();
+      ctx.strokeStyle = "oklch(0.4 0.08 070)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // línea vertical guía
+      ctx.beginPath();
+      ctx.moveTo(pxBoya, yBoya);
+      ctx.lineTo(pxBoya, nivel);
+      ctx.strokeStyle = "oklch(0.638 0.138 070 / 0.35)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // rótulo lambda
+    ctx.fillStyle = this.token("--tenue", "oklch(0.495 0.017 245)");
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    const lambdaTxt = this.lambda ? `λ = 2·π/k = ${this.lambda.toFixed(0)} m` : "";
+    ctx.fillText(lambdaTxt, 8, h - 8);
+  }
+
+  iniciar() {
+    if (this.pausado) return;
+    const loop = (now: number) => {
+      if (this.pausado) return;
+      if (this.t0 === null) this.t0 = now;
+      const t = (now - this.t0) / 1000;
+      this.dibujar(t);
+      this.rafId = requestAnimationFrame(loop);
+    };
+    this.rafId = requestAnimationFrame(loop);
+  }
+
+  pausar() {
+    this.pausado = true;
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  reanudar() {
+    // respeta prefers-reduced-motion al reanudar
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    this.pausado = false;
+    this.t0 = null;
+    this.iniciar();
+  }
+
+  detener() {
+    this.pausar();
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "relieve_sombreado",
+  "coleccion": "COPERNICUS/DEM/GLO30",
+  "descripcion": "Copernicus DEM GLO-30 hillshade, 30 m",
+  "recorte": {
+    "lon_min": -82.6,
+    "lon_max": -70.8,
+    "lat_min": 0.8,
+    "lat_max": 15.2
+  },
+  "resolucion_m": 30,
+  "rango": "2021",
+  "licencia": "ESA Copernicus DEM, CC BY 4.0",
+  "niveles": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "zoom_max": 9,
+  "fuente": "COPERNICUS/DEM/GLO30 via Google Earth Engine",
+  "estimacion_plano": {
+    "ancho_m": 1300792,
+    "alto_m": 1591776,
+    "nx_pixeles": 43360,
+    "ny_pixeles": 53059,
+    "megapixeles": 2300.6,
+    "mb_rgb8": 6582.2,
+    "mosaicos_z10": 35360
+  },
+  "procedimiento": "geemap Export.image.toDrive + gdal2tiles piramidacion XYZ 256px; ver descargar_rasteres.py"
+}

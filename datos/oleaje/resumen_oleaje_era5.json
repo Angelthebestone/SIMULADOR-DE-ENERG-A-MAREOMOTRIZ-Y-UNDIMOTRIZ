@@ -1,0 +1,35 @@
+{
+  "isla_fuerte": {
+    "nombre": "Isla Fuerte",
+    "lat_solicitada": 9.39,
+    "lon_solicitada": -76.18,
+    "lat_rejilla": 9.5,
+    "lon_rejilla": -76.0,
+    "registros": 87672,
+    "hs_media_m": 0.756,
+    "te_media_s": 5.39,
+    "densidad_potencia_media_kw_m": 1.959
+  },
+  "san_andres": {
+    "nombre": "San Andrés",
+    "lat_solicitada": 12.569,
+    "lon_solicitada": -81.701,
+    "lat_rejilla": 12.5,
+    "lon_rejilla": -81.5,
+    "registros": 87672,
+    "hs_media_m": 1.461,
+    "te_media_s": 6.421,
+    "densidad_potencia_media_kw_m": 8.258
+  },
+  "tumaco": {
+    "nombre": "Tumaco",
+    "lat_solicitada": 1.903,
+    "lon_solicitada": -78.912,
+    "lat_rejilla": 2.0,
+    "lon_rejilla": -79.0,
+    "registros": 87672,
+    "hs_media_m": 0.931,
+    "te_media_s": 7.663,
+    "densidad_potencia_media_kw_m": 3.368
+  }
+}

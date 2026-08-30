@@ -1,0 +1,22 @@
+{
+  "id": "tidal_tornillo",
+  "familia": "mareomotriz_corriente",
+  "nombre": "Tornillo de Arquímedes",
+  "principio": "Helicoide sacacorchos extrae potencia al pasar agua por espiral",
+  "simulable": false,
+  "cp_tipico": {
+    "valor": 0.35,
+    "unidad": "adimensional",
+    "fuente": "Cp estimado helicoidal por debajo axial - sin dato publicado especifico",
+    "estado": "pendiente"
+  },
+  "cp_betz": {
+    "valor": 0.5926,
+    "unidad": "adimensional",
+    "fuente": "Betz flujo libre",
+    "estado": "verificado"
+  },
+  "ejemplos": "Flumill",
+  "desenlace_comercial": "Sin despliegue comercial relevante",
+  "fuente_taxonomia": "EMEC Archimedes screw"
+}

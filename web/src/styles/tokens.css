@@ -1,0 +1,53 @@
+:root {
+  --lienzo: oklch(0.96 0.004 106);
+  --panel: oklch(0.988 0.003 106);
+  --tinta: oklch(0.238 0.017 238);
+  --tenue: oklch(0.495 0.017 245);
+  --borde: oklch(0.781 0.008 107);
+  --borde-suave: oklch(0.9 0.008 235);
+  --foco: oklch(0.532 0.131 244);
+  --acento-suave: oklch(0.96 0.02 235);
+  --fondo: oklch(0.960 0.004 106);
+  --escala: 1;
+
+  /* Tipografía — pila del sistema, sin CDN (Segoe UI Variable / Segoe UI / system-ui) */
+  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+
+  /* Escala tipográfica: pasos distinguibles */
+  --text-meta: 12px;
+  --text-cuerpo: 15px;
+  --text-seccion: 20px;
+  --text-nivel: 27px;
+  --text-cifra: 36px;
+
+  /* Espaciado base 4 px — ritmo 1·4·9: --s-1:4px, --s-4:16px, --s-9:36px, --s-13:52px */
+  --s-1: 4px;
+  --s-4: 16px;
+  --s-9: 36px;
+  --s-13: 52px;
+
+  /* Tokens para el mapa: la paleta de relleno del fondo y de la tierra sale
+     de aquí, no de literales en mapa.ts. Los valores se declaran en oklch
+     para que el mapa lea el mismo vocabulario que el resto de la interfaz. */
+  --map-bg: oklch(0.945 0.003 106);
+  --map-tierra-fill: oklch(0.910 0.005 106);
+  --map-tierra-stroke: oklch(0.470 0.012 245);
+  --map-stroke-tinta: oklch(0.245 0.020 238);
+  --map-fallback: oklch(0.500 0.005 106);
+}
+
+[data-sustentacion] {
+  --escala: 2.1;
+}
+
+/* Aplicación base — cifras tabulares y sin altura fija en contenedores de texto */
+html {
+  font-family: var(--font-sans);
+  font-size: var(--text-cuerpo);
+  color: var(--tinta);
+  background: var(--lienzo);
+}
+
+* {
+  font-variant-numeric: tabular-nums;
+}

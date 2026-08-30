@@ -51,9 +51,14 @@ AVISO_EXTRAPOLACION = (
 )
 
 
-def _aviso(geometria: GeometriaReferencia) -> str:
-    d = geometria.diametro_m
-    return AVISO_EXTRAPOLACION.format(geom=geometria.descripcion, dmin=d * 0.5, dmax=d * 2.0)
+def _aviso(geometria: GeometriaReferencia, d_ref: float = GEOMETRIA_CILINDRO_10M.diametro_m) -> str:
+    """El aviso cita SIEMPRE el rango de la geometria de referencia, no del D particular.
+
+    Asi, cuando el lector ve "fuera de diametro 5-20 m" sabe a que se refiere
+    el rango, no se confunde con un intervalo construido a la medida del
+    diametro evaluado.
+    """
+    return AVISO_EXTRAPOLACION.format(geom=geometria.descripcion, dmin=d_ref * 0.5, dmax=d_ref * 2.0)
 
 
 def _masa_anadida_cilindro(omega: np.ndarray, geometria: GeometriaReferencia) -> np.ndarray:

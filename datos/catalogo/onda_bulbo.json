@@ -1,0 +1,29 @@
+{
+  "id": "onda_bulbo",
+  "familia": "undimotriz",
+  "nombre": "Onda de bulbo (bulge wave)",
+  "principio": "Tubo caucho lleno agua amarrado fondo hacia oleaje, bulbo crece y acciona turbina baja carga proa",
+  "simulable": false,
+  "cwr_media_handbook": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Sin CWR tabulada - TRL bajo, sin base datos Babarit especifica",
+    "estado": "pendiente"
+  },
+  "cwr_rango_babarit_min": {
+    "valor": 0.05,
+    "unidad": "adimensional",
+    "fuente": "Sin rango Babarit directo, estimado bajo 5% por TRL - pendiente medicion",
+    "estado": "pendiente"
+  },
+  "cwr_rango_babarit_max": {
+    "valor": 0.1,
+    "unidad": "adimensional",
+    "fuente": "Sin rango, estimado <10%",
+    "estado": "pendiente"
+  },
+  "cwr_handbook_vs_babarit": "Sin datos contrastables - TRL bajo. Ventaja sin metal movil, tolerante extremos, desventaja durabilidad elastomero fatiga.",
+  "ejemplos": "Anaconda Checkmate SeaEnergy",
+  "desenlace_comercial": "Ningun desarrollo comercial en operacion - investigacion",
+  "fuente_taxonomia": "EMEC bulge wave"
+}

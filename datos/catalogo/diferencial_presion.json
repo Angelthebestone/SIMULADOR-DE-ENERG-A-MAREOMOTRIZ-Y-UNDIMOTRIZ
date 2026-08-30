@@ -1,0 +1,29 @@
+{
+  "id": "diferencial_presion",
+  "familia": "undimotriz",
+  "nombre": "Diferencial de presión sumergido",
+  "principio": "Cerca costa anclado fondo, ola sube/baja nivel sobre dispositivo induce presion alternante que bombea fluido",
+  "simulable": false,
+  "cwr_media_handbook": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Sin CWR especifica tabulada Handbook - rango subsumido en flotante cabeceo 20-36% como referencia",
+    "estado": "pendiente"
+  },
+  "cwr_rango_babarit_min": {
+    "valor": 0.2,
+    "unidad": "adimensional",
+    "fuente": "Asimilado a flotante en cabeceo Babarit 20-36% B~25 m - referencia aproximada, no medida directa diferencial presion",
+    "estado": "inferido"
+  },
+  "cwr_rango_babarit_max": {
+    "valor": 0.36,
+    "unidad": "adimensional",
+    "fuente": "Babarit flotante cabeceo max 36%",
+    "estado": "inferido"
+  },
+  "cwr_handbook_vs_babarit": "Sin dato directo Handbook vs rango aproximado Babarit cabeza 20-36%. Ventaja protegido temporal, desventaja mantenimiento sellos y atenuacion presion con profundidad.",
+  "ejemplos": "Archimedes Wave Swing AWS, CETO sumergido",
+  "desenlace_comercial": "Sin desarrollo comercial sostenido; acceso mantenimiento caro, fatiga elastomero/sellos",
+  "fuente_taxonomia": "EMEC submerged pressure differential"
+}

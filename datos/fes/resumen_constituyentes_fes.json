@@ -1,0 +1,114 @@
+{
+  "isla_fuerte": {
+    "nombre": "Isla Fuerte",
+    "lat": 9.39,
+    "lon": -76.18,
+    "fuente": "FES2014/FES2022 AVISO/CNES atlas global de constituyentes de marea",
+    "constituyentes": [
+      "M2",
+      "S2",
+      "N2",
+      "K1",
+      "O1",
+      "P1",
+      "Q1",
+      "M4",
+      "MS4",
+      "MN4"
+    ],
+    "amplitudes_m": null,
+    "rango_estimado_m": null,
+    "nota": "Rango estimado 2*(M2+S2) ponderado; validar contra serie medida IOC/IDEAM",
+    "archivo": null
+  },
+  "san_andres": {
+    "nombre": "San Andrés",
+    "lat": 12.569,
+    "lon": -81.701,
+    "fuente": "FES2014/FES2022 AVISO/CNES atlas global de constituyentes de marea",
+    "constituyentes": [
+      "M2",
+      "S2",
+      "N2",
+      "K1",
+      "O1",
+      "P1",
+      "Q1",
+      "M4",
+      "MS4",
+      "MN4"
+    ],
+    "amplitudes_m": null,
+    "rango_estimado_m": null,
+    "nota": "Rango estimado 2*(M2+S2) ponderado; validar contra serie medida IOC/IDEAM",
+    "archivo": null
+  },
+  "tumaco": {
+    "nombre": "Tumaco",
+    "lat": 1.903,
+    "lon": -78.912,
+    "fuente": "FES2014/FES2022 AVISO/CNES atlas global de constituyentes de marea",
+    "constituyentes": [
+      "M2",
+      "S2",
+      "N2",
+      "K1",
+      "O1",
+      "P1",
+      "Q1",
+      "M4",
+      "MS4",
+      "MN4"
+    ],
+    "amplitudes_m": null,
+    "rango_estimado_m": null,
+    "nota": "Rango estimado 2*(M2+S2) ponderado; validar contra serie medida IOC/IDEAM",
+    "archivo": null
+  },
+  "islas_rosario": {
+    "nombre": "Islas del Rosario",
+    "lat": 10.235,
+    "lon": -75.741,
+    "fuente": "FES2014/FES2022 AVISO/CNES atlas global de constituyentes de marea",
+    "constituyentes": [
+      "M2",
+      "S2",
+      "N2",
+      "K1",
+      "O1",
+      "P1",
+      "Q1",
+      "M4",
+      "MS4",
+      "MN4"
+    ],
+    "amplitudes_m": null,
+    "rango_estimado_m": null,
+    "nota": "Rango estimado 2*(M2+S2) ponderado; validar contra serie medida IOC/IDEAM",
+    "archivo": null
+  },
+  "bahia_malaga": {
+    "nombre": "Bahía Málaga",
+    "lat": 3.925,
+    "lon": -77.349,
+    "fuente": "FES2014/FES2022 AVISO/CNES atlas global de constituyentes de marea",
+    "constituyentes": [
+      "M2",
+      "S2",
+      "N2",
+      "K1",
+      "O1",
+      "P1",
+      "Q1",
+      "M4",
+      "MS4",
+      "MN4"
+    ],
+    "amplitudes_m": null,
+    "rango_estimado_m": null,
+    "nota": "Rango estimado 2*(M2+S2) ponderado; validar contra serie medida IOC/IDEAM",
+    "archivo": null
+  },
+  "_nota_corriente": "Los constituyentes de corriente de marea de FES no estan publicados como producto independiente; FES distribuye elevacion (amplitud/fase). Velocidades de corriente mareal requieren modelo hidrodinamico regional.",
+  "_fuente": "FES2014/FES2022 AVISO/CNES atlas global de constituyentes de marea"
+}

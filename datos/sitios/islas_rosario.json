@@ -1,0 +1,58 @@
+{
+  "id": "islas_rosario",
+  "nombre": "Islas del Rosario",
+  "descripcion": "Cartagena, Caribe - descartado por Parque Nacional Natural Corales del Rosario y San Bernardo",
+  "latitud": {
+    "valor": 10.235,
+    "unidad": "grados",
+    "fuente": "Isla Tesoro INVEMAR [0014017001] 10,235N -75,741W Islas del Rosario - datos/ideam/nivel_mar_islatesoro_10min_2012-2020.csv",
+    "estado": "verificado"
+  },
+  "longitud": {
+    "valor": -75.741,
+    "unidad": "grados",
+    "fuente": "IDEAM INVEMAR Isla Tesoro",
+    "estado": "verificado"
+  },
+  "estado_legal": "descartado",
+  "area_protegida": "Corales del Rosario y de San Bernardo - Parque Nacional Natural - datos/runap/areas_marinas_protegidas_atributos.json",
+  "rango_mareal_medio": {
+    "valor": 0.23,
+    "unidad": "m",
+    "fuente": "IDEAM API abierta Isla Tesoro INVEMAR 59 dias ene-feb 2019, 0,23 m medio 0,31 m max - documentacion/fuentes_datos_ideam.md",
+    "estado": "verificado"
+  },
+  "rango_mareal_caribe_ref": {
+    "valor": 0.31,
+    "unidad": "m",
+    "fuente": "IDEAM DHIME Escuela Naval CIOH Cartagena 2003 dias 0,31 m medio Preliminar 900 - serie mas larga Caribe",
+    "estado": "verificado"
+  },
+  "regimen_marea": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Mixta predominantemente diurna Cartagena/Islas del Rosario - investigacion 7.1, cualitativo",
+    "estado": "pendiente"
+  },
+  "densidad_potencia_media": {
+    "valor": 0.0,
+    "unidad": "kW/m",
+    "fuente": "Sin dato en kW/m publicado especifico Islas del Rosario - especificacion 13.2 cerrado por via legal (PNN), pendiente dato honesto si se calcula ejercicio teorico",
+    "estado": "pendiente"
+  },
+  "corriente_maxima_ms": {
+    "valor": 0.22,
+    "unidad": "m/s",
+    "fuente": "Copernicus Marine GLORYS12 1/12° GLOBAL_MULTIYEAR_PHY_001_030, celda 10,25N -75,75W ~1,9 km, mediana 2015-2024, datos/cmems/resumen_corrientes_glorys.json - pendiente reemplazo por serie descargada",
+    "estado": "inferido",
+    "resolucion": "1/12° (~9 km)",
+    "resolucion_km": 9.0,
+    "distancia_celda_km": 1.94
+  },
+  "costo_unitario_zni_cop_kwh": {
+    "valor": 0.0,
+    "unidad": "COP/kWh",
+    "fuente": "ZNI Islas del Rosario no buscado individualmente en Superservicios 5cvc-m38t, pendiente extraccion por id_empresa",
+    "estado": "pendiente"
+  }
+}

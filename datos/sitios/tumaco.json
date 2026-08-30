@@ -1,0 +1,86 @@
+{
+  "id": "tumaco",
+  "nombre": "Tumaco",
+  "descripcion": "Nariño, Pacifico, utilizable, sin area protegida en 5 km",
+  "latitud": {
+    "valor": 1.903,
+    "unidad": "grados",
+    "fuente": "Coordenada solicitada ERA5 - datos/oleaje/resumen_oleaje_era5.json",
+    "estado": "verificado"
+  },
+  "longitud": {
+    "valor": -78.912,
+    "unidad": "grados",
+    "fuente": "Coordenada solicitada ERA5",
+    "estado": "verificado"
+  },
+  "estado_legal": "utilizable",
+  "area_protegida": "ninguna en 5 km - libre (RUNAP, documentacion/areas_marinas_protegidas.md)",
+  "densidad_potencia_media": {
+    "valor": 3.37,
+    "unidad": "kW/m",
+    "fuente": "ERA5-Ocean via Open-Meteo, rejilla 0,5° (2,0N -79,0W ~15 km), 2015-2024, datos/oleaje/resumen_oleaje_era5.json",
+    "estado": "inferido",
+    "resolucion": "0,5° (~55 km)",
+    "resolucion_km": 55.0,
+    "distancia_celda_km": 15.0
+  },
+  "hs_media_era5": {
+    "valor": 0.93,
+    "unidad": "m",
+    "fuente": "ERA5-Ocean Tumaco media 2015-2024",
+    "estado": "inferido"
+  },
+  "te_media_era5": {
+    "valor": 7.66,
+    "unidad": "s",
+    "fuente": "ERA5-Ocean Tumaco Te media",
+    "estado": "inferido"
+  },
+  "rango_mareal_medio": {
+    "valor": 2.62,
+    "unidad": "m",
+    "fuente": "IOC Sea Level Monitoring tumc (GLOSS 171, DIMAR, 1,82N -78,73W, radar), 2023-2025, 898 dias, datos/mareas/resumen_mareas_tumaco.json, documentacion/fuentes_datos_oleaje.md",
+    "estado": "verificado"
+  },
+  "rango_mareal_maximo": {
+    "valor": 6.95,
+    "unidad": "m",
+    "fuente": "IOC tumc maximo incluye picos de sensor, pendiente recalculo percentil 99, valor operativo ~4,06 m filtrado",
+    "estado": "verificado"
+  },
+  "rango_mareal_alternativo_ideam": {
+    "valor": 3.28,
+    "unidad": "m",
+    "fuente": "IDEAM DHIME Buenaventura IDEAM [53119010] como referencia Pacifico 3,28 m medio 2016-2024, 1643 dias, Preliminar 900, documentacion/fuentes_datos_ideam.md",
+    "estado": "verificado"
+  },
+  "rango_mareal_fes_m": {
+    "valor": 2.41,
+    "unidad": "m",
+    "fuente": "FES2014 AVISO/CNES constituyentes elevacion, 2*(M2+S2) ponderado, celda 1/12° Tumaco, datos/fes/resumen_constituyentes_fes.json - pendiente descarga pyfes",
+    "estado": "inferido",
+    "resolucion": "1/12° (~9 km)",
+    "resolucion_km": 9.0,
+    "distancia_celda_km": 1.61,
+    "contraste_ioc_m": 2.62,
+    "diferencia_vs_ioc_pct": -8.0
+  },
+  "corriente_maxima_ms": {
+    "valor": 0.42,
+    "unidad": "m/s",
+    "fuente": "Copernicus Marine GLORYS12 1/12° GLOBAL_MULTIYEAR_PHY_001_030, celda 1,92N -78,92W ~1,6 km, mediana 2015-2024, datos/cmems/resumen_corrientes_glorys.json - degrada de 0,54 verificado (Bahia Malaga) a inferido propio; anterior 0,54 verificado de modelo Delft3D Bahia Malaga/Buenaventura Quintero y Rueda-Bayona 2019 no es dato de Tumaco",
+    "estado": "inferido",
+    "resolucion": "1/12° (~9 km)",
+    "resolucion_km": 9.0,
+    "distancia_celda_km": 1.61,
+    "estado_anterior": "verificado 0,54 m/s Bahia Malaga/Buenaventura",
+    "motivo_degradacion": "Origen prestado de otra region (Bahia Malaga) - correccion procedencia 10.4"
+  },
+  "profundidad_estimada": {
+    "valor": 0.0,
+    "unidad": "m",
+    "fuente": "Sin transecto GMRT propio para Tumaco, pendiente extraccion batimetria especifica",
+    "estado": "pendiente"
+  }
+}

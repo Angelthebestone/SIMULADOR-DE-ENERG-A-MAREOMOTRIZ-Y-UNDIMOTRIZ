@@ -17,6 +17,7 @@ RANGOS: dict[str, tuple[float, float]] = {
     "J": (2.0, 60.0),
     "profundidad": (10.0, 100.0),
     "diametro_boya": (2.0, 20.0),
+    "masa_boya": (10_000.0, 1_000_000.0),
     "amortiguamiento_pto": (10_000.0, 500_000.0),
     "carrera_pto": (1.0, 5.0),
     "rango_mareal": (0.0, 15.0),

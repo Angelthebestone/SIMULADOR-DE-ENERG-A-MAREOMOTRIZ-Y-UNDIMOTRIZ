@@ -1,0 +1,29 @@
+{
+  "id": "owc",
+  "familia": "undimotriz",
+  "nombre": "Columna de agua oscilante (OWC)",
+  "principio": "Camara hueca abierta bajo flotacion, ola comprime aire que pasa por turbina autorrectificante",
+  "simulable": false,
+  "cwr_media_handbook": {
+    "valor": 0.29,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 1 - OWC 29%",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_min": {
+    "valor": 0.15,
+    "unidad": "adimensional",
+    "fuente": "Babarit OWC 15-40% B~30 m",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_max": {
+    "valor": 0.4,
+    "unidad": "adimensional",
+    "fuente": "Babarit max OWC 40%",
+    "estado": "verificado"
+  },
+  "cwr_handbook_vs_babarit": "Consistente: 29% dentro de 15-40%. Ninguna parte movil en agua (ventaja), turbina cuello botella, integrada en rompeolas comparte obra civil.",
+  "ejemplos": "Mutriku 296 kW 16 Wells 18,5 kW activo 2011 >3 GWh, LIMPET Islay 500->250 kW, Pico Azores",
+  "desenlace_comercial": "Mutriku mayor horas operacion mundo, factor planta 0,11 indice 0,26 - funciona porque obra civil la pago el puerto; LIMPET desmantelado 2011-2012 tras rebaja mitad potencia",
+  "fuente_taxonomia": "EMEC OWC"
+}

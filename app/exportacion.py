@@ -6,6 +6,7 @@ import hashlib
 import json
 import pathlib
 
+from analisis.figuras import aplicar_tema, marcar_figura
 from nucleo.resultado import Resultado
 
 
@@ -77,14 +78,30 @@ def exportar_figuras_datos(
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
+        aplicar_tema()
+        paleta = None
+        try:
+            import seaborn as sns
+
+            paleta = sns.color_palette("muted")
+        except ImportError:
+            paleta = None
         fig, ax = plt.subplots()
         nombres = [e.nombre for e in resultado.eslabones] or ["vacio"]
         rends = [e.rendimiento for e in resultado.eslabones] or [0]
-        ax.bar(nombres, rends)
+        color = paleta[0] if paleta else None
+        ax.bar(nombres, rends, color=color)
         ax.set_ylabel("rendimiento")
         ax.set_ylim(0, 1)
+        try:
+            import seaborn as sns
+
+            sns.despine()
+        except ImportError:
+            pass
         p_png = base / "cadena_rendimientos.png"
         fig.tight_layout()
+        marcar_figura(fig)
         fig.savefig(p_png, dpi=120)
         plt.close(fig)
         salidas.append(p_png)

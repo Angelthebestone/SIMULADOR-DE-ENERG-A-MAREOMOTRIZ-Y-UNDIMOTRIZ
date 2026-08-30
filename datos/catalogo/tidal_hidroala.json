@@ -1,0 +1,22 @@
+{
+  "id": "tidal_hidroala",
+  "familia": "mareomotriz_corriente",
+  "nombre": "Hidroala oscilante",
+  "principio": "Perfil sobre brazo oscilante, sustentacion acciona hidraulico",
+  "simulable": false,
+  "cp_tipico": {
+    "valor": 0.3,
+    "unidad": "adimensional",
+    "fuente": "Cp estimado bajo - sin dato directo publicado, programa abandonado",
+    "estado": "pendiente"
+  },
+  "cp_betz": {
+    "valor": 0.5926,
+    "unidad": "adimensional",
+    "fuente": "Betz flujo libre",
+    "estado": "verificado"
+  },
+  "ejemplos": "Stingray 150 kW Escocia 2003",
+  "desenlace_comercial": "Stingray abandonado por coste, ningun comercial en operacion; ventaja aguas muy someras rectangulo barrido",
+  "fuente_taxonomia": "EMEC oscillating hydrofoil"
+}

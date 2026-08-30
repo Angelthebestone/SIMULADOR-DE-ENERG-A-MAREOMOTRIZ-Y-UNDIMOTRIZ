@@ -1,0 +1,53 @@
+{
+  "id": "embalse",
+  "nombre": "Presa o laguna mareal (rango)",
+  "familia": "mareomotriz",
+  "tipo_emec": "tidal barrage / tidal lagoon",
+  "simulable": true,
+  "descripcion": "Energia potencial por rango - dependencia cuadratica con R, cuatro modos (vaciado, llenado, bidireccional, bombeo) por integracion temporal, no por E=1/2 rho g A R2.",
+  "area_embalse_ref": {
+    "valor": 22000000.0,
+    "unidad": "m2",
+    "fuente": "La Rance 22 km2 = 22e6 m2 - Wikipedia y Tethys La Rance 40y feedback, documentacion/fuentes_datos_economicos.md 7 resuelto EF/wikipedia, orden magnitud pendiente fuente primaria unica",
+    "estado": "verificado"
+  },
+  "rango_mareal_ref": {
+    "valor": 8.0,
+    "unidad": "m",
+    "fuente": "La Rance 8 m medio, max ~13,5 m - especificacion M7 y wikipedia",
+    "estado": "verificado"
+  },
+  "energia_por_ciclo_teorica": {
+    "valor": 1.97,
+    "unidad": "GWh",
+    "fuente": "E=0,5 rho g A R2 = 7,08e12 J = 1,97 GWh por ciclo - calculo especificacion M7 con A=22 km2 R=8 m",
+    "estado": "verificado"
+  },
+  "energia_anual_teorica": {
+    "valor": 1435.0,
+    "unidad": "GWh/año",
+    "fuente": "1,97*2*365=1435 GWh/ano teorica - especificacion M7 validacion",
+    "estado": "verificado"
+  },
+  "produccion_anual_real": {
+    "valor": 502.0,
+    "unidad": "GWh/año",
+    "fuente": "EDF 2019 - 502 GWh en 2018; wikipedia 491-523 GWh 2009-2013, promedio ~491, documentacion/fuentes_datos_economicos.md 7",
+    "estado": "verificado"
+  },
+  "rendimiento_ciclo": {
+    "valor": 0.35,
+    "unidad": "adimensional",
+    "fuente": "500/1435=0,35 rendimento global ciclo La Rance - especificacion M7, incluye operacion no solo turbina",
+    "estado": "verificado"
+  },
+  "rendimiento_turbina_bulbo": {
+    "valor": 0.9,
+    "unidad": "adimensional",
+    "fuente": "Turbina de bulbo 0,88-0,92 especificacion tabla rangos 8.8 e investigacion 2.1.2",
+    "estado": "verificado"
+  },
+  "modos": "vaciado (ebb), llenado (flood), bidireccional, con bombeo - especificacion M7",
+  "nota_energia": "E=1/2 rho g A R2 solo como cota teorica; produccion por bucle estado, H(t), Q(t), P=rho g Q H eta(H,Q), balance volumen A(h) - especificacion M7 y tareas 2.4",
+  "ejemplos": "La Rance 240 MW activa 1966, Sihwa Lake 254 MW solo llenado sin bombeo activa 2011, Annapolis Royal 20 MW desmantelada 2019"
+}

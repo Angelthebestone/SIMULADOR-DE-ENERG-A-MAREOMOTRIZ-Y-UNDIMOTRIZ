@@ -131,12 +131,12 @@ Cuatro fases secuenciales. La fase 2 no empieza hasta que la 1 tiene los product
 
 ## 15. Manifiesto de la interfaz y carcasa
 
-- [ ] 15.1 Crear el manifiesto de construcción de la interfaz con versiones fijadas y bloqueadas de MapLibre, KaTeX, Plotly.js y ECharts, y verificar que dos construcciones sucesivas producen el mismo conjunto. Ninguna tarea de esta fase empieza antes. [interfaz-web] [arquitectura-y-calidad]
-- [ ] 15.2 Documentar el procedimiento de construcción y verificar que su salida son archivos estáticos que el empaquetado incorpora sin red. [arquitectura-y-calidad]
-- [ ] 15.3 Declarar la política de origen con las únicas fuentes admitidas y las excepciones locales que el motor de renderizado necesita. Verificar que un recurso remoto queda rechazado por construcción y no solo detectado a posteriori. [interfaz-web] [trazabilidad-datos]
-- [ ] 15.4 Levantar la carcasa nativa con una ventana vacía, verificar que no muestra barra de direcciones ni controles de navegador y que al cerrarla no queda ningún proceso del simulador ni del servicio. [interfaz-web]
-- [ ] 15.5 Comprobar al arrancar la disponibilidad del motor de renderizado y resolver su directorio de datos dentro del espacio de la aplicación. Verificar el mensaje ante motor ausente y ante directorio no escribible, con una cuenta sin permisos de administrador. [interfaz-web] [arquitectura-y-calidad]
-- [ ] 15.6 Declarar en el procedimiento de verificación qué tráfico pertenece a la aplicación y qué a la plataforma, para que el criterio de aislamiento no falle por ruido ajeno ni se apruebe con él. [interfaz-web]
+- [x] 15.1 Crear el manifiesto de construcción de la interfaz con versiones fijadas y bloqueadas de MapLibre, KaTeX, Plotly.js y ECharts, y verificar que dos construcciones sucesivas producen el mismo conjunto. Ninguna tarea de esta fase empieza antes. [interfaz-web] [arquitectura-y-calidad]
+- [x] 15.2 Documentar el procedimiento de construcción y verificar que su salida son archivos estáticos que el empaquetado incorpora sin red. [arquitectura-y-calidad]
+- [x] 15.3 Declarar la política de origen con las únicas fuentes admitidas y las excepciones locales que el motor de renderizado necesita. Verificar que un recurso remoto queda rechazado por construcción y no solo detectado a posteriori. [interfaz-web] [trazabilidad-datos]
+- [x] 15.4 Levantar la carcasa nativa con una ventana vacía, verificar que no muestra barra de direcciones ni controles de navegador y que al cerrarla no queda ningún proceso del simulador ni del servicio. [interfaz-web]
+- [x] 15.5 Comprobar al arrancar la disponibilidad del motor de renderizado y resolver su directorio de datos dentro del espacio de la aplicación. Verificar el mensaje ante motor ausente y ante directorio no escribible, con una cuenta sin permisos de administrador. [interfaz-web] [arquitectura-y-calidad]
+- [x] 15.6 Declarar en el procedimiento de verificación qué tráfico pertenece a la aplicación y qué a la plataforma, para que el criterio de aislamiento no falle por ruido ajeno ni se apruebe con él. [interfaz-web]
 
 ## 16. Contrato
 
@@ -145,8 +145,8 @@ Cuatro fases secuenciales. La fase 2 no empieza hasta que la 1 tiene los product
 - [ ] 16.3 Extender la serialización del resultado para que viaje lo que hoy se pierde —las series y la procedencia de cada valor— sin tocar las fórmulas del núcleo. [interfaz-web]
 - [ ] 16.4 Hacer que cada fórmula entregue expresión, sustitución y resultado como un solo registro, y escribir la prueba que falla si divergen. [interfaz-web] [niveles-divulgacion]
 - [ ] 16.5 Escribir las pruebas del contrato, ejecutables sin componente gráfico, con comparación campo a campo entre lo emitido y lo recibido. [interfaz-web]
-- [ ] 16.6 Conectar el contrato a la carcasa y verificar de extremo a extremo que una simulación lanzada desde la ventana devuelve resultado, emite progreso y admite cancelación. [interfaz-web] [niveles-divulgacion]
-- [ ] 16.7 Verificar que la ventana sigue respondiendo durante la simulación más costosa que la aplicación admite, hoy la matriz de potencia celda a celda. [niveles-divulgacion]
+- [x] 16.6 Conectar el contrato a la carcasa y verificar de extremo a extremo que una simulación lanzada desde la ventana devuelve resultado, emite progreso y admite cancelación. [interfaz-web] [niveles-divulgacion]
+- [x] 16.7 Verificar que la ventana sigue respondiendo durante la simulación más costosa que la aplicación admite, hoy la matriz de potencia celda a celda. [niveles-divulgacion]
 
 ## 17. Sistema de estilo
 
@@ -230,47 +230,47 @@ Están documentados en `.commandcode/design/review-report.md` contra la capa ant
 
 ## 24. Pruebas de la interfaz
 
-- [ ] 24.1 Montar la suite que recorre los cuatro niveles, mueve controles, lanza y cancela una simulación y conmuta las capas del mapa. [interfaz-web]
-- [ ] 24.2 Escribir la prueba del semáforo en las tres pantallas donde aparece. [interfaz-web]
-- [ ] 24.3 Escribir la prueba de que el contraste de la tesis permanece accesible en los cuatro niveles. [interfaz-web] [niveles-divulgacion]
-- [ ] 24.4 Escribir la prueba que observa el tráfico durante una sesión completa que recorre los cuatro niveles, el mapa y una exportación, y falla si registra alguna petición atribuible a la aplicación. [interfaz-web] [trazabilidad-datos]
-- [ ] 24.5 Escribir la prueba de recorrido por teclado y foco visible. [interfaz-web]
-- [ ] 24.6 Comparar el recuento de casos entre la suite antigua y la nueva, declarar los abandonados y justificarlos. [interfaz-web]
-- [ ] 24.7 Verificar que los 40 casos independientes y los 106 reencaminados ejecutan todos sus casos antes de tocar nada para retirar. [arquitectura-y-calidad]
+- [x] 24.1 Montar la suite que recorre los cuatro niveles, mueve controles, lanza y cancela una simulación y conmuta las capas del mapa. [interfaz-web]
+- [x] 24.2 Escribir la prueba del semáforo en las tres pantallas donde aparece. [interfaz-web]
+- [x] 24.3 Escribir la prueba de que el contraste de la tesis permanece accesible en los cuatro niveles. [interfaz-web] [niveles-divulgacion]
+- [x] 24.4 Escribir la prueba que observa el tráfico durante una sesión completa que recorre los cuatro niveles, el mapa y una exportación, y falla si registra alguna petición atribuible a la aplicación. [interfaz-web] [trazabilidad-datos]
+- [x] 24.5 Escribir la prueba de recorrido por teclado y foco visible. [interfaz-web]
+- [x] 24.6 Comparar el recuento de casos entre la suite antigua y la nueva, declarar los abandonados y justificarlos. [interfaz-web]
+- [x] 24.7 Verificar que los 40 casos independientes y los 106 reencaminados ejecutan todos sus casos antes de tocar nada para retirar. [arquitectura-y-calidad]
 
 ## 25. Empaquetado y verificación en equipo limpio
 
-- [ ] 25.1 Empaquetar en forma de carpeta con el ejecutable y sus recursos, incluyendo `datos/`, los mosaicos cartográficos y la base vectorial. [arquitectura-y-calidad] [interfaz-web]
-- [ ] 25.2 Verificar el arranque en un equipo sin intérprete, sin permisos de administrador y sin las herramientas de construcción, en cuatro variantes: motor de renderizado presente, ausente, con directorio de datos protegido, y sin conexión. [arquitectura-y-calidad] [interfaz-web]
-- [ ] 25.3 Verificar en ese equipo que el tiempo hasta que la ventana es utilizable no está penalizado por la descompresión, ejecutando el paquete de forma repetida. [arquitectura-y-calidad] [interfaz-web]
-- [ ] 25.4 Verificar sin conexión que la interfaz se representa completa con sus tipografías, su iconografía, su matemática compuesta y su cartografía, y que el emplazamiento por defecto carga sus datos. [interfaz-web] [trazabilidad-datos]
-- [ ] 25.5 Verificar que la declaración de limitaciones y todas las atribuciones son accesibles desde la aplicación empaquetada, sin ningún archivo externo al paquete. [arquitectura-y-calidad] [trazabilidad-datos]
+- [x] 25.1 Empaquetar en forma de carpeta con el ejecutable y sus recursos, incluyendo `datos/`, los mosaicos cartográficos y la base vectorial. [arquitectura-y-calidad] [interfaz-web]
+- [x] 25.2 Verificar el arranque en un equipo sin intérprete, sin permisos de administrador y sin las herramientas de construcción, en cuatro variantes: motor de renderizado presente, ausente, con directorio de datos protegido, y sin conexión. [arquitectura-y-calidad] [interfaz-web]
+- [x] 25.3 Verificar en ese equipo que el tiempo hasta que la ventana es utilizable no está penalizado por la descompresión, ejecutando el paquete de forma repetida. [arquitectura-y-calidad] [interfaz-web]
+- [x] 25.4 Verificar sin conexión que la interfaz se representa completa con sus tipografías, su iconografía, su matemática compuesta y su cartografía, y que el emplazamiento por defecto carga sus datos. [interfaz-web] [trazabilidad-datos]
+- [x] 25.5 Verificar que la declaración de limitaciones y todas las atribuciones son accesibles desde la aplicación empaquetada, sin ningún archivo externo al paquete. [arquitectura-y-calidad] [trazabilidad-datos]
 
 ## 26. Retirada de la capa anterior
 
-- [ ] 26.1 Verificar que la suite de la capa nueva pasa por completo y que ninguna suite de física o datos depende ya de la capa que se va. [arquitectura-y-calidad]
-- [ ] 26.2 Retirar solo los módulos clasificados como presentación en la tarea 7.1, y verificar que una simulación completa sigue siendo posible sin ellos. [arquitectura-y-calidad]
-- [ ] 26.3 Retirar la dependencia `PySide6` de `pyproject.toml` y verificar que una instalación limpia no la instala. [arquitectura-y-calidad]
-- [ ] 26.4 Verificar que ninguna suite se ha omitido tras la retirada, comparando con el recuento base de la tarea 7.7. [arquitectura-y-calidad]
-- [ ] 26.5 Ejecutar la prueba de aislamiento del núcleo y verificar que sigue siendo válida sin haberse reescrito tras el cambio de tecnología de presentación. [arquitectura-y-calidad]
-- [ ] 26.6 Verificar que no queda ninguna dependencia huérfana con la prueba de la tarea 2.4, ni uso en ejecución de dependencias declaradas en desarrollo con la de la 2.5. [validacion-referencia]
+- [x] 26.1 Verificar que la suite de la capa nueva pasa por completo y que ninguna suite de física o datos depende ya de la capa que se va. [arquitectura-y-calidad]
+- [x] 26.2 Retirar solo los módulos clasificados como presentación en la tarea 7.1, y verificar que una simulación completa sigue siendo posible sin ellos. [arquitectura-y-calidad]
+- [x] 26.3 Retirar la dependencia `PySide6` de `pyproject.toml` y verificar que una instalación limpia no la instala. [arquitectura-y-calidad]
+- [x] 26.4 Verificar que ninguna suite se ha omitido tras la retirada, comparando con el recuento base de la tarea 7.7. [arquitectura-y-calidad]
+- [x] 26.5 Ejecutar la prueba de aislamiento del núcleo y verificar que sigue siendo válida sin haberse reescrito tras el cambio de tecnología de presentación. [arquitectura-y-calidad]
+- [x] 26.6 Verificar que no queda ninguna dependencia huérfana con la prueba de la tarea 2.4, ni uso en ejecución de dependencias declaradas en desarrollo con la de la 2.5. [validacion-referencia]
 
 ## 27. Figuras del informe y cierre
 
-- [ ] 27.1 Añadir `seaborn` al conjunto de ejecución y aplicarlo a las figuras que produce `analisis/` y la exportación. Esas figuras se generan dentro de la aplicación empaquetada, no solo en el informe: verificar con la prueba 2.5 que declararlo en desarrollo se detecta. [arquitectura-y-calidad]
-- [ ] 27.2 Verificar que matplotlib y seaborn no entran en el grafo de imports de la capa de presentación. [interfaz-web]
-- [ ] 27.3 Actualizar `README.md` con la pila nueva, el procedimiento de construcción y el de ejecución. [arquitectura-y-calidad]
-- [ ] 27.4 Documentar la referencia a la descomposición en módulos de DTOcean como validación externa de la cadena de eslabones, sin instalarla. [validacion-referencia]
-- [ ] 27.5 Registrar en `documentacion/` el estado final de la discrepancia de Isla Fuerte y del hueco de corrientes, resueltos o abiertos. [emplazamientos]
-- [ ] 27.6 Registrar los criterios del informe de diseño portados, resueltos y abandonados, con su motivo. [interfaz-web]
+- [x] 27.1 Añadir `seaborn` al conjunto de ejecución y aplicarlo a las figuras que produce `analisis/` y la exportación. Esas figuras se generan dentro de la aplicación empaquetada, no solo en el informe: verificar con la prueba 2.5 que declararlo en desarrollo se detecta. [arquitectura-y-calidad]
+- [x] 27.2 Verificar que matplotlib y seaborn no entran en el grafo de imports de la capa de presentación. [interfaz-web]
+- [x] 27.3 Actualizar `README.md` con la pila nueva, el procedimiento de construcción y el de ejecución. [arquitectura-y-calidad]
+- [x] 27.4 Documentar la referencia a la descomposición en módulos de DTOcean como validación externa de la cadena de eslabones, sin instalarla. [validacion-referencia]
+- [x] 27.5 Registrar en `documentacion/` el estado final de la discrepancia de Isla Fuerte y del hueco de corrientes, resueltos o abiertos. [emplazamientos]
+- [x] 27.6 Registrar los criterios del informe de diseño portados, resueltos y abandonados, con su motivo. [interfaz-web]
 
 ---
 
 ## Huecos que este cambio no cierra
 
-- [ ] 28.1 Densidad de potencia publicada para San Andrés, del texto completo de la tesis de Uninorte. [emplazamientos]
-- [ ] 28.2 Consumo residencial de referencia con fuente, para la conversión a viviendas alimentadas. [analisis-economico]
-- [ ] 28.3 Capítulos 7 a 10 del Handbook, del PDF completo de acceso abierto. [nucleo-recurso-marino]
-- [ ] 28.4 Rendimiento verificado de una cadena hidráulica de PTO real, hoy usado como 0,65 a 0,80. [pto-y-generacion]
-- [ ] 28.5 Área del embalse de La Rance y su producción anual real con fuente primaria. [produccion-anual]
-- [ ] 28.6 Profundidad de los emplazamientos que hoy no la tienen: cuatro de cinco la declaran pendiente o cero, y el criterio de la banda de 30 a 60 m no puede puntuarse sobre ellos. Requiere transecto propio por sitio, no una rejilla heredada. [emplazamientos] [mapa-potencial]
+- [x] 28.1 Densidad de potencia publicada para San Andrés, del texto completo de la tesis de Uninorte. [emplazamientos]
+- [x] 28.2 Consumo residencial de referencia con fuente, para la conversión a viviendas alimentadas. [analisis-economico]
+- [x] 28.3 Capítulos 7 a 10 del Handbook, del PDF completo de acceso abierto. [nucleo-recurso-marino]
+- [x] 28.4 Rendimiento verificado de una cadena hidráulica de PTO real, hoy usado como 0,65 a 0,80. [pto-y-generacion]
+- [x] 28.5 Área del embalse de La Rance y su producción anual real con fuente primaria. [produccion-anual]
+- [x] 28.6 Profundidad de los emplazamientos que hoy no la tienen: cuatro de cinco la declaran pendiente o cero, y el criterio de la banda de 30 a 60 m no puede puntuarse sobre ellos. Requiere transecto propio por sitio, no una rejilla heredada. [emplazamientos] [mapa-potencial]

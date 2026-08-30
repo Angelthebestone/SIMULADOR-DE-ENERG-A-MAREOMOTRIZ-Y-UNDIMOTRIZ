@@ -1,0 +1,65 @@
+{
+  "id": "turbina_corriente",
+  "nombre": "Turbina de corriente mareal",
+  "familia": "mareomotriz",
+  "tipo_emec": "horizontal axis turbine",
+  "simulable": true,
+  "descripcion": "Energia cinetica - dependencia cubica con V, limite Betz 16/27 no universal en canal confinado, integrar sobre serie V(t)^3.",
+  "diametro_rotor_ref": {
+    "valor": 20.0,
+    "unidad": "m",
+    "fuente": "Orbital O2 20 m rotor, A=314 m2, 2 MW - investigacion 3.2 y especificacion M8",
+    "estado": "verificado"
+  },
+  "area_barrida_ref": {
+    "valor": 314.0,
+    "unidad": "m2",
+    "fuente": "pi*10^2=314 m2 por rotor Orbital O2",
+    "estado": "verificado"
+  },
+  "cp_real": {
+    "valor": 0.4,
+    "unidad": "adimensional",
+    "fuente": "Cp 0,40-0,50 turbinas axiales modernas - investigacion 4.7 y Vallg - especificacion M8",
+    "estado": "verificado"
+  },
+  "cp_max_betz": {
+    "valor": 0.5926,
+    "unidad": "adimensional",
+    "fuente": "Betz 16/27=0,5926 flujo libre - especificacion M8 y nucleo/constantes.py BETZ_LIMITE",
+    "estado": "verificado"
+  },
+  "cp_rango_max_verificado": {
+    "valor": 0.5,
+    "unidad": "adimensional",
+    "fuente": "Cp max verificado 0,50 - investigacion 4.7",
+    "estado": "verificado"
+  },
+  "potencia_3ms": {
+    "valor": 5535.0,
+    "unidad": "W",
+    "fuente": "P=0,5*1025*0,4*1*27=5535 W a 3 m/s con A=1 m2 - validacion especificacion M8",
+    "estado": "verificado"
+  },
+  "potencia_054ms": {
+    "valor": 32.3,
+    "unidad": "W",
+    "fuente": "P=32,3 W a 0,54 m/s misma turbina 1 m2 - factor 171 - especificacion 6 conclusiones",
+    "estado": "verificado"
+  },
+  "potencia_orbital_o2_3ms": {
+    "valor": 1740000.0,
+    "unidad": "W",
+    "fuente": "Orbital O2 por rotor 1,74 MW a 3 m/s D=20 m Cp=0,40 - validacion tareas 7.9",
+    "estado": "verificado"
+  },
+  "densidad_agua": {
+    "valor": 1025.0,
+    "unidad": "kg/m3",
+    "fuente": "RHO_AGUA_MAR - nucleo/constantes.py",
+    "estado": "verificado"
+  },
+  "nota_betz": "En canal confinado Cp puede superar 16/27 referido a velocidad no perturbada por bloqueo (Vennell et al.) - aviso explicito no bloqueo - especificacion M8 y tareas 2.5",
+  "nota_cubo": "Media del cubo != cubo de la media - integrar V(t)^3 sobre serie reconstruida por armonicos M2 S2 K1 O1 - especificacion M8 y nucleo/corrientes.py",
+  "ejemplos": "Orbital O2 2 MW flotante activo, MeyGen 6 MW fase 1A 21% factor planta, SeaGen 1,2 MW desmantelado 2019"
+}

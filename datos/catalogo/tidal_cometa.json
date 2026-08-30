@@ -1,0 +1,28 @@
+{
+  "id": "tidal_cometa",
+  "familia": "mareomotriz_corriente",
+  "nombre": "Cometa mareal (tidal kite)",
+  "principio": "Cometa vuela en ocho, turbina bajo ala ve velocidad relativa varias veces corriente (P~V3 habilita baja velocidad)",
+  "simulable": false,
+  "cp_tipico": {
+    "valor": 0.4,
+    "unidad": "adimensional",
+    "fuente": "Cp turbina cometa ~0,40 viento relativo - investigacion 2.2D",
+    "estado": "verificado"
+  },
+  "cp_betz": {
+    "valor": 0.5926,
+    "unidad": "adimensional",
+    "fuente": "Betz aplica a flujo cometa relativo",
+    "estado": "verificado"
+  },
+  "masa_potencia": {
+    "valor": 0.023,
+    "unidad": "t/kW",
+    "fuente": "Minesto Dragon 12 28 t / 1,2 MW = 0,023 t/kW - investigacion 3.2, mejor masa/potencia informe",
+    "estado": "verificado"
+  },
+  "ejemplos": "Minesto Dragon 12 1,2 MW 12 m 28 t Vestmanna Feroe feb 2024 conectado red",
+  "desenlace_comercial": "Activo febrero 2024 - ventaja habilita baja velocidad cometa, desventaja control activo y fatiga umbilical",
+  "fuente_taxonomia": "EMEC tidal kite"
+}

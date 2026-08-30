@@ -1,0 +1,46 @@
+{
+  "N": {
+    "distancia_30m_km": 6.5,
+    "distancia_60m_km": 17.0
+  },
+  "NNE": {
+    "distancia_30m_km": 3.0,
+    "distancia_60m_km": 24.25
+  },
+  "NE": {
+    "distancia_30m_km": 17.5,
+    "distancia_60m_km": null
+  },
+  "ENE": {
+    "distancia_30m_km": null,
+    "distancia_60m_km": null
+  },
+  "E": {
+    "distancia_30m_km": null,
+    "distancia_60m_km": null
+  },
+  "SE": {
+    "distancia_30m_km": null,
+    "distancia_60m_km": null
+  },
+  "S": {
+    "distancia_30m_km": null,
+    "distancia_60m_km": null
+  },
+  "SW": {
+    "distancia_30m_km": 8.11,
+    "distancia_60m_km": null
+  },
+  "W": {
+    "distancia_30m_km": 10.67,
+    "distancia_60m_km": 19.75
+  },
+  "NW": {
+    "distancia_30m_km": 5.41,
+    "distancia_60m_km": 10.0
+  },
+  "NNW": {
+    "distancia_30m_km": 4.33,
+    "distancia_60m_km": 15.0
+  }
+}

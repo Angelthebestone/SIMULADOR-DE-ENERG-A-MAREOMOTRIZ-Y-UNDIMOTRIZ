@@ -1,0 +1,63 @@
+{
+  "id": "absorbedor_puntual",
+  "nombre": "Absorbedor puntual",
+  "familia": "undimotriz",
+  "tipo_emec": "point absorber",
+  "simulable": true,
+  "descripcion": "Boya oscilante en arfada - ensena resonancia, ancho mayor que diametro y optimizacion B_pto. Limitado a heave 1 gdl.",
+  "diametro": {
+    "valor": 10.0,
+    "unidad": "m",
+    "fuente": "Dimension de referencia 12-20 m Handbook cap 1 tabla 2; geometria hidrodinamica D=10 m Falnes (2002) cap 5, nucleo/hidrodinamica.py GEOMETRIA_CILINDRO_10M",
+    "estado": "verificado"
+  },
+  "calado": {
+    "valor": 5.0,
+    "unidad": "m",
+    "fuente": "Falnes D=10 m calado 5 m referencia",
+    "estado": "verificado"
+  },
+  "masa": {
+    "valor": 0.0,
+    "unidad": "kg",
+    "fuente": "Sin dato unico publicado - depende de lastre y escala, pendiente dimensionado segun desplazamiento rho g S_w d",
+    "estado": "pendiente"
+  },
+  "cwr_media": {
+    "valor": 0.16,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 1 - absorbedor puntual 16% media",
+    "estado": "verificado"
+  },
+  "cwr_rango_min": {
+    "valor": 0.03,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 Renew. Energy - base Coastal Wiki - absorbedor puntual 3-42% (5-20 m)",
+    "estado": "verificado"
+  },
+  "cwr_rango_max": {
+    "valor": 0.42,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 max absorbedor puntual 42%",
+    "estado": "verificado"
+  },
+  "pto_tipo": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Multiple - hidraulico 65%, mecanico 90%, directo 95% Handbook cap 1 tabla 4, pendiente eleccion especifica",
+    "estado": "pendiente"
+  },
+  "rendimiento_pto": {
+    "valor": 0.65,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 4 - hidraulico 0,65 (rango documentado 0,65-0,80, documentacion/fuentes_datos_economicos.md pendiente 14.6)",
+    "estado": "verificado"
+  },
+  "limite_captura_lambda_2pi": {
+    "valor": 0.0,
+    "unidad": "m",
+    "fuente": "Budal-Falnes lambda/2pi solo heave - especificacion 4 y nucleo/hidrodinamica.py, calculable desde Te y h - limite teorico no dato fijo",
+    "estado": "pendiente"
+  },
+  "ejemplos": "CETO 6 (20 m, 1,5 MW), PowerBuoy, CorPower, Seabased, Wavestar multi-boya"
+}

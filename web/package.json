@@ -1,0 +1,23 @@
+{
+  "name": "simulador-web",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "=5.1.4",
+    "echarts": "=5.5.1",
+    "katex": "=0.16.9",
+    "maplibre-gl": "=4.7.1",
+    "plotly.js-dist-min": "=2.27.1",
+    "pmtiles": "=3.2.0",
+    "vue": "=3.4.38"
+  },
+  "devDependencies": {
+    "typescript": "=5.6.3",
+    "vite": "=5.4.8"
+  }
+}

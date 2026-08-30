@@ -1,0 +1,22 @@
+{
+  "id": "tidal_venturi",
+  "familia": "mareomotriz_corriente",
+  "nombre": "Efecto Venturi (enclosed tips)",
+  "principio": "Conducto embudo concentra flujo sobre turbina, o diferencial presion acciona aire",
+  "simulable": false,
+  "cp_tipico": {
+    "valor": 0.4,
+    "unidad": "adimensional",
+    "fuente": "Cp turbina dentro Venturi ~0,40 - aumento velocidad local compite con arrastre conducto",
+    "estado": "inferido"
+  },
+  "cp_betz": {
+    "valor": 0.5926,
+    "unidad": "adimensional",
+    "fuente": "Betz aplica a area conducto",
+    "estado": "verificado"
+  },
+  "ejemplos": "Dispositivos en conducto, colector embudo sumergido",
+  "desenlace_comercial": "Rara vez aumento neto compensa coste arrastre - investigacion 2.2E",
+  "fuente_taxonomia": "EMEC enclosed tips / Venturi"
+}

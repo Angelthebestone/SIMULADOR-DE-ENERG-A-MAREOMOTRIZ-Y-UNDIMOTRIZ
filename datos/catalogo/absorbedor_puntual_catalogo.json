@@ -1,0 +1,29 @@
+{
+  "id": "absorbedor_puntual",
+  "familia": "undimotriz",
+  "nombre": "Absorbedor puntual",
+  "principio": "Flotante pequeno frente a lambda, absorbe desde todas direcciones por movimiento del cuerpo boyante vs referencia",
+  "simulable": false,
+  "cwr_media_handbook": {
+    "valor": 0.16,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 1 - absorbedor puntual 16%",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_min": {
+    "valor": 0.03,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 - absorbedor puntual 3-42% (5-20 m, pequenos porcentajes bajos)",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_max": {
+    "valor": 0.42,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 max 42%",
+    "estado": "verificado"
+  },
+  "cwr_handbook_vs_babarit": "Handbook 16% dentro de rango Babarit 3-42%. Consistente: media cae dentro de rango medido.",
+  "ejemplos": "CETO 6, PowerBuoy PB40, CorPower, Seabased, Wavestar multi-boya",
+  "desenlace_comercial": "CETO 6 1,5 MW boya 20 m TRL 7 activo despliegues Wave Hub/Albany cancelados - Carnegie busca IECRE via Lloyd Register",
+  "fuente_taxonomia": "EMEC point absorber"
+}

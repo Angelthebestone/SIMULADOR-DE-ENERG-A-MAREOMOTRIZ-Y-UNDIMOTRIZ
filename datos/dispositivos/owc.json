@@ -1,0 +1,75 @@
+{
+  "id": "owc",
+  "nombre": "Columna de agua oscilante (OWC)",
+  "familia": "undimotriz",
+  "tipo_emec": "oscillating water column",
+  "simulable": true,
+  "descripcion": "Integrada en rompeolas - ensena coste obra civil compartido y turbina autorrectificante.",
+  "ancho_camara": {
+    "valor": 4.5,
+    "unidad": "m",
+    "fuente": "Mutriku 4,5 m ancho, 3,1 m fondo, 10 m alto sobre BMVE - investigacion_convertidores_marinos.md 3.1 y especificacion 5 Mutriku 16 x 18,5 kW",
+    "estado": "verificado"
+  },
+  "potencia_instalada_ref": {
+    "valor": 296.0,
+    "unidad": "kW",
+    "fuente": "Mutriku 296 kW 16 turbinas Wells 18,5 kW - EVE/ wikipedia Mutriku",
+    "estado": "verificado"
+  },
+  "factor_planta": {
+    "valor": 0.11,
+    "unidad": "adimensional",
+    "fuente": "Mutriku 0,11 medio - investigacion 4.8 y especificacion 5",
+    "estado": "verificado"
+  },
+  "indice_rendimiento_planta": {
+    "valor": 0.26,
+    "unidad": "adimensional",
+    "fuente": "Mutriku 0,26 - investigacion 4.8",
+    "estado": "verificado"
+  },
+  "cwr_media": {
+    "valor": 0.29,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 1 - OWC 29% media",
+    "estado": "verificado"
+  },
+  "cwr_rango_min": {
+    "valor": 0.15,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 OWC 15-40% B~30 m",
+    "estado": "verificado"
+  },
+  "cwr_rango_max": {
+    "valor": 0.4,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 OWC max 40%",
+    "estado": "verificado"
+  },
+  "rendimiento_turbina_wells": {
+    "valor": 0.525,
+    "unidad": "adimensional",
+    "fuente": "Wells 50-55% pico - Das et al. SAGE 2017, investigacion 1.3.3, rango estrecho con stall",
+    "estado": "verificado"
+  },
+  "rendimiento_turbina_impulso": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Impulso <50% pico pero mas ancho de banda - investigacion 1.3.4, valor especifico pendiente",
+    "estado": "pendiente"
+  },
+  "rendimiento_pto_aire": {
+    "valor": 0.55,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 4 - aire 0,55",
+    "estado": "verificado"
+  },
+  "longitud_referencia": {
+    "valor": 12.0,
+    "unidad": "m",
+    "fuente": "Handbook cap 1 tabla 2 - OWC longitud 12-20 m dimensiones hidrodinamicamente optimas norte Europa",
+    "estado": "verificado"
+  },
+  "ejemplos": "Mutriku (activo 2011, >3 GWh), LIMPET Islay (rebajado 500 a 250 kW, desmantelado 2011-2012), Pico Azores"
+}

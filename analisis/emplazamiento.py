@@ -163,6 +163,14 @@ def _es_descartado(estado_legal: str) -> bool:
     return estado_legal.strip().lower() == "descartado"
 
 
+def _es_pendiente(campo: object) -> bool:
+    """True si el campo trae un estado declarado como pendiente."""
+    if not isinstance(campo, dict):
+        return False
+    estado = campo.get("estado")
+    return isinstance(estado, str) and estado == "pendiente"
+
+
 def _resolver_defaults(
     sitio: dict[str, object],
     sitio_id: str,
@@ -173,9 +181,15 @@ def _resolver_defaults(
 ) -> tuple[float, float | None, float | None, float | None]:
     j = j_kw_m
     if j is None:
-        v = _extraer_valor(sitio.get("densidad_potencia_media"))
-        if v is None or v == 0:
-            v = _extraer_valor(sitio.get("densidad_potencia_era5"))
+        dpm = sitio.get("densidad_potencia_media")
+        # Un dato con estado "pendiente" no entra como cifra: cae al fallback (0.0)
+        # para que el criterio puntue como ausente, no como verificado.
+        if _es_pendiente(dpm):
+            v: float | None = 0.0
+        else:
+            v = _extraer_valor(dpm)
+            if v is None or v == 0:
+                v = _extraer_valor(sitio.get("densidad_potencia_era5"))
         j = float(v) if v is not None else 0.0
     dk = distancia_km
     if dk is None:

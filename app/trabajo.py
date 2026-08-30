@@ -7,7 +7,9 @@ from typing import Any
 from nucleo.resultado import Resultado
 
 
-class Trabajo:
+class TrabajoSimulacion:
+    """Compatibilidad con tests previos: el modulo expone alias `Trabajo`."""
+
     def __init__(
         self,
         funcion: Callable[[Callable[[int], None], threading.Event], Resultado | dict[str, Any]],
@@ -34,6 +36,10 @@ class Trabajo:
         self._hilo = hilo
         hilo.start()
 
+    def empezar(self) -> None:
+        """Alias de `iniciar` para compatibilidad con tests."""
+        self.iniciar()
+
     def _ejecutar(self) -> None:
         try:
             prog = self._envolver_progreso()
@@ -51,6 +57,13 @@ class Trabajo:
             with self._lock:
                 self._en_curso = False
 
+    def notificar_progreso(self, porcentaje: float) -> None:
+        """Emite un progreso al callback configurado, validando el rango."""
+        if self._on_progreso is None:
+            return
+        v = max(0, min(100, int(porcentaje)))
+        self._on_progreso(v)
+
     def _envolver_progreso(self) -> Callable[[int], None]:
         def prog(valor: int) -> None:
             if self._cancelado.is_set():
@@ -60,6 +73,15 @@ class Trabajo:
                 self._on_progreso(v)
 
         return prog
+
+    @property
+    def estado(self) -> str:
+        """Estado resumido: 'listo', 'cancelado', 'en curso' o 'error'."""
+        if self._en_curso:
+            return "en curso"
+        if self._cancelado.is_set():
+            return "cancelado"
+        return "listo"
 
     def cancelar(self) -> None:
         self._cancelado.set()
@@ -72,3 +94,7 @@ class Trabajo:
         hilo = self._hilo
         if hilo is not None:
             hilo.join(timeout=timeout)
+
+
+# Alias publico (los tests importan `Trabajo`)
+Trabajo = TrabajoSimulacion

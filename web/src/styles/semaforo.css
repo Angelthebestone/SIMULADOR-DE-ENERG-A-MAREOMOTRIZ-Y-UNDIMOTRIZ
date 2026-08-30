@@ -1,0 +1,51 @@
+@import "./tokens.css";
+
+/* Semaforo — dos vocabularios separados: --conf-* y --rol-*
+   Regla: ningun valor --conf-* aparece como --rol-*. Estado deja de ir en color
+   de texto; va en glifo con forma (●/◐/○) sobre tinta + palabra en --tinta.
+   Color del estado solo refuerzo (anillo/sombra, capa del mapa) y cumple 3:1 sobre fondo.
+   En gris los tres estados se distinguen por forma distinta. */
+:root {
+  /* Estado — escala luminosa separada del rol */
+  --conf-verificado: oklch(0.578 0.117 166); /* #0A8F6A */
+  --conf-inferido: oklch(0.638 0.138 070);   /* #C07A00 */
+  --conf-pendiente: oklch(0.494 0.159 037);  /* #A8340A */
+  --conf-texto: var(--tinta);
+
+  /* Roles de cadena — canal distinto (ningun --rol-* coincide con --conf-*) */
+  --rol-recurso: oklch(0.532 0.131 244);   /* #0072B2 */
+  --rol-captura: oklch(0.6 0.13 245);      /* #2E86C8 */
+  --rol-pto: oklch(0.62 0.14 070);
+  --rol-electrico: oklch(0.5 0.12 166);
+  --rol-perdida: oklch(0.596 0.133 350);
+  --rol-acento: oklch(0.55 0.15 037);
+}
+
+/* Semáforo idéntico en las 3 pantallas: Ver, Mapa, Diseñar */
+.semaforo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--conf-texto);
+}
+
+.semaforo__simbolo {
+  line-height: 1;
+  font-size: 10px;
+}
+
+.semaforo--verificado .semaforo__simbolo {
+  color: var(--conf-verificado);
+}
+
+.semaforo--inferido .semaforo__simbolo {
+  color: var(--conf-inferido);
+}
+
+.semaforo--pendiente .semaforo__simbolo {
+  color: var(--conf-pendiente);
+}
+
+.semaforo__simbolo--verificado::before { content: "●"; }
+.semaforo__simbolo--inferido::before { content: "◐"; }
+.semaforo__simbolo--pendiente::before { content: "○"; }

@@ -1,0 +1,14 @@
+{
+  "id": "seagen",
+  "nombre": "SeaGen Strangford Lough",
+  "tipo": "Corriente eje horizontal 2 rotores 600 kW monopilote",
+  "potencia_nominal_kw": 1200.0,
+  "dimensiones": "1,2 MW, 11,6 GWh vida, 12M GBP inversion",
+  "origen": "SAE Renewables MeyGen update y Tethys - investigacion 3.2",
+  "año_fin": 2019,
+  "estado": "Desmantelado julio 2019 - primer desmantelamiento completo industria",
+  "causa": "Fin de programa demostracion, coste unitario altisimo 1,03 GBP/kWh solo CAPEX amortizado (11,6 GWh / 12M GBP). Primer maremotriz red comercial 2008.",
+  "origen_causa": "investigacion 3.2 calculo propio 11,6/12M GBP",
+  "coste_hundido": "12M GBP - carisimo por ser primero de su clase, no invalida tecnologia pero explica despliegue lento",
+  "destino_coste": "Capital desarrollo amortizado sobre 11,6 GWh - perdidas desarrollador"
+}

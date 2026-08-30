@@ -1,0 +1,14 @@
+{
+  "id": "oyster_800",
+  "nombre": "Oyster 800 - Aquamarine Power",
+  "tipo": "OWSC aleta articulada boyante",
+  "potencia_nominal_kw": 800.0,
+  "dimensiones": "~10 m profundidad, 0,5 km costa, 2 pistones hidraulicos bombeo a tierra",
+  "origen": "PRIMRE Aquamarine_Power_Oyster_800 y especificacion 5",
+  "año_fin": 2015,
+  "estado": "Inactivo desde 2015",
+  "causa": "Economica - sin comprador, cese actividad noviembre 2015 tras administracion octubre 2015. >40 empresas Orkney, >3M GBP, conectado Billia Croo junio 2012.",
+  "origen_causa": "En.wikipedia Aquamarine Power",
+  "coste_hundido": "Inversion privada perdida, sin recuperacion regulador publicada",
+  "destino_coste": "Capital riesgo privado varado"
+}

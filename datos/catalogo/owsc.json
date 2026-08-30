@@ -1,0 +1,29 @@
+{
+  "id": "owsc",
+  "familia": "undimotriz",
+  "nombre": "Convertidor de oleaje oscilante por embate (OWSC)",
+  "principio": "Aleta articulada en fondo 10-15 m, oscila con embate horizontal de particulas",
+  "simulable": false,
+  "cwr_media_handbook": {
+    "valor": 0.37,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 1 - aleta oscilante fija al fondo 37%",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_min": {
+    "valor": 0.41,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 OWSC 41-65% B~20 m - mejor CWR de todas las familias",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_max": {
+    "valor": 0.65,
+    "unidad": "adimensional",
+    "fuente": "Babarit 2015 max OWSC 65%",
+    "estado": "verificado"
+  },
+  "cwr_handbook_vs_babarit": "Discrepancia: Handbook 37% vs Babarit 41-65% - mismo trabajo Babarit versiones 2011 vs 2015. Rangos recomendados y dos fuentes citadas, no promedio. Mejor CWR y sin embargo Aquamarine quebro.",
+  "ejemplos": "Oyster 1/800 (315/800 kW), WaveRoller",
+  "desenlace_comercial": "Aquamarine Power administracion octubre 2015, cese noviembre 2015, >40 empresas Orkney, >3M GBP - especificacion 5 e investigacion 3.1",
+  "fuente_taxonomia": "EMEC OWSC"
+}

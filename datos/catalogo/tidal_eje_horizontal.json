@@ -1,0 +1,22 @@
+{
+  "id": "tidal_eje_horizontal",
+  "familia": "mareomotriz_corriente",
+  "nombre": "Turbina de eje horizontal",
+  "principio": "Rotor horizontal como eolica, flujo axial gira rotor",
+  "simulable": false,
+  "cp_tipico": {
+    "valor": 0.45,
+    "unidad": "adimensional",
+    "fuente": "Cp 0,40-0,50 turbinas axiales modernas - investigacion 4.7, especificacion M8",
+    "estado": "verificado"
+  },
+  "cp_betz": {
+    "valor": 0.5926,
+    "unidad": "adimensional",
+    "fuente": "Betz 16/27 - Vennell canal confinado puede superar - investigacion 4.7",
+    "estado": "verificado"
+  },
+  "ejemplos": "MeyGen 6 MW 1,5 MW x4 Pentland Firth 84 GWh 21% planta, SeaGen 1,2 MW, Orbital O2 2 MW 20 m, Andritz Hammerfest, Verdant",
+  "desenlace_comercial": "Dominante 40 anos aprendizaje eolico; MeyGen activo mayor array mundo, factor planta 21% incluye retiros mantenimiento",
+  "fuente_taxonomia": "EMEC https://www.emec.org.uk/marine-energy/tidal-devices/ - horizontal axis"
+}

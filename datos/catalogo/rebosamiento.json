@@ -1,0 +1,29 @@
+{
+  "id": "rebosamiento",
+  "familia": "undimotriz",
+  "nombre": "Rebosamiento (overtopping / terminator)",
+  "principio": "Rampa almacena agua en embalse elevado, devuelve por turbina Kaplan baja carga; colectores concentran energia",
+  "simulable": false,
+  "cwr_media_handbook": {
+    "valor": 0.17,
+    "unidad": "adimensional",
+    "fuente": "Handbook cap 1 tabla 1 - rebosamiento flotante 17%",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_min": {
+    "valor": 0.04,
+    "unidad": "adimensional",
+    "fuente": "Babarit rebosamiento 4-23% B~300 m (grandes 124 m)",
+    "estado": "verificado"
+  },
+  "cwr_rango_babarit_max": {
+    "valor": 0.23,
+    "unidad": "adimensional",
+    "fuente": "Babarit max 23%",
+    "estado": "verificado"
+  },
+  "cwr_handbook_vs_babarit": "Consistente: 17% dentro de 4-23%. Potencia suave por almacenamiento hidraulico, estructuras enormes 5,5 t/kW.",
+  "ejemplos": "Wave Dragon 4 MW 22000 t 5000 m3 (nunca construido escala), TAPCHAN Noruega, SSG",
+  "desenlace_comercial": "Wave Dragon nunca escala comercial DanWEC queda en diseno; 22000 t hormigon 4 MW factor planta 34% pero masa mata economia",
+  "fuente_taxonomia": "EMEC overtopping"
+}

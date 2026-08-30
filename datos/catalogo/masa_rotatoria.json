@@ -1,0 +1,29 @@
+{
+  "id": "masa_rotatoria",
+  "familia": "undimotriz",
+  "nombre": "Masa rotatoria",
+  "principio": "Arfada+deriva accionan peso excentrico o giroscopio cuya precesion va a generador interno estanco",
+  "simulable": false,
+  "cwr_media_handbook": {
+    "valor": 0.0,
+    "unidad": "adimensional",
+    "fuente": "Sin CWR Handbook especifica - asimilable a cabeceo",
+    "estado": "pendiente"
+  },
+  "cwr_rango_babarit_min": {
+    "valor": 0.2,
+    "unidad": "adimensional",
+    "fuente": "Asimilado flotante cabeceo 20-36% B~25 m - referencia",
+    "estado": "inferido"
+  },
+  "cwr_rango_babarit_max": {
+    "valor": 0.36,
+    "unidad": "adimensional",
+    "fuente": "Babarit flotante cabeceo max 36%",
+    "estado": "inferido"
+  },
+  "cwr_handbook_vs_babarit": "Sin dato directo, referencia cabeceo 20-36%. Ventaja casco estanco sin penetraciones, desventaja masa/kW y control complejo.",
+  "ejemplos": "Penguin Wello, ISWEC",
+  "desenlace_comercial": "TRL medio, sin granja comercial - argumento fiabilidad casco sellado",
+  "fuente_taxonomia": "EMEC rotating mass"
+}

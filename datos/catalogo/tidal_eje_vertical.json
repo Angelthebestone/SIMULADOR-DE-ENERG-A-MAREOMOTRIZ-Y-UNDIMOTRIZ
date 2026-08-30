@@ -1,0 +1,22 @@
+{
+  "id": "tidal_eje_vertical",
+  "familia": "mareomotriz_corriente",
+  "nombre": "Turbina de eje vertical",
+  "principio": "Rotor vertical omnidireccional, generador fuera agua posible",
+  "simulable": false,
+  "cp_tipico": {
+    "valor": 0.3,
+    "unidad": "adimensional",
+    "fuente": "Cp por debajo horizontal, arranque pobre, par pulsante - investigacion 2.2 estimado",
+    "estado": "inferido"
+  },
+  "cp_betz": {
+    "valor": 0.5926,
+    "unidad": "adimensional",
+    "fuente": "Betz aplica flujo libre",
+    "estado": "verificado"
+  },
+  "ejemplos": "Desarrollos de eje vertical diversos, ventaja omnidireccional no yaw",
+  "desenlace_comercial": "Rendimiento < horizontal, fatiga elevada, nicho",
+  "fuente_taxonomia": "EMEC vertical axis"
+}

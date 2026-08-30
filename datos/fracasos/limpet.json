@@ -1,0 +1,14 @@
+{
+  "id": "limpet",
+  "nombre": "LIMPET Islay",
+  "tipo": "OWC costera columna inclinada",
+  "potencia_nominal_kw": 250.0,
+  "dimensiones": "Diseno 500 kW rebajado a 250 kW tras reevaluacion, 2 Wells contrarrotantes 250 kW c/u",
+  "origen": "Wikipedia Islay LIMPET y especificacion 5",
+  "año_fin": 2012,
+  "estado": "Desmantelado 2011-2012, primer undimotriz comercial mundo nov 2000",
+  "causa": "Tecnica/economica - potencia real mitad de nominal de catalogo (500->250 kW). Leccion: potencia nominal != entregable. Columna inclinada reduce turbulencia.",
+  "origen_causa": "Wikipedia Islay LIMPET",
+  "coste_hundido": "Planta piloto Islay, sin cifra 27M - coste hundido menor escala",
+  "destino_coste": "Queens University / Wavegen - investigacion"
+}
