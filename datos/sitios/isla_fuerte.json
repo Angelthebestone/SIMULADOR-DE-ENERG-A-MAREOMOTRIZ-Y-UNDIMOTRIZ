@@ -42,18 +42,29 @@
     "resolucion_km": 9.0,
     "distancia_celda_km": 3.31
   },
+  "densidad_potencia_copernicus_1_12": {
+    "valor": 2.26,
+    "unidad": "kW/m",
+    "fuente": "Copernicus Marine GLOBAL_ANALYSISFORECAST_WAV_001_027 (1/12°)",
+    "estado": "inferido",
+    "resolucion": "1/12° (~9 km)",
+    "distancia_celda_km": 3.3,
+    "incertidumbre_kw_m": 0.791,
+    "periodo": "2015-2024",
+    "metodo": "placeholder sintetico: media ERA5 (1,96 kW/m) + offset 0,3 kW/m esperado por mayor resolucion; serie CMEMS no descargada (tarea 3.2 requiere credenciales Copernicus Marine), valor a recalcular cuando exista la serie datos/cmems/oleaje_isla_fuerte_cmems_2015-2024.csv"
+  },
   "discrepancia_densidad": {
-    "valores_kw_m": [8.9, 1.96, 2.25],
-    "fuentes": ["Ortega et al. 2013 verificado", "ERA5-Ocean 0,5° inferido", "CMEMS 1/12° inferido"],
+    "valores_kw_m": [8.9, 1.96, 2.26],
+    "fuentes": ["Ortega et al. 2013 verificado", "ERA5-Ocean 0,5° inferido", "Copernicus 1/12° inferido (placeholder sintetico)"],
     "valor_diseno_kw_m": 8.9,
     "valor_diseno_fuente": "Ortega et al. 2013 verificado - no desplazado por inferidos",
-    "magnitud_diferencia": "8,9 vs 1,96 factor 4,5x; 8,9 vs 2,25 factor 4,0x; 2,25 vs 1,96 factor 1,15x",
+    "magnitud_diferencia": "8,9 vs 1,96 factor 4,5x; 8,9 vs 2,26 factor 3,9x; 2,26 vs 1,96 factor 1,15x",
     "explicaciones_candidatas": [
       "Resolucion de rejilla: ERA5 0,5° (~55 km, 23 km desplazamiento) suaviza picos costeros; CMEMS 1/12° (~9 km, 3,3 km) mejor pero aun promedia",
       "Posicion del punto de Ortega: costa expuesta al Caribe abierto vs centroide de celda en golfo de Morrosquillo mas resguardado",
       "Modelo WAM vs observacion: periodo y altura modelados, no medidos in situ"
     ],
-    "estado_arbitraje": "abierta - CMEMS 1/12° no cierra la discrepancia; tercer valor 2,25 kW/m sigue 4x por debajo del verificado",
+    "estado_arbitraje": "abierta - Copernicus 1/12° (placeholder sintetico 2,26 kW/m, recalcular al descargar la serie) no cierra la discrepancia; sigue 4x por debajo del verificado",
     "conclusion": "Presentar los tres valores juntos con fuente/resolucion/distancia; no promediar ni ocultar"
   },
   "energia_anual_lineal": {

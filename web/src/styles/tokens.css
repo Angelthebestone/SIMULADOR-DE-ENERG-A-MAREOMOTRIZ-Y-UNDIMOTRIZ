@@ -10,8 +10,23 @@
   --fondo: oklch(0.960 0.004 106);
   --escala: 1;
 
-  /* Tipografía — pila del sistema, sin CDN (Segoe UI Variable / Segoe UI / system-ui) */
+  /* Paleta marina de dominio. Azules profundos para el recurso que entra del
+     mar; ámbar solar para la energía que el dispositivo consigue captar. Es
+     vocabulario de rol, disjunto del semáforo de estado (--conf-*). */
+  --rol-mar-profundo: oklch(0.402 0.079 236);
+  --rol-mar-medio: oklch(0.500 0.100 226);
+  --rol-captado: oklch(0.520 0.130 062);
+
+  /* Superficie de trabajo del tablero: un escalón por debajo del panel para
+     separar rejilla de contenido sin recurrir a una sombra más. */
+  --superficie: oklch(0.930 0.006 235);
+
+  /* Tipografía — pila del sistema, sin CDN (Segoe UI Variable / Segoe UI / system-ui).
+     La política de origen único prohíbe traer Fira Sans / Fira Code de un CDN,
+     así que la intención de tablero técnico se resuelve con la pila local más
+     numerales tabulares. */
   --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
 
   /* Escala tipográfica: pasos distinguibles */
   --text-meta: 12px;
@@ -19,12 +34,26 @@
   --text-seccion: 20px;
   --text-nivel: 27px;
   --text-cifra: 36px;
+  --text-kpi: 30px;
 
-  /* Espaciado base 4 px — ritmo 1·4·9: --s-1:4px, --s-4:16px, --s-9:36px, --s-13:52px */
+  /* Espaciado base 4 px — ritmo 1·4·9: --s-1:4px, --s-4:16px, --s-9:36px, --s-13:52px
+     Los pasos --s-2 y --s-6 cubren la densidad de tablero entre 4 y 16. */
   --s-1: 4px;
+  --s-2: 8px;
   --s-4: 16px;
+  --s-6: 24px;
   --s-9: 36px;
   --s-13: 52px;
+
+  /* Radios y elevación: una sola escala para toda la interfaz. */
+  --radio: 6px;
+  --radio-caja: 10px;
+  --sombra-caja: 0 1px 2px oklch(0.2 0.02 240 / 0.07);
+
+  /* Movimiento sutil: dos duraciones y una curva de salida. */
+  --dur-rapida: 120ms;
+  --dur-media: 220ms;
+  --ease-salida: cubic-bezier(0.2, 0, 0, 1);
 
   /* Tokens para el mapa: la paleta de relleno del fondo y de la tierra sale
      de aquí, no de literales en mapa.ts. Los valores se declaran en oklch
@@ -38,6 +67,23 @@
 
 [data-sustentacion] {
   --escala: 2.1;
+}
+
+/* Movimiento sutil sólo si el sistema no pide lo contrario. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-rapida: 0ms;
+    --dur-media: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Aplicación base — cifras tabulares y sin altura fija en contenedores de texto */

@@ -1,15 +1,15 @@
 <template>
   <section class="comparar" aria-labelledby="titulo-comparar">
-    <h1 id="titulo-comparar">Comparar — juzgar</h1>
+    <h1 id="titulo-comparar" class="titulo-nivel">Comparar</h1>
 
-    <!-- 20.1 Diagrama de pérdidas: Sankey con ECharts, eslabones recurso->captura->PTO->eléctrico->pérdida, columnas alineadas -->
+    <!-- Diagrama de pérdidas: recurso -> captura -> PTO -> eléctrico -> pérdida -->
     <div class="sankey-wrap">
       <SankeyECharts
         :eslabones="eslabonesSankey"
-        vacio-msg="sin cadena que dibujar todavía — mueve un control o pulsa Calcular"
+        :cargando="cargando"
+        vacio-msg="mueve un control en Ver para dibujar la cadena"
       />
-      <!-- Tabla eslabones alineada con Sankey por nombre, no compite en altura -->
-      <div class="tabla-eslabones" role="table" aria-label="Pérdidas por eslabón">
+      <div class="tabla-eslabones" role="table" aria-label="Pérdidas por eslabón" data-testid="tabla-eslabones">
         <div class="fila cabecera" role="row">
           <span role="columnheader">Eslabón</span><span role="columnheader">Entra</span><span role="columnheader">Sale</span><span role="columnheader">Se pierde</span><span role="columnheader">Aprovecha</span>
         </div>
@@ -20,26 +20,31 @@
           <span role="cell">{{ formatPot(Math.max(e.potencia_entrada_w - e.potencia_salida_w, 0)) }}</span>
           <span role="cell">{{ formatPct(e.rendimiento) }}</span>
         </div>
-        <p v-if="eslabonesSankey.length===0" class="vacio">mueve un control en Ver — sin cadena todavía</p>
+        <div v-if="cargando && eslabonesSankey.length===0" class="esqueleto" aria-hidden="true">
+          <span v-for="n in 4" :key="n" class="esqueleto-fila"></span>
+        </div>
+        <p v-else-if="eslabonesSankey.length===0" class="vacio">
+          <Icono icono="pendiente" tamano="sm" />
+          <span>mueve un control en Ver</span>
+        </p>
       </div>
     </div>
 
-    <!-- 20.2/10.2-10.3 Fichas 8+7 sin fórmulas, fracasos con causa técnica/económica -->
+    <!-- Catálogo EMEC: 8 undimotriz + 7 de corriente, sin fórmulas -->
     <div class="fichas-bloque">
-      <h2>Catálogo EMEC — 8 undimotriz + 7 corriente (sin fórmulas)</h2>
-      <p class="nota">Simulable vs consultable según <code>simulable</code> del archivo — la interfaz no deduce, lee el flag.</p>
-      <div class="grid-fichas">
+      <h2>Catálogo EMEC</h2>
+      <div class="grid-fichas" data-testid="catalogo-fichas" data-origen="simulable">
         <FichaDispositivo v-for="f in catalogo" :key="String(f.id)" :ficha="f as unknown as Record<string,unknown>" />
       </div>
 
       <h2>Dispositivos reales y fracasos</h2>
-      <div class="grid-fichas">
+      <div class="grid-fichas" data-testid="fichas-fracasos">
         <FichaDispositivo v-for="f in fracasos" :key="String(f.id)" :ficha="f as unknown as Record<string,unknown>" tipo="fracaso" />
       </div>
-      <p class="nota-fracasos">Ningún fracaso fue por física imposible — coste, disponibilidad y capital. Fuente: documentacion/investigacion_convertidores_marinos.md §3.3</p>
+      <p class="nota-fracasos">Ninguno falló por física imposible: coste, disponibilidad y capital.</p>
     </div>
 
-    <!-- 20.3 Comparación dos tecnologías sobre mismo emplazamiento, eslabón que separa, cadenas distinta longitud alineadas por nombre -->
+    <!-- Dos tecnologías sobre el mismo recurso, cadenas alineadas por nombre -->
     <div class="comparacion-paralelo">
       <h2>Dos tecnologías en paralelo — mismo recurso</h2>
       <div class="controles-comparar">
@@ -53,10 +58,16 @@
             <option v-for="k in opciones" :key="k" :value="k">{{ k }}</option>
           </select>
         </label>
-        <button @click="comparar">Comparar sobre el mismo emplazamiento</button>
+        <button class="btn-comparar" @click="comparar">Comparar</button>
       </div>
-      <p class="recurso-comun" v-if="recurso">Mismo recurso: {{ recurso.hm0 }} m, {{ recurso.te }} s, {{ recurso.rango_m }} m marea — resueltas con el mismo recurso</p>
-      <div class="tabla-paralelo" role="table" aria-label="Comparación por eslabón alineada por nombre">
+      <p class="recurso-comun" v-if="recurso">Mismo recurso para ambas: {{ recurso.hm0 }} m, {{ recurso.te }} s, {{ recurso.rango_m }} m de marea</p>
+      <div
+        class="tabla-paralelo"
+        role="table"
+        aria-label="Comparación por eslabón"
+        data-testid="tabla-paralelo"
+        data-alineacion="nombre"
+      >
         <div class="fila cabecera" role="row"><span>Eslabón</span><span>{{ claveA }}</span><span>{{ claveB }}</span></div>
         <div v-for="nombre in nombresAlineados" :key="nombre" class="fila" role="row">
           <span><strong>{{ nombre }}</strong></span>
@@ -64,26 +75,25 @@
           <span>{{ pctDe(nombre, 'b') }}</span>
         </div>
       </div>
-      <p class="divergencia" aria-live="polite">
+      <p class="divergencia" aria-live="polite" data-testid="divergencia">
         Se separan en: <strong>{{ divergencia }}</strong>
       </p>
-      <p class="nota-alineacion">Cadenas de distinta longitud alineadas por nombre, no por índice — eslabón ausente se declara ausente, no se compara índice a índice.</p>
       <EstadoBloque :estado="estadoComparar" :motivo="motivoComparar" />
     </div>
 
-    <!-- Isla Fuerte 8.9 vs 1.96 vs 2.25 juntos (21.3) -->
+    <!-- Isla Fuerte: los tres valores juntos, sin promediar -->
     <div class="discrepancia">
       <h2>Isla Fuerte — tres valores juntos</h2>
       <table class="tabla-discrepancia">
         <thead><tr><th>Fuente</th><th>Valor</th><th>Estado</th><th>Resolución</th><th>Distancia celda</th></tr></thead>
         <tbody>
-          <tr><td>Ortega et al. 2013 RE 57 240-248</td><td>8,9 kW/m</td><td><span aria-hidden="true">●</span> verificado</td><td>publicación puntual</td><td>0,0 km</td></tr>
-          <tr><td>ERA5-Ocean  0,5° vía Open-Meteo 2015-2024</td><td>1,96 kW/m</td><td><span aria-hidden="true">◐</span> inferido</td><td>0,5° (~55 km)</td><td>23,0 km</td></tr>
-          <tr><td>CMEMS GLOBAL_ANALYSISFORECAST_WAV_001_027 1/12°</td><td>2,25 kW/m</td><td><span aria-hidden="true">◐</span> inferido</td><td>1/12° (~9 km)</td><td>3,31 km</td></tr>
+          <tr><td>Ortega et al. 2013 RE 57 240-248</td><td>8,9 kW/m</td><td><span class="semaforo semaforo--verificado"><span class="semaforo__simbolo semaforo__simbolo--verificado" aria-hidden="true"></span> verificado</span></td><td>publicación puntual</td><td>0,0 km</td></tr>
+          <tr><td>ERA5-Ocean 0,5° vía Open-Meteo 2015-2024</td><td>1,96 kW/m</td><td><span class="semaforo semaforo--inferido"><span class="semaforo__simbolo semaforo__simbolo--inferido" aria-hidden="true"></span> inferido</span></td><td>0,5° (~55 km)</td><td>23,0 km</td></tr>
+          <tr><td>CMEMS GLOBAL_ANALYSISFORECAST_WAV_001_027 1/12°</td><td>2,25 kW/m</td><td><span class="semaforo semaforo--inferido"><span class="semaforo__simbolo semaforo__simbolo--inferido" aria-hidden="true"></span> inferido</span></td><td>1/12° (~9 km)</td><td>3,31 km</td></tr>
         </tbody>
       </table>
-      <p>Magnitud diferencia: 8,9 vs 1,96 = <strong>4,5×</strong>; 8,9 vs 2,25 = 4,0×; 2,25 vs 1,96 = 1,15× — valor diseño 8,9 (no promediado, no oculto).</p>
-      <p class="sub">Explicaciones candidatas (abierta, sin cerrar): resolución de rejilla, posición del punto expuesto vs centroide golfo Morrosquillo, WAM vs observación. Estado arbitraje: <em>abierta</em>.</p>
+      <p class="veredicto-linea">Diferencia de <strong>4,5×</strong> entre el mayor y el menor. Valor de diseño: 8,9 kW/m, sin promediar.</p>
+      <p class="sub">Discrepancia abierta: resolución de rejilla, punto expuesto frente a centroide del golfo, modelo frente a observación.</p>
     </div>
   </section>
 </template>
@@ -93,12 +103,16 @@ import { ref, computed, onMounted } from 'vue'
 import SankeyECharts from '../components/SankeyECharts.vue'
 import FichaDispositivo from '../components/FichaDispositivo.vue'
 import EstadoBloque from '../components/EstadoBloque.vue'
+import Icono from '../components/Icono.vue'
 import { formatearNumero } from '../utils/formato'
 
 type Eslabon = { nombre: string; potencia_entrada_w: number; potencia_salida_w: number; rendimiento: number }
 
-// Props desde contrato Resultado — todo viene de Resultado, nada se deriva en presentación
-const props = defineProps<{ resultado?: { eslabones: Eslabon[]; recurso?: Record<string, unknown> } }>()
+// Todo viene del cálculo; nada se deriva en presentación.
+const props = defineProps<{
+  resultado?: { eslabones: Eslabon[]; recurso?: Record<string, unknown> }
+  cargando?: boolean
+}>()
 
 const eslabonesSankey = computed<Eslabon[]>(() => {
   const src = props.resultado?.eslabones ?? []
@@ -277,30 +291,68 @@ async function comparar(){
 </script>
 
 <style scoped>
-.comparar{ max-width:1180px; margin:0 auto; padding:12px }
-.sankey-wrap{ display:grid; grid-template-columns: 5fr 7fr; gap:16px; align-items:start; margin:12px 0 }
+.comparar{ max-width:1180px; margin:0 auto; padding:12px; display:grid; gap: var(--s-6); align-content:start }
+/* Un hijo de rejilla no encoge por debajo de su contenido salvo que se le diga.
+   Sin esto la tabla de discrepancia, que no parte lineas, estiraba todo el
+   nivel y el panel se desplazaba en horizontal en pantallas estrechas. */
+.comparar > *{ min-inline-size: 0 }
+.sankey-wrap > *{ min-inline-size: 0 }
+
+.titulo-nivel{
+  font-size: var(--text-meta);
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color: var(--tenue);
+  margin:0;
+}
+
+.comparar h2{ font-size: var(--text-seccion); margin:0 0 var(--s-2) }
+
+.sankey-wrap{ display:grid; grid-template-columns: 5fr 7fr; gap: var(--s-4); align-items:start }
 @media (max-width: 900px){ .sankey-wrap{ grid-template-columns:1fr } }
-.tabla-eslabones{ border:1px solid var(--borde, #B8B8B2); border-radius:8px; overflow:auto; background: var(--panel,#fff); box-shadow: 0 1px 2px oklch(0.2 0.02 240 / 0.06); }
-.fila{ display:grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 0.9fr; gap:8px; padding:8px 10px; border-bottom:1px solid var(--borde-suave,#D6D6D1); align-items:center }
-.fila.cabecera{ font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color: var(--tenue,#5A636B); background: var(--fondo,#F2F2EF) }
-.vacio{ color: var(--tenue); font-style:italic; padding:8px }
-.grid-fichas{ display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin:10px 0 18px }
-.grid-fichas > :first-child{ grid-column: span 2; }
-@media (max-width: 860px){ .grid-fichas{ grid-template-columns: repeat(2, 1fr); } .grid-fichas > :first-child{ grid-column: span 2; } }
-@media (max-width: 520px){ .grid-fichas{ grid-template-columns: 1fr; } .grid-fichas > :first-child{ grid-column: auto; } }
-.nota, .nota-fracasos, .nota-alineacion{ font-size:12px; color: var(--tenue); }
-.comparacion-paralelo{ margin-top:18px; border-top:1px solid var(--borde-suave); padding-top:12px }
-.controles-comparar{ display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin:8px 0 }
-.controles-comparar label{ display:flex; flex-direction:column; font-size:14px; gap:4px }
-.tabla-paralelo{ border:1px solid var(--borde); border-radius:8px; overflow:auto; background: var(--panel) }
-.recurso-comun{ font-size:12px; color: var(--tenue) }
-.divergencia{ margin:8px 0; font-size:14px }
-.discrepancia{ margin-top:18px; border:1px solid var(--borde); border-radius:8px; padding:10px; background: var(--panel) }
-.tabla-discrepancia{ width:100%; border-collapse:collapse; font-size:14px; overflow:auto; display:block; max-width:100% }
+
+.tabla-eslabones, .tabla-paralelo{
+  border:1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  overflow:auto;
+  background: var(--panel);
+  box-shadow: var(--sombra-caja);
+}
+
+.fila{ display:grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 0.9fr; gap: var(--s-2); padding:6px 10px; border-bottom:1px solid var(--borde-suave); align-items:center; font-family: var(--font-mono) }
+.fila > :first-child{ font-family: var(--font-sans) }
+.fila.cabecera{ font-family: var(--font-sans); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color: var(--tenue); background: var(--superficie) }
+.tabla-paralelo .fila{ grid-template-columns: 1.4fr 1fr 1fr }
+
+/* Carga con estructura: el esqueleto ocupa el sitio de las filas que faltan. */
+.esqueleto{ display:grid; gap:6px; padding:10px }
+.esqueleto-fila{ display:block; block-size:1rem; border-radius:4px; background: var(--superficie); animation: latido 1.4s ease-in-out infinite alternate }
+@keyframes latido{ from{ opacity:0.55 } to{ opacity:1 } }
+
+.vacio{ display:flex; align-items:center; gap:6px; color: var(--tenue); font-style:italic; padding:10px; margin:0; font-size: var(--text-meta) }
+
+.grid-fichas{ display:grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); margin: var(--s-2) 0 var(--s-4) }
+@media (max-width: 860px){ .grid-fichas{ grid-template-columns: repeat(2, 1fr) } }
+@media (max-width: 520px){ .grid-fichas{ grid-template-columns: 1fr } }
+
+.nota-fracasos, .sub, .recurso-comun{ font-size: var(--text-meta); color: var(--tenue); margin: var(--s-1) 0 0 }
+
+.comparacion-paralelo{ border-top:1px solid var(--borde-suave); padding-top: var(--s-4) }
+.controles-comparar{ display:flex; gap: var(--s-2); flex-wrap:wrap; align-items:end; margin: var(--s-2) 0 }
+.controles-comparar label{ display:flex; flex-direction:column; font-size: var(--text-meta); text-transform:uppercase; letter-spacing:0.04em; color: var(--tenue); gap:2px }
+.controles-comparar select{ font-size: var(--text-cuerpo); text-transform:none; letter-spacing:0; color: var(--tinta); padding:4px 8px; border:1px solid var(--borde); border-radius: var(--radio); background: var(--panel) }
+.btn-comparar{ padding:4px 14px; border:1px solid var(--rol-mar-profundo); border-radius: var(--radio); background: var(--rol-mar-profundo); color: var(--panel); font-weight:600; cursor:pointer }
+.btn-comparar:hover{ background: var(--rol-mar-medio); border-color: var(--rol-mar-medio) }
+
+.divergencia{ margin: var(--s-2) 0; font-size: var(--text-cuerpo) }
+
+.discrepancia{ border:1px solid var(--borde-suave); border-radius: var(--radio-caja); padding: var(--s-2) var(--s-4); background: var(--panel); box-shadow: var(--sombra-caja) }
+.tabla-discrepancia{ width:100%; border-collapse:collapse; font-size: var(--text-cuerpo); overflow:auto; display:block; max-width:100% }
 .tabla-discrepancia th, .tabla-discrepancia td{ border-bottom:1px solid var(--borde-suave); padding:6px 8px; text-align:left; white-space:nowrap }
-.tabla-discrepancia th{ font-size:12px; text-transform:uppercase; letter-spacing:0.04em; color: var(--tenue) }
-.sub{ font-size:12px; color: var(--tenue) }
-.comparar :focus-visible{ outline:2px solid var(--foco, #0072B2); outline-offset:2px; border-radius:4px }
-@media (max-width: 320px){ .fila{ grid-template-columns: 1fr 1fr; } .sankey-wrap{ grid-template-columns:1fr } }
+.tabla-discrepancia th{ font-size: var(--text-meta); text-transform:uppercase; letter-spacing:0.04em; color: var(--tenue) }
+.veredicto-linea{ margin: var(--s-2) 0 0; font-size: var(--text-cuerpo) }
+
+.comparar :focus-visible{ outline:2px solid var(--foco); outline-offset:2px; border-radius:4px }
+@media (max-width: 320px){ .fila{ grid-template-columns: 1fr 1fr } .sankey-wrap{ grid-template-columns:1fr } }
 /* Sin altura fija: tablas y sankey desplazan en su propio contenedor */
 </style>

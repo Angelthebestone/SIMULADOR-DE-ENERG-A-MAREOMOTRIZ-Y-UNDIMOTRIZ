@@ -312,14 +312,22 @@ def simular(
     sitio = cargar_sitio(params.sitio_id)
     contexto = ContextoRecurso(profundidad_m=params.profundidad_m)
     resultado = crear_dispositivo(params).resolver(recurso_de(params, sitio), contexto)
-    # Genera series de tiempo y elevacion para la animacion: la onda regular
-    # equivalente del par (Hm0, Te) sobre 10 ciclos, 50 muestras por ciclo.
+    # La animacion necesita un eje de tiempo. Si el dispositivo ya integro su
+    # propia posicion, solo se le pone el eje: sobreescribir z_m con una senoide
+    # de amplitud Hm0/2 hacia que la boya dibujada fuera la superficie del mar,
+    # asi que el freno del PTO no cambiaba nada ni en pantalla ni en la amplitud
+    # publicada. Solo cuando no hay serie propia se sintetiza la onda regular
+    # equivalente, y entonces es la elevacion, no la posicion de un cuerpo.
     if not resultado.series.get("t_s"):
-        omega = 2.0 * math.pi / max(params.te_s, 1e-6)
-        t = np.linspace(0.0, 10.0 * params.te_s, 500)
-        a = params.hm0_m / 2.0
-        resultado.series["t_s"] = t
-        resultado.series["z_m"] = a * np.sin(omega * t)
+        z_propia = resultado.series.get("z_m")
+        if z_propia is not None and len(z_propia) > 0:
+            resultado.series["t_s"] = np.linspace(0.0, 20.0 * params.te_s, len(z_propia))
+        else:
+            omega = 2.0 * math.pi / max(params.te_s, 1e-6)
+            t = np.linspace(0.0, 10.0 * params.te_s, 500)
+            a = params.hm0_m / 2.0
+            resultado.series["t_s"] = t
+            resultado.series["z_m"] = a * np.sin(omega * t)
     prog(10)
     # La integracion de una sola condicion de mar no se puede interrumpir por
     # dentro, pero todo lo que viene detras si: barridos, panel de sitio y, sobre

@@ -81,9 +81,10 @@ def test_18_2_sin_serie_sintetica():
     # no generar seno sintético para boya cuando falta z_m
     # debe haber return temprano sin asignar serie sintética
     assert re.search(r"series\s*=\s*null", t)
-    # Ver.vue también declara ausencia
+    # Ver.vue también declara la ausencia: renderiza el mensaje que compone
+    # AnimacionCanvas en vez de repetir el literal en dos archivos.
     v = _read(VER)
-    assert "sin serie de posición" in v
+    assert "sinSerie" in v and "aviso-sin-serie" in v
 
 
 def test_18_2_no_sintetiza_en_web():

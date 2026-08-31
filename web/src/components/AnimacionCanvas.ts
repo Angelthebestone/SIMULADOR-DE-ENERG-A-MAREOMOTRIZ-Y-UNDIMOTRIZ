@@ -21,7 +21,11 @@ export class AnimacionCanvas {
   private t0: number | null = null;
   private dispositivo = "desconocido";
   private profundidad: number = PROFUNDIDAD_M;
-  private sinSerieMsg = "";
+  sinSerieMsg = "";
+  private medidas: [number, number] = [0, 0];
+  private dpr = 0;
+  private ultimoT = 0;
+  private observador: ResizeObserver | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -38,15 +42,40 @@ export class AnimacionCanvas {
       });
     }
     this.ajustarDPR();
+
+    // El primer dibujo ocurre antes de que el navegador asiente la maquetación,
+    // así que el lienzo se mide estrecho. Mientras hay animación el siguiente
+    // fotograma lo corrige solo; en pausa (o con movimiento reducido) no hay
+    // siguiente fotograma, de ahí el observador.
+    if (typeof ResizeObserver !== "undefined") {
+      this.observador = new ResizeObserver(() => {
+        if (this.pausado) this.dibujar(this.ultimoT);
+      });
+      this.observador.observe(canvas);
+    }
   }
 
-  private ajustarDPR() {
-    const dpr = window.devicePixelRatio || 1;
+  /** Devuelve el tamaño CSS actual y reajusta el búfer si ha cambiado.
+   *
+   * Se llama en cada dibujo, no sólo en el constructor: cuando el canvas se
+   * construye antes de que el navegador aplique la maquetación, el rect mide
+   * ~1 px y el búfer se quedaba en 2 px de ancho para siempre, así que no se
+   * veía nada aunque se dibujara. */
+  private ajustarDPR(): [number, number] {
     const rect = this.canvas.getBoundingClientRect();
-    if (rect.width === 0) return;
-    this.canvas.width = rect.width * dpr;
-    this.canvas.height = rect.height * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const [w, h] = [rect.width, rect.height];
+    if (w < 2 || h < 2) return this.medidas;
+    const dpr = window.devicePixelRatio || 1;
+    // El DPR también cambia (mover la ventana a otro monitor, zoom del
+    // navegador), así que entra en la comparación y no sólo el tamaño CSS.
+    if (w !== this.medidas[0] || h !== this.medidas[1] || dpr !== this.dpr) {
+      this.canvas.width = Math.round(w * dpr);
+      this.canvas.height = Math.round(h * dpr);
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.medidas = [w, h];
+      this.dpr = dpr;
+    }
+    return this.medidas;
   }
 
   // Contrato: una transferencia por simulación. No llamar por fotograma.
@@ -120,8 +149,9 @@ export class AnimacionCanvas {
 
   // Dibuja un instante t (segundos de animación). No comunica con núcleo.
   dibujar(t: number) {
-    const w = this.canvas.getBoundingClientRect().width;
-    const h = this.canvas.getBoundingClientRect().height;
+    this.ultimoT = t;
+    const [w, h] = this.ajustarDPR();
+    if (w < 2 || h < 2) return;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, w, h);
 
@@ -192,6 +222,16 @@ export class AnimacionCanvas {
     ctx.fillText(lambdaTxt, 8, h - 8);
   }
 
+  /** Punto de entrada normal: pinta siempre un fotograma y anima si procede.
+   *
+   * Respetar `prefers-reduced-motion` significa no mover la ola, no dejar el
+   * lienzo en blanco: antes `iniciar()` salía por la primera línea y quien
+   * tuviera la preferencia activada no veía absolutamente nada. */
+  arrancar() {
+    this.dibujar(0);
+    this.iniciar();
+  }
+
   iniciar() {
     if (this.pausado) return;
     const loop = (now: number) => {
@@ -213,8 +253,9 @@ export class AnimacionCanvas {
   }
 
   reanudar() {
-    // respeta prefers-reduced-motion al reanudar
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    // `prefers-reduced-motion` fija el valor inicial de `pausado`; pulsar
+    // "Reanudar" es una decisión explícita del usuario y manda sobre él.
+    // Antes el botón no hacía nada y parecía roto.
     this.pausado = false;
     this.t0 = null;
     this.iniciar();
@@ -222,5 +263,7 @@ export class AnimacionCanvas {
 
   detener() {
     this.pausar();
+    this.observador?.disconnect();
+    this.observador = null;
   }
 }

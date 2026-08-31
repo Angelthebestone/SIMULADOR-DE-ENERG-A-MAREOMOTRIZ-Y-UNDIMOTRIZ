@@ -1,7 +1,7 @@
 {
   "_fuente": "XM/API_XM (EquipoAnaliticaXM, pydataxm, MIT, sin clave) https://github.com/EquipoAnaliticaXM/API_XM",
   "_nota": "Bolsa = solo generación (horaria), distinto de CU Superservicios (GM+DM+CM). Factor emisión horario. Cache offline; la app no hace requests.",
-  "periodo_solicitado": "2023-01-01 a 2023-12-31",
+  "periodo_solicitado": "2023-01-01 a 2024-12-31",
   "PrecBolsNaci": {
     "metric_id": "PrecBolsNaci",
     "descripcion": "Precio de Bolsa Nacional",
@@ -9,8 +9,8 @@
     "entity": "Sistema",
     "endpoint": "HourlyEntities",
     "unidad": "COP/kWh",
-    "archivo": "PrecBolsNaci_2023-2023.csv",
-    "filas": 8760,
+    "archivo": "PrecBolsNaci_2023-2024.csv",
+    "filas": 17544,
     "formato": "fecha_hora (ISO8601), valor (float), id"
   },
   "factorEmisionCO2e": {
@@ -20,8 +20,8 @@
     "entity": "Sistema",
     "endpoint": "HourlyEntities",
     "unidad": "tCO2eq/kWh",
-    "archivo": "factorEmisionCO2e_2023-2023.csv",
-    "filas": 8760,
+    "archivo": "factorEmisionCO2e_2023-2024.csv",
+    "filas": 17544,
     "formato": "fecha_hora (ISO8601), valor (float), id"
   }
 }

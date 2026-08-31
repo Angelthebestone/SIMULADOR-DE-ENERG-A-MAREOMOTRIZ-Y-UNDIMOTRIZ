@@ -11,6 +11,8 @@
   "resolucion_m": 450,
   "rango": "2023",
   "licencia": "GEBCO Compilation Group (2023), CC BY 4.0",
+  "maxzoom": 11,
+  "zoom_max": 11,
   "niveles": [
     0,
     1,
@@ -20,9 +22,11 @@
     5,
     6,
     7,
-    8
+    8,
+    9,
+    10,
+    11
   ],
-  "zoom_max": 8,
   "fuente": "GEBCO/GEBCO_2023 via Google Earth Engine",
   "estimacion_plano": {
     "ancho_m": 1300792,

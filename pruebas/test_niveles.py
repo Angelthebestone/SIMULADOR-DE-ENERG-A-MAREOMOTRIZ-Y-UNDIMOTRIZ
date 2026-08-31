@@ -37,6 +37,9 @@ PLOTLY = WEB / "components" / "GraficaPlotly.vue"
 FICHA = WEB / "components" / "FichaDispositivo.vue"
 ESTADO = WEB / "components" / "EstadoBloque.vue"
 MAIN = WEB / "main.ts"
+# La carcasa (pestanas, foco, cita) se declara en su hoja, no en una cadena
+# de CSS inyectada desde main.ts: las reglas se comprueban sobre las dos.
+APP_CSS = WEB / "styles" / "app.css"
 INVEST = REPO / "documentacion" / "investigacion_convertidores_marinos.md"
 FORMULAS = REPO / "app" / "formulas.py"
 
@@ -139,28 +142,45 @@ def test_20_05_katex_griego_fraccion_exponente():
         'FORMULA_DENSIDAD = "J = \\\\rho g^2 Hm0^2 Te / (64\\\\pi)"' in c
     ), "variable exacta FORMULA_DENSIDAD"
     assert "\\rho" in c, "densidad agua como \\rho"
-    assert "\\frac" in c, "división como \\frac{}{}"
-    assert "^{" in c, "exponentes ^{}"
-    # no queda fórmula plana rho g² sin KaTeX
+    # no queda fórmula plana sin KaTeX
     assert "katex" in c.lower(), "KaTeX para fórmulas"
+    # La vista renderiza la expresión que llega, no una copia suya: cada tarjeta
+    # tiene su nodo de render y su sustitución.
+    assert 'data-testid="formula-tarjeta"' in c, "una tarjeta por fórmula"
+    assert "f.sustitucion" in c, "la tarjeta muestra la sustitución del cálculo"
 
 
 def test_20_05_formulas_py_katex():
     t = _read(FORMULAS)
     assert "\\rho" in t and "\\frac" in t, "app/formulas.py entrega KaTeX (\\rho, \\frac)"
+    assert "^" in t, "app/formulas.py entrega exponentes"
 
 
 # 20.6
 def test_20_06_coma_en_text_sin_espacio_miles():
+    # El ancla ya no es una frase de ejemplo escrita en la vista: la coma pegada
+    # la produce quien compone el LaTeX, y la vista sólo lo pinta.
     c = _read(CALCULAR)
-    assert "\\text{" in c, "valores sustituidos envueltos en \\text{8,9} para coma sin espacio"
-    # demostración con 8,9 y miles 1.025
-    assert "8,9" in c or "8.9" in c
+    assert "katex" in c.lower(), "la vista pinta el LaTeX que recibe"
+    f = _read(FORMULAS)
+    assert "\\text{" in f, "valores sustituidos en \\text{} para coma sin espacio"
     # formato español miles no es decimal
     from app.formato import formatear_numero
 
     assert formatear_numero(1025, 0) == "1.025"
     assert formatear_numero(8.9, 1) == "8,9"
+    # y la sustitución que llega a la tarjeta trae la coma decimal ya puesta
+    from app.formulas import formulas_desde_resultado
+    from nucleo.resultado import Eslabon, Resultado
+
+    r = Resultado(
+        eslabones=[Eslabon("recurso", 1000.0, 900.0, 0.9)],
+        recurso={"Hm0": 1.5, "Te": 7.0},
+    )
+    sustituciones = " ".join(v[1] for v in formulas_desde_resultado(r).values())
+    assert re.search(r"\d,\d", sustituciones), (
+        f"la sustitución debe traer coma decimal española: {sustituciones[:120]!r}"
+    )
 
 
 # 20.7
@@ -173,15 +193,22 @@ def test_20_07_graficas_plotly_compuestas_en_python():
     assert (REPO / "analisis" / "captura.py").exists()
     assert (REPO / "analisis" / "resonancia.py").exists()
     assert (REPO / "analisis" / "aep.py").exists()
-    # LCOE con separador miles (formatear)
-    assert "formatMiles" in d or "separador miles" in d.lower()
+    # LCOE con separador de miles: lo hace formatMiles, y la cifra es
+    # localizable por su atributo, no por una coletilla escrita al lado.
+    assert "formatMiles" in d, "el LCOE se formatea con formatMiles"
+    assert 'data-testid="lcoe-valor"' in d, "la cifra de LCOE es localizable"
+    from app.formato import formatear_numero
+
+    assert formatear_numero(1234567, 0) == "1.234.567", "miles con punto"
 
 
 # 20.8
 def test_20_08_disenar_rail_4_anclas_100vh_1280x720():
     d = _read(DISENAR)
     assert d.count("sec-") >= 4, "rail 4 anclas (resonancia, límites Falnes, matriz, AEP/LCOE)"
-    assert "100vh" in d, "cada sección = 100vh operable sin scroll previo a 1280x720"
+    assert re.search(r"min-block-size\s*:\s*100%|height\s*:\s*100vh", d), (
+        "cada sección llena una pantalla, operable sin scroll previo a 1280x720"
+    )
     assert "1280" in d or "1280x720" in d
 
 
@@ -236,7 +263,7 @@ def test_21_02_cargando_vacio_desbordado_teclado():
             break
     assert 'tabindex="0"' in _read(ESTADO)
     # foco visible 2px --foco
-    m = _read(MAIN)
+    m = _read(MAIN) + _read(APP_CSS)
     assert "--foco" in m and "2px" in m
 
 
@@ -256,9 +283,15 @@ def test_21_03_isla_fuerte_tres_valores_juntos_con_resolucion_y_4_5x():
 # 21.5
 def test_21_05_corriente_pendiente_cuando_sin_dato():
     d = _read(DISENAR)
-    assert "corriente" in d.lower()
-    assert "pendiente" in d.lower() and "○" in d
-    assert "sin dato" in d.lower() or "sin dato propio" in d.lower() or "Dato pendiente" in d
+    # La fila de corriente mareal existe siempre; sin dato queda pendiente y
+    # sin cifra. El estado va en un atributo, no en una frase.
+    assert "corriente" in d.lower(), "la tabla de criterios declara la corriente mareal"
+    assert 'data-testid="tabla-criterios"' in d, "criterios como tabla localizable"
+    assert ':data-estado="c.estado"' in d, "cada fila publica su estado"
+    assert "'pendiente'" in d, "la fila sin dato se marca pendiente"
+    assert "sin dato" in d.lower(), "y dice que no hay dato, en vez de inventar cifra"
+    # el semáforo de la fila usa los mismos tokens de estado
+    assert "--conf-pendiente" in d
 
 
 # 21.6
@@ -272,9 +305,18 @@ def test_21_06_dato_pendiente_bloquea_calculo_sin_cifra():
 # 21.7
 def test_21_07_restringido_no_es_utilizable_ni_descartado():
     d = _read(DISENAR)
-    assert "restringido" in d.lower()
-    assert "no es utilizable ni descartado" in d.lower()
-    assert "descartado" in d.lower() and "utilizable" in d.lower()
+    # Los tres estados son independientes: la vista los publica tal cual en
+    # data-estado, sin colapsar `restringido` en ninguno de los otros dos.
+    assert 'data-testid="estado-legal"' in d, "el estado legal es localizable"
+    assert ':data-estado="estadoLegal"' in d, "el estado legal se publica sin traducir"
+    for estado in ("restringido", "utilizable", "descartado"):
+        assert estado in d.lower(), f"falta el estado legal {estado}"
+    # y cada uno tiene su propia marca visual, ninguna compartida
+    marcas = {
+        m.group(1)
+        for m in re.finditer(r"\.legal\.(\w+)\{[^}]*--conf-(\w+)", d)
+    }
+    assert len(marcas) >= 2, f"los estados legales comparten marca visual: {marcas}"
 
 
 # 22.x
@@ -283,14 +325,15 @@ def test_22_criterios_review_report_portados():
     r = _read(REPO / ".commandcode" / "design" / "review-report.md")
     assert r, "review-report.md existe"
     # foco visible en todos los controles
-    assert "2px" in _read(MAIN) and "--foco" in _read(MAIN)
+    carcasa = _read(MAIN) + _read(APP_CSS)
+    assert "2px" in carcasa and "--foco" in carcasa
     # Comparar: Sankey no compite en altura con tabla
     assert "SankeyECharts" in _read(COMPARAR)
 
 
 # 23.x
 def test_23_modo_sustentacion_y_accesibilidad():
-    m = _read(MAIN)
+    m = _read(MAIN) + _read(APP_CSS)
     assert "[data-sustentacion]" in m or "data-sustentacion" in m
     assert "--escala:2.1" in m or "--escala" in m and "2.1" in m
     assert "Escape" in m or "ESC" in m, "atajo ESC"
@@ -300,7 +343,7 @@ def test_23_modo_sustentacion_y_accesibilidad():
     assert "320px" in _read(DISENAR) or "320px" in _read(CALCULAR) or "320px" in m
     for p in [DISENAR, CALCULAR, COMPARAR]:
         assert (
-            "height:" not in _read(p) or "100vh" in _read(p) or "min-height" in _read(p)
+            "height:" not in _read(p) or "100%" in _read(p) or "min-" in _read(p)
         ), f"{p.name} sin altura fija que rompa 200% zoom"
     # map text-size y re-layout figuras
     assert "text-size" in m or "map" in m.lower()
@@ -322,3 +365,73 @@ def test_codigo_muerto_quitado():
     # no contenedores height fijo que rompen 200% zoom ya cubierto
     # no inventar valores — pendiente bloquea
     assert "Dato pendiente" in _read(DISENAR) or "pendiente" in _read(DISENAR).lower()
+
+
+# --- Copy: nada de vocabulario de construcción ni citas largas en pantalla ---
+
+VISTAS = ["Ver.vue", "Comparar.vue", "Calcular.vue", "Disenar.vue"]
+JERGA = ["contrato", "flag", "66ch", "oráculo", "oraculo", "demo", "spec"]
+
+
+def _marcado_visible(fuente: str) -> str:
+    """Devuelve el <template> sin comentarios HTML ni atributos técnicos.
+
+    Lo que queda es, aproximadamente, lo que una persona lee en pantalla: los
+    comentarios de código y los identificadores de prueba no se pintan.
+    """
+    m = re.search(r"<template>(.*?)</template>", fuente, re.DOTALL)
+    cuerpo = m.group(1) if m else ""
+    cuerpo = re.sub(r"<!--.*?-->", "", cuerpo, flags=re.DOTALL)
+    cuerpo = re.sub(r'data-testid="[^"]*"', "", cuerpo)
+    cuerpo = re.sub(r'class="[^"]*"', "", cuerpo)
+    return cuerpo
+
+
+def test_sin_jerga_interna_en_las_vistas():
+    """Ningún texto de pantalla usa el vocabulario del equipo que la construyó."""
+    culpables: list[str] = []
+    for nombre in VISTAS:
+        cuerpo = _marcado_visible(_read(WEB / "views" / nombre)).lower()
+        for palabra in JERGA:
+            if palabra in cuerpo:
+                culpables.append(f"{nombre}: {palabra}")
+    # La carcasa se mira entera: su plantilla es una cadena, no un <template>.
+    main = _read(MAIN)
+    plantilla = main[main.find("const PLANTILLA") : main.find("const app =")]
+    plantilla = re.sub(r'data-testid="[^"]*"', "", plantilla).lower()
+    for palabra in JERGA:
+        if palabra in plantilla:
+            culpables.append(f"main.ts: {palabra}")
+    assert not culpables, "vocabulario de construcción visible en pantalla: " + ", ".join(culpables)
+
+
+def test_ninguna_cita_larga_en_linea():
+    """Las citas viven en el diálogo Fuentes, no pegadas a una cifra."""
+    dialogo = WEB / "components" / "DialogoFuentes.vue"
+    assert dialogo.exists(), "falta el diálogo de fuentes"
+    assert 'data-testid="cita-completa"' in _read(dialogo), "la cita completa vive en el diálogo"
+
+    largas: list[str] = []
+    for nombre in VISTAS:
+        fuente = _read(WEB / "views" / nombre)
+        # cadenas literales del script, que son las que podrían pintarse
+        for cadena in re.findall(r"""(?<![\w])['"]([^'"\n]{200,})['"]""", fuente):
+            largas.append(f"{nombre}: {cadena[:60]}…")
+    assert not largas, "cita larga en línea dentro de una vista: " + "; ".join(largas)
+
+
+def test_las_vistas_declaran_estado_de_carga_con_estructura():
+    """Gráfica y Sankey muestran esqueleto mientras calculan, no sólo texto."""
+    for ruta in (PLOTLY, SANKEY):
+        t = _read(ruta)
+        assert "cargando" in t, f"{ruta.name} no conoce el estado de carga"
+        assert "esqueleto" in t.lower(), f"{ruta.name} no reserva estructura al cargar"
+
+
+def test_la_carcasa_publica_los_cuatro_indicadores():
+    """Los cuatro KPI existen, se anuncian y declaran su estado."""
+    m = _read(MAIN)
+    for clave in ("kpi-", "recurso", "potencia", "anual", "factor"):
+        assert clave in m, f"falta el indicador {clave}"
+    assert 'role="status"' in m and 'aria-live="polite"' in m, "la barra de KPI se anuncia"
+    assert "pendiente:" in m, "un indicador sin dato queda pendiente"

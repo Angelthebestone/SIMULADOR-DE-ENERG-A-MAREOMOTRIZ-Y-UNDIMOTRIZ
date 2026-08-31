@@ -2,16 +2,19 @@ from __future__ import annotations
 
 
 def formatear_numero(valor: float, decimales: int = 1) -> str:
-    negativo = valor < 0
-    v = abs(float(valor))
-    entero = int(v)
-    dec = v - entero
-    entero_str = f"{entero:,}".replace(",", ".")
-    if decimales <= 0:
-        res = entero_str
-    else:
-        dec_str = f"{dec:.{decimales}f}"[1:].replace(".", ",")
-        res = entero_str + dec_str
+    """Numero en formato espanol: coma decimal, punto de miles.
+
+    Se redondea primero y se parte despues. Al reves se perdia el acarreo:
+    5,96 con un decimal daba "5,0" en vez de "6,0", porque la parte entera se
+    tomaba de int(5,96)=5 mientras la decimal redondeaba a 1,0.
+    """
+    texto = f"{float(valor):.{max(decimales, 0)}f}"
+    negativo = texto.startswith("-")
+    if negativo:
+        texto = texto[1:]
+    entero, _, dec = texto.partition(".")
+    entero_str = f"{int(entero):,}".replace(",", ".")
+    res = f"{entero_str},{dec}" if dec else entero_str
     return f"-{res}" if negativo else res
 
 

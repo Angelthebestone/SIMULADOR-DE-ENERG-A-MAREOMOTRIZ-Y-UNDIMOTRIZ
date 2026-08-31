@@ -16,7 +16,6 @@ dependencies = [
     "matplotlib>=3.7",
     "seaborn>=0.13",
     "pywebview>=5",
-    "mhkit>=3; python_version<'3.12'",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +23,10 @@ dev = [
     "pytest>=7",
     "ruff>=0.1",
     "black>=23",
+    "playwright>=1.45",  # suite e2e de la app web (tarea 2.*); requiere `playwright install chromium`
+    "statsmodels>=0.13",  # dependencia transitiva de mhkit (oráculo JONSWAP IEC TS 62600-100)
+    "mhkit>=3; python_version<'3.12'",  # oráculo de rendimiento (validacion-referencia)
+    "wavespectra>=3",  # oráculo de espectros (validacion-referencia)
 ]
 
 [tool.ruff]

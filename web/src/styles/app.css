@@ -1,0 +1,337 @@
+/* Carcasa de la aplicación: barra, pestañas, barra de indicadores y panel.
+   Tablero denso: la rejilla fija deja el máximo de alto al panel activo, que
+   es donde están el lienzo, las gráficas y el mapa. */
+
+@layer base, componentes;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    block-size: 100%;
+  }
+
+  body {
+    line-height: 1.5;
+  }
+
+  /* Un solo anillo de foco para toda la aplicación. */
+  :focus-visible {
+    outline: 2px solid var(--foco);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Los controles nativos heredan el acento del proyecto en vez de el del
+     sistema: sliders, casillas y selects quedan en la misma paleta. */
+  :root {
+    accent-color: var(--rol-recurso);
+    color-scheme: light;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    margin-block: 0 var(--s-1);
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Objetivo táctil mínimo WCAG 2.5.8 AA. Con padding, no con alto fijo,
+     para que el contenido pueda crecer pero nunca encoger el objetivo. */
+  button,
+  select,
+  input:not([type='range']) {
+    min-block-size: 2rem;
+    font: inherit;
+    color: inherit;
+  }
+
+  @media (pointer: coarse) {
+    button,
+    select,
+    input:not([type='range']) {
+      min-block-size: 2.75rem;
+    }
+  }
+}
+
+@layer componentes {
+  /* La aplicación ocupa la ventana: sólo desplaza el panel activo, de modo que
+     pestañas e indicadores quedan siempre a la vista. */
+  #app {
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    block-size: 100dvh;
+    background: var(--lienzo);
+  }
+
+  /* Una fila de la rejilla no baja del contenido de su hijo salvo que se le
+     diga. Sin esto, con la escala de sustentacion a 320 px la tira de pestanas
+     ensanchaba toda la aplicacion en vez de desplazarse ella sola. */
+  #app > * {
+    min-inline-size: 0;
+  }
+
+  /* ---- Barra superior: qué es esto y sobre qué escenario ---- */
+  .barra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--s-4);
+    padding: var(--s-2) var(--s-4);
+    background: var(--panel);
+    border-block-end: 1px solid var(--borde-suave);
+  }
+
+  .marca {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-inline-size: 0;
+  }
+
+  .marca strong {
+    font-size: var(--text-seccion);
+  }
+
+  .marca-sub {
+    font-size: var(--text-meta);
+    color: var(--tenue);
+  }
+
+  .escenario {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--s-4);
+    min-inline-size: 0;
+  }
+
+  /* Etiqueta encima del control: se escanea más rápido y la proximidad
+     agrupa cada par sin ambigüedad. */
+  /* min-inline-size: 0 deja que el campo encoja por debajo del ancho natural
+     del <select>, que lo fija la opcion mas larga. Sin esto, con la escala de
+     sustentacion a 320 px la barra empujaba toda la aplicacion fuera de la
+     pantalla. */
+  .campo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .campo > span {
+    font-size: var(--text-meta);
+    color: var(--tenue);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .campo select {
+    max-inline-size: 100%;
+    padding: var(--s-1) var(--s-2);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    background: var(--panel);
+  }
+
+  .acciones-barra {
+    display: flex;
+    gap: var(--s-2);
+  }
+
+  .btn-barra {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: var(--s-1) 10px;
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    background: var(--panel);
+    font-size: var(--text-meta);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color var(--dur-rapida) var(--ease-salida),
+      background-color var(--dur-rapida) var(--ease-salida);
+  }
+
+  .btn-barra:hover {
+    border-color: var(--foco);
+  }
+
+  .btn-barra[aria-pressed='true'] {
+    border-color: var(--foco);
+    background: var(--acento-suave);
+  }
+
+  /* ---- Pestañas ---- */
+  .tabs {
+    display: flex;
+    gap: var(--s-1);
+    padding: var(--s-1) var(--s-4);
+    border-block-end: 1px solid var(--borde-suave);
+    overflow-x: auto;
+    background: var(--lienzo);
+  }
+
+  .tabs [role='tab'] {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: var(--s-1) 12px;
+    border: 1px solid transparent;
+    border-radius: var(--radio);
+    background: transparent;
+    color: var(--tenue);
+    font-weight: 600;
+    line-height: 1.15;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--dur-rapida) var(--ease-salida),
+      background-color var(--dur-rapida) var(--ease-salida);
+  }
+
+  .tabs [role='tab']:hover:not([aria-selected='true']) {
+    color: var(--tinta);
+    background: var(--superficie);
+  }
+
+  .tabs [role='tab'][aria-selected='true'] {
+    background: var(--rol-mar-profundo);
+    border-color: var(--rol-mar-profundo);
+    color: var(--panel);
+  }
+
+  /* ---- Barra de indicadores: las cifras del cálculo, en todos los niveles ---- */
+  .kpis {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--s-2) var(--s-6);
+    padding: var(--s-2) var(--s-4);
+    background: var(--panel);
+    border-block-end: 1px solid var(--borde-suave);
+  }
+
+  .kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-inline-size: 7rem;
+  }
+
+  .kpi-etiqueta {
+    font-size: var(--text-meta);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--tenue);
+    line-height: 1.3;
+  }
+
+  .kpi-valor {
+    /* tabular-nums es global: las cifras ya alinean sin la monoespaciada, que
+       a este tamaño separa demasiado la coma decimal del entero. */
+    font-size: var(--text-kpi);
+    font-weight: 600;
+    line-height: 1.05;
+    color: var(--tinta);
+  }
+
+  .kpi-unidad {
+    font-size: 0.42em;
+    font-weight: 600;
+    color: var(--tenue);
+  }
+
+  /* El indicador de recurso es la entrada del mar; el de potencia, lo captado.
+     El color refuerza el rol, la etiqueta lo nombra. */
+  [data-testid='kpi-recurso'] .kpi-valor {
+    color: var(--rol-mar-profundo);
+  }
+
+  [data-testid='kpi-potencia'] .kpi-valor {
+    color: var(--rol-captado);
+  }
+
+  .kpi-pendiente {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    /* Mismo alto que la cifra: cuando llega el valor la barra no salta. */
+    block-size: calc(var(--text-kpi) * 1.05);
+    font-size: var(--text-cuerpo);
+    font-style: italic;
+    color: var(--tenue);
+  }
+
+  .kpi-esqueleto {
+    display: block;
+    inline-size: 5.5rem;
+    block-size: calc(var(--text-kpi) * 1.05);
+    border-radius: var(--radio);
+    background: linear-gradient(90deg, var(--superficie), var(--borde-suave), var(--superficie));
+    background-size: 200% 100%;
+    animation: kpi-latido 1.4s linear infinite;
+  }
+
+  @keyframes kpi-latido {
+    from {
+      background-position: 200% 0;
+    }
+
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  .aviso {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    margin-inline-start: auto;
+    align-self: center;
+    padding: var(--s-1) var(--s-2);
+    border: 1px solid var(--borde-suave);
+    border-radius: var(--radio);
+    background: var(--lienzo);
+    font-size: var(--text-meta);
+    color: var(--tenue);
+  }
+
+  .aviso--error {
+    border-color: var(--conf-pendiente);
+    color: var(--conf-pendiente);
+    font-weight: 600;
+  }
+
+  /* ---- Panel activo ---- */
+  #app > [role='tabpanel'] {
+    overflow: auto;
+    padding: var(--s-4);
+    scroll-padding-block-start: var(--s-4);
+  }
+
+  @media (width <= 40rem) {
+    .barra {
+      align-items: start;
+    }
+
+    .kpi {
+      min-inline-size: 6rem;
+    }
+
+    .kpis {
+      gap: var(--s-2) var(--s-4);
+    }
+
+    .aviso {
+      margin-inline-start: 0;
+    }
+  }
+}

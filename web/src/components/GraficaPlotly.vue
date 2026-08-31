@@ -1,86 +1,124 @@
 <template>
-  <div
-    ref="contenedor"
-    class="grafica"
-    role="img"
-    :aria-label="titulo || 'Gráfica analítica compuesta en Python'"
-    tabindex="0"
-  ></div>
-  <p v-if="!figura" class="pendiente"><span aria-hidden="true">○</span> pendiente — sin figura todavía</p>
+  <figure class="grafica-wrap">
+    <figcaption v-if="titulo" class="titulo">{{ titulo }}</figcaption>
+    <!-- Sin figura no se reserva lienzo: antes quedaban ~220 px en blanco por
+         gráfica y el nivel Diseñar parecía roto en vez de pendiente. -->
+    <div
+      v-if="figura"
+      ref="contenedor"
+      class="grafica"
+      role="img"
+      :aria-label="titulo || 'Gráfica analítica'"
+      tabindex="0"
+    ></div>
+    <div v-else-if="cargando" class="grafica-esqueleto" aria-hidden="true">
+      <span v-for="n in 7" :key="n" class="esqueleto-barra" :style="{ blockSize: ALTOS[n - 1] }"></span>
+    </div>
+    <p v-else class="pendiente">
+      <Icono icono="pendiente" tamano="sm" />
+      <span>pendiente — {{ motivo || 'sin figura todavía' }}</span>
+    </p>
+  </figure>
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch, ref, onBeforeUnmount } from 'vue'
-declare const Plotly: { newPlot: (el: HTMLElement, data: unknown[], layout: unknown, config?: unknown)=>Promise<void>; relayout:(el:HTMLElement,o:unknown)=>void; resize:(el:HTMLElement)=>void; purge:(el:HTMLElement)=>void }
+import { ref } from 'vue'
+import Icono from './Icono.vue'
 
+// ponytail: sin renderizador. `analisis/` no compone ninguna figura {data,
+// layout} todavía, así que este componente sólo puede declarar la ausencia.
+//
+// El renderizador anterior inyectaba un <script src> a una ruta que no existe
+// en el árbol: nunca llegó a dibujar una figura. Importar `plotly.js-dist-min`
+// como módulo sí funciona, pero mete en el bundle los mapas base de Plotly y
+// sus proveedores de teselas remotos, y eso rompe la política de origen único
+// que verifica pruebas/test_construccion_web.py.
+//
+// Cuando Python emita figuras, dibujarlas con ECharts, que ya está en el
+// bundle por el Sankey y no arrastra orígenes externos.
 const props = defineProps<{
   figura: { data: unknown[]; layout: Record<string,unknown> } | null
   titulo?: string
+  motivo?: string
   height?: number
+  cargando?: boolean
 }>()
+
+// Alturas del esqueleto: perfil de una serie, no barras iguales, para que el
+// hueco se lea como «va a haber una gráfica aquí».
+const ALTOS = ['35%', '58%', '46%', '82%', '64%', '90%', '52%']
 
 const contenedor = ref<HTMLElement | null>(null)
 
-async function asegurarPlotly(): Promise<void> {
-  if (typeof (window as unknown as Record<string,unknown>).Plotly !== 'undefined') return
-  await new Promise<void>((resolve, reject)=>{
-    const s = document.createElement('script')
-    s.src = '/vendor/plotly/plotly.min.js'
-    // fallback local vendorizado sin red
-    s.onload = ()=> resolve()
-    s.onerror = ()=> {
-      // intentar cdn vendorizado alternativo local
-      const s2 = document.createElement('script')
-      s2.src = './vendor/plotly/plotly.min.js'
-      s2.onload = ()=> resolve()
-      s2.onerror = ()=> reject(new Error('Plotly no disponible sin conexión'))
-      document.head.appendChild(s2)
-    }
-    document.head.appendChild(s)
-  })
-}
-
-async function render() {
-  if (!contenedor.value) return
-  const el = contenedor.value
-  if (!props.figura || !props.figura.data) {
-    const P = (window as unknown as Record<string,unknown>).Plotly as typeof Plotly | undefined
-    if (P) try{ P.purge(el) }catch{}
-    return
-  }
-  try { await asegurarPlotly() } catch { return }
-  const P = (window as unknown as Record<string,unknown>).Plotly as typeof Plotly
-  if (!P || !P.newPlot) return
-  const layout = { ...(props.figura.layout || {}), height: props.height || 320, autosize: true, margin:{ t:30, r:10, b:40, l:50 } }
-  await P.newPlot(el, props.figura.data as unknown[], layout as unknown, { responsive:true, displayModeBar:false } as unknown)
-}
-
-function onResize(){ const el=contenedor.value; if(!el) return; const P=(window as unknown as Record<string,unknown>).Plotly as typeof Plotly|undefined; if(P?.resize) try{ P.resize(el) }catch{} }
-
-function onSustentacion(){
-  // re-layout figuras compuestas en Python: refit sin fetch nuevo
-  onResize()
-}
-
-onMounted(()=> {
-  render()
-  window.addEventListener('resize', onResize)
-  window.addEventListener('sustentacion', onSustentacion)
-})
-onBeforeUnmount(()=> {
-  window.removeEventListener('resize', onResize)
-  window.removeEventListener('sustentacion', onSustentacion)
-  if (contenedor.value) {
-    const P=(window as unknown as Record<string,unknown>).Plotly as typeof Plotly|undefined
-    if(P?.purge) try{ P.purge(contenedor.value) }catch{}
-  }
-})
-watch(()=> props.figura, render, { deep:true })
-watch(()=> props.height, render)
+const motivoVisible = () => props.motivo || 'sin figura todavía'
+defineExpose({ motivoVisible })
 </script>
 
 <style scoped>
-.grafica{ width:100%; min-height:220px; display:block; outline:none }
-.grafica:focus-visible{ outline:2px solid var(--foco, #0072B2); outline-offset:2px; border-radius:6px }
-.pendiente{ border-left:3px solid var(--conf-pendiente, #A8340A); padding-left:8px; background: var(--acento-suave, #FFF0E6); font-style:italic }
+.grafica-wrap {
+  margin: 0;
+  display: grid;
+  gap: var(--s-1);
+}
+
+.titulo {
+  font-size: var(--text-meta);
+  color: var(--tenue);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.grafica {
+  inline-size: 100%;
+  min-block-size: 13.75rem;
+  display: block;
+}
+
+.grafica:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.grafica-esqueleto {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-2);
+  inline-size: 100%;
+  min-block-size: 8rem;
+  padding: var(--s-2);
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  box-sizing: border-box;
+}
+
+.esqueleto-barra {
+  flex: 1;
+  border-radius: 4px;
+  background: var(--superficie);
+  animation: grafica-latido 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes grafica-latido {
+  from {
+    opacity: 0.5;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.pendiente {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  border-inline-start: 3px solid var(--conf-pendiente);
+  padding: 6px var(--s-2);
+  background: var(--acento-suave);
+  color: var(--tenue);
+  font-style: italic;
+  font-size: var(--text-meta);
+}
 </style>

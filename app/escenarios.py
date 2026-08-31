@@ -38,11 +38,21 @@ def cargar_escenario(ruta: str | pathlib.Path) -> dict[str, object]:
 
 def verificar_reproducible(
     ruta: str | pathlib.Path,
-    parametros: dict[str, object],
+    parametros: dict[str, object] | None = None,
     resultado: dict[str, object] | None = None,
 ) -> bool:
+    """Comprueba que el escenario guardado sigue describiendo lo que dice.
+
+    Sin `parametros` se verifica el archivo contra si mismo: su huella tiene
+    que corresponder al contenido que lleva dentro. Con `parametros` se
+    comprueba que un escenario nuevo reproduce el guardado.
+    """
     data = cargar_escenario(ruta)
     h_guard = str(data.get("hash", ""))
+    if parametros is None:
+        parametros = data.get("parametros") or {}  # type: ignore[assignment]
+        if resultado is None:
+            resultado = data.get("resultado") or {}  # type: ignore[assignment]
     h_calc = _hash_escenario({"parametros": parametros, "resultado": resultado or {}})
     if h_guard:
         return h_guard == h_calc

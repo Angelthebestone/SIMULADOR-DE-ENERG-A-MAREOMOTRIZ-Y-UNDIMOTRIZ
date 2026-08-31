@@ -1,67 +1,109 @@
 <template>
-  <section class="ver">
-    <header class="tesis">
-      <div class="hero-cifras">
-        <div class="cifra"><span class="kicker">Isla Fuerte — verificado</span><span class="num">{{ formatearNumero(8.9, 1) }} <small>kW/m</small></span><span class="ref">Ortega et al. 2013 RE 57</span></div>
-        <div class="divisor">frente a</div>
-        <div class="cifra umbral"><span class="num">{{ formatearNumero(40, 1) }} <small>kW/m</small></span><span class="ref">umbral granja — Handbook</span></div>
-      </div>
-      <p class="fuentes">8,9 verificado vs 40 umbral rentabilidad (Osorio et al. 2016 / Handbook cap. 1). La tesis se decide aquí.</p>
-    </header>
+  <section class="ver" aria-labelledby="titulo-ver">
+    <h1 id="titulo-ver" class="titulo-nivel">Ver</h1>
 
     <div class="lienzo-wrap">
-      <canvas ref="canvasRef" class="oleaje" width="900" height="260" aria-label="Animación del oleaje y boya"></canvas>
-      <p v-if="sinSerie" class="aviso-sin-serie">{{ sinSerie }}</p>
-    </div>
-
-    <div class="acciones">
-      <button class="btn-prim" @click="togglePausa">{{ animacion?.pausado ? "Reanudar" : "Pausar" }}</button>
-      <span class="accion-hint">Mueve altura, ritmo y freno. Mira cómo responde la boya.</span>
+      <canvas ref="canvasRef" class="oleaje" width="900" height="260" aria-label="Animación del oleaje y la boya"></canvas>
+      <button class="btn-lienzo" @click="togglePausa" :aria-pressed="pausado ? 'true' : 'false'">
+        <Icono :icono="pausado ? 'reproducir' : 'pausar'" />
+        <span>{{ pausado ? "Reanudar" : "Pausar" }}</span>
+      </button>
+      <p v-if="sinSerie" class="aviso-sin-serie">
+        <Icono icono="pendiente" tamano="sm" />
+        <span>{{ sinSerie }}</span>
+      </p>
     </div>
 
     <ControlesFisicos
-      :hm0_m="hm0_m"
-      :te_s="te_s"
-      :b_pto_ns_m="b_pto_ns_m"
-      @update:hm0_m="v => hm0_m = v"
-      @update:te_s="v => te_s = v"
-      @update:b_pto_ns_m="v => b_pto_ns_m = v"
+      :hm0_m="params.hm0_m"
+      :te_s="params.te_s"
+      :b_pto_ns_m="params.b_pto_ns_m"
+      @update:hm0_m="v => emit('update:params', { hm0_m: v })"
+      @update:te_s="v => emit('update:params', { te_s: v })"
+      @update:b_pto_ns_m="v => emit('update:params', { b_pto_ns_m: v })"
     />
 
-    <p class="viviendas">
-      <template v-if="viviendas !== null">
-        Alcanza para {{ formatearNumero(viviendas, 0) }} viviendas
-      </template>
-      <template v-else>
-        pendiente — consumo residencial sin fuente verificada
-      </template>
-    </p>
+    <div class="fila-resultado">
+      <article class="tarjeta" data-testid="tarjeta-viviendas" aria-live="polite">
+        <h2 class="tarjeta-titulo">Alcanza para</h2>
+        <template v-if="viviendas !== null">
+          <p class="tarjeta-cifra">{{ formatearNumero(viviendas, 0) }} <small>viviendas</small></p>
+        </template>
+        <p v-else-if="cargando" class="tarjeta-estado">
+          <Icono icono="calculando" tamano="sm" />
+          <span>integrando la cadena…</span>
+        </p>
+        <p v-else class="tarjeta-estado semaforo semaforo--pendiente">
+          <Icono icono="pendiente" tamano="sm" />
+          <span>pendiente — {{ error || "consumo residencial sin fuente verificada" }}</span>
+        </p>
+      </article>
+
+      <article class="tarjeta contraste" data-testid="tesis-contraste">
+        <h2 class="tarjeta-titulo">Recurso frente al umbral de granja</h2>
+        <div class="barras">
+          <div v-for="b in BARRAS" :key="b.id" class="barra-fila" :data-testid="'barra-' + b.id">
+            <span class="barra-rotulo">{{ b.rotulo }}</span>
+            <span class="barra-pista">
+              <span class="barra-relleno" :class="'barra-relleno--' + b.id" :style="{ inlineSize: b.ancho }"></span>
+            </span>
+            <span class="barra-cifra">{{ b.cifra }} <small>kW/m</small></span>
+            <span class="barra-fuente">{{ b.fuente }}</span>
+          </div>
+        </div>
+      </article>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { AnimacionCanvas, PROFUNDIDAD_M } from "../components/AnimacionCanvas";
 import ControlesFisicos from "../components/ControlesFisicos.vue";
+import Icono from "../components/Icono.vue";
 import { formatearNumero } from "../utils/formato";
+import type { Params } from "../api";
 
-// Variables exactas
-const Hm0 = ref<number>(1.5); // m — alias hm0_m para el prop
-const Te = ref<number>(7.0); // s
-const Bpto = ref<number>(80_000); // Ns/m
+// Ver ya no llama al servicio: el cálculo lo lanza main.ts una sola vez y
+// alimenta los cuatro niveles. Aquí sólo se dibuja lo que llega.
+const props = defineProps<{
+  params: Params;
+  resultado: Record<string, any> | null;
+  viviendas: number | null;
+  cargando?: boolean;
+  error?: string;
+}>();
 
-const hm0_m = ref(1.5);
-const te_s = ref(7.0);
-const b_pto_ns_m = ref(80_000);
-const profundidad_m = ref(PROFUNDIDAD_M); // 30, no recalcular física por fotograma
-const viviendas = ref<number | null>(null);
+const emit = defineEmits<{ (e: "update:params", v: Partial<Params>): void }>();
+
+// El contraste de la tesis, sobre una escala común de 0 a 40 kW/m. Ancho y
+// cifra se declaran juntos: la presentación no calcula ninguna magnitud, sólo
+// coloca las dos que app/tesis.py::DENSIDADES ya publica.
+const BARRAS = [
+  {
+    id: "sitio",
+    rotulo: "Isla Fuerte",
+    cifra: formatearNumero(8.9, 1),
+    ancho: "22.25%",
+    fuente: "Ortega et al. 2013 · verificado",
+  },
+  {
+    id: "umbral",
+    rotulo: "Umbral de granja",
+    cifra: formatearNumero(40, 1),
+    ancho: "100%",
+    fuente: "Osorio et al. 2016 / Handbook cap. 1",
+  },
+];
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let animacion: AnimacionCanvas | null = null;
 const sinSerie = ref("");
+const pausado = ref(false); // reactivo: el rótulo del botón depende de él
 
 function numeroOnda(omega: number, h: number): number {
-  // Newton-Raphson liviano espejo de nucleo.olas.numero_onda — solo para k de dibujo, no para balance energético
+  // Newton-Raphson liviano, espejo de nucleo.olas.numero_onda — sólo para la k
+  // del dibujo, no para el balance energético.
   const g = 9.81;
   const arg = (omega * omega * h) / g;
   let th = Math.tanh(arg);
@@ -74,90 +116,258 @@ function numeroOnda(omega: number, h: number): number {
     const ch = Math.cosh(kh);
     const sech2 = 1 / (ch * ch);
     const df = g * th2 + g * k * h * sech2;
-    const delta = f / df;
-    k -= delta;
+    k -= f / df;
     if (Math.abs(f) < 1e-10) break;
   }
   return k;
 }
 
-async function cargarSimulacion() {
-  const H = hm0_m.value;
-  const TeV = te_s.value;
-  const Bp = b_pto_ns_m.value;
-  const omega = (2 * Math.PI) / TeV;
-  const k = numeroOnda(omega, profundidad_m.value);
-  // Contrato: series transfer UNA vez por simulación vía servicio
-  // Si dispositivo no entrega z_m (ej TurbinaCorriente), muestra "sin serie de posición — dispositivo <nombre>" sin sintetizar
-  let series: { t_s: number[]; z_m: number[] } | null = null;
-  let dispositivo = "absorbedor_puntual";
-  let viviendasSrv: number | null = null;
-  try {
-    // intento servicio real si está disponible (app/servicio.py expone /simular en despliegue)
-    const r = await fetch(`/api/simular`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hm0_m: H, te_s: TeV, b_pto_ns_m: Bp, profundidad_m: profundidad_m.value }),
-    });
-    if (r.ok) {
-      const j = await r.json();
-      const z = j?.resultado?.series?.z_m ?? j?.series?.z_m ?? null;
-      const t = j?.resultado?.series?.t_s ?? j?.series?.t_s ?? null;
-      dispositivo = j?.resultado?.metadatos?.dispositivo ?? j?.dispositivo ?? dispositivo;
-      if (Array.isArray(t) && Array.isArray(z) && t.length && z.length) series = { t_s: t, z_m: z };
-      else series = null; // no sintetizar
-      viviendasSrv = j?.extras?.viviendas?.viviendas ?? j?.viviendas ?? null;
-    }
-  } catch {
-    // sin servicio: sin serie sintética — declarar ausencia si aplica
-  }
-  // Si aún sin series y dispositivo es absorbedor, no inventamos; si es turbina, también ausencia
-  if (animacion) {
-    animacion.cargarSimulacion({ series, k, Hm0: H, Te: TeV, Bpto: Bp, dispositivo, profundidad_m: profundidad_m.value });
-    sinSerie.value = (animacion as any).sinSerieMsg || "";
-    if (!animacion.pausado) animacion.iniciar();
-  }
-  viviendas.value = viviendasSrv;
-  // fallback viviendas local si servicio no responde: estimación simple sin fórmulas en pantalla
-  if (viviendas.value === null && series) {
-    // no calcular física aquí: solo mostrar pendiente si no hay servicio
-    viviendas.value = null;
-  }
+function redibujar() {
+  if (!animacion) return;
+  const { hm0_m, te_s, b_pto_ns_m } = props.params;
+  const profundidad = props.params.profundidad_m || PROFUNDIDAD_M;
+  const k = numeroOnda((2 * Math.PI) / te_s, profundidad);
+
+  // Series del contrato. Si el dispositivo no entrega z_m se declara la
+  // ausencia; no se sintetiza una serie falsa.
+  const r = props.resultado;
+  const t = r?.series?.t_s ?? null;
+  const z = r?.series?.z_m ?? null;
+  const series =
+    Array.isArray(t) && Array.isArray(z) && t.length && z.length ? { t_s: t, z_m: z } : null;
+
+  animacion.cargarSimulacion({
+    series,
+    k,
+    Hm0: hm0_m,
+    Te: te_s,
+    Bpto: b_pto_ns_m,
+    dispositivo: String(r?.metadatos?.dispositivo ?? props.params.dispositivo),
+    profundidad_m: profundidad,
+  });
+  sinSerie.value = animacion.sinSerieMsg;
+  animacion.arrancar();
+  pausado.value = animacion.pausado;
 }
 
 function togglePausa() {
   if (!animacion) return;
   if (animacion.pausado) animacion.reanudar();
   else animacion.pausar();
+  pausado.value = animacion.pausado;
 }
 
 onMounted(() => {
-  if (canvasRef.value) {
-    animacion = new AnimacionCanvas(canvasRef.value);
-    cargarSimulacion();
-  }
+  if (!canvasRef.value) return;
+  animacion = new AnimacionCanvas(canvasRef.value);
+  redibujar();
 });
 
-watch([hm0_m, te_s, b_pto_ns_m], cargarSimulacion);
+onBeforeUnmount(() => animacion?.detener());
+
+watch(() => [props.params, props.resultado], redibujar, { deep: true });
 </script>
 
 <style scoped>
-.ver { max-width: 960px; margin: 0 auto; }
-.tesis { border-bottom: 1px solid var(--borde-suave); margin-bottom: var(--s-4); padding-bottom: 8px; }
-.hero-cifras { display: flex; align-items: end; gap: 18px; flex-wrap: wrap; }
-.cifra { display: flex; flex-direction: column; line-height: 1.05; }
-.cifra .kicker { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tenue); }
-.cifra .num { font-size: var(--text-cifra); font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }
-.cifra .num small { font-size: 0.45em; font-weight: 600; color: var(--tenue); }
-.cifra .ref { font-size: var(--text-meta); color: var(--tenue); }
-.divisor { font-size: 13px; color: var(--tenue); align-self: center; padding-bottom: 14px; }
-.cifra.umbral .num { color: var(--conf-pendiente); opacity: 0.95; }
-.fuentes { font-size: var(--text-meta); color: var(--tenue); margin: 8px 0 0; }
-.oleaje { width: 100%; height: 260px; display: block; background: var(--panel); border: 1px solid var(--borde); border-top: 3px solid var(--foco); box-shadow: 0 1px 2px oklch(0.2 0.02 240 / 0.08); }
-.aviso-sin-serie { color: var(--tenue); text-align: center; font-size: var(--text-meta); margin: 6px 0 0; }
-.acciones { display: flex; align-items: center; gap: 12px; margin: 10px 0 6px; }
-.btn-prim { background: var(--tinta); color: var(--panel); border: 1px solid var(--tinta); border-radius: 6px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
-.btn-prim:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
-.accion-hint { font-size: 12px; color: var(--tenue); }
-.fila input[type="range"] { vertical-align: middle; }
+.ver {
+  max-width: 72rem;
+  margin-inline: auto;
+  display: grid;
+  gap: var(--s-4);
+  align-content: start;
+}
+
+/* El título del nivel existe para el foco y el lector de pantalla; la pestaña
+   ya lo nombra en grande, así que aquí va discreto. */
+.titulo-nivel {
+  font-size: var(--text-meta);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+/* La animación es el protagonista del nivel: primera y a todo el ancho. */
+.lienzo-wrap {
+  position: relative;
+}
+
+.oleaje {
+  inline-size: 100%;
+  block-size: min(22rem, 42dvh);
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--borde);
+  border-block-start: 3px solid var(--rol-mar-profundo);
+  border-radius: var(--radio-caja);
+}
+
+.btn-lienzo {
+  position: absolute;
+  inset-block-start: var(--s-2);
+  inset-inline-end: var(--s-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--panel);
+  font-weight: 600;
+  font-size: var(--text-meta);
+  cursor: pointer;
+  transition: border-color var(--dur-rapida) var(--ease-salida);
+}
+
+.btn-lienzo:hover {
+  border-color: var(--foco);
+}
+
+.aviso-sin-serie {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--tenue);
+  font-size: var(--text-meta);
+  margin-block: var(--s-1) 0;
+}
+
+.fila-resultado {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(20rem, 2fr);
+  gap: var(--s-4);
+  align-items: stretch;
+}
+
+.tarjeta {
+  display: grid;
+  align-content: start;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  background: var(--panel);
+  box-shadow: var(--sombra-caja);
+}
+
+.tarjeta-titulo {
+  font-size: var(--text-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tenue);
+  font-weight: 600;
+}
+
+.tarjeta-cifra {
+  margin: 0;
+  font-size: var(--text-cifra);
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--rol-captado);
+}
+
+.tarjeta-cifra small {
+  font-size: 0.32em;
+  font-weight: 600;
+  color: var(--tenue);
+}
+
+.tarjeta-estado {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-cuerpo);
+  color: var(--tenue);
+  font-style: italic;
+}
+
+/* ---- Contraste 8,9 frente a 40 sobre la misma escala ---- */
+.barras {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.barra-fila {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) minmax(6rem, 1fr) auto;
+  grid-template-areas:
+    'rotulo pista cifra'
+    'fuente fuente fuente';
+  align-items: center;
+  column-gap: var(--s-2);
+}
+
+.barra-rotulo {
+  grid-area: rotulo;
+  font-weight: 600;
+}
+
+.barra-pista {
+  grid-area: pista;
+  display: block;
+  block-size: 0.875rem;
+  border-radius: 999px;
+  background: var(--superficie);
+  overflow: hidden;
+}
+
+.barra-relleno {
+  display: block;
+  block-size: 100%;
+  border-radius: 999px;
+  transition: inline-size var(--dur-media) var(--ease-salida);
+}
+
+.barra-relleno--sitio {
+  background: var(--rol-mar-profundo);
+}
+
+/* El umbral no es una medida del sitio: se dibuja rayado para que se distinga
+   de la barra medida incluso en escala de grises. */
+.barra-relleno--umbral {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--tenue) 0 4px,
+    transparent 4px 8px
+  );
+  border: 1px solid var(--tenue);
+  box-sizing: border-box;
+}
+
+.barra-cifra {
+  grid-area: cifra;
+  font-size: var(--text-seccion);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.barra-cifra small {
+  font-size: 0.55em;
+  font-weight: 600;
+  color: var(--tenue);
+}
+
+.barra-fuente {
+  grid-area: fuente;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+}
+
+@media (width <= 52rem) {
+  .fila-resultado {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (width <= 26rem) {
+  .barra-fila {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'rotulo cifra'
+      'pista pista'
+      'fuente fuente';
+    row-gap: var(--s-1);
+  }
+}
 </style>

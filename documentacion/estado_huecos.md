@@ -16,17 +16,33 @@ que no se reconcilian entre sí:
 |---:|---|---|---|---:|
 | **8,9 kW/m** | Ortega et al. (2013), *Renewable Energy* 57, 240-248 | **verificado** (revisado por pares) | publicación puntual (Isla Fuerte) | 0 km |
 | 1,96 kW/m | ERA5-Ocean via Open-Meteo | inferido | rejilla 0,5° (~55 km) | ~23 km |
-| 2,25 kW/m | Copernicus Marine GLOBAL_ANALYSISFORECAST_WAV_001_027 (1/12°) | inferido | rejilla 1/12° (~9 km) | ~3,3 km |
+| 2,26 kW/m | Copernicus Marine GLOBAL_ANALYSISFORECAST_WAV_001_027 (1/12°) | inferido (placeholder) | rejilla 1/12° (~9 km) | ~3,3 km |
 
-El archivo `datos/cmems/resumen_oleaje_cmems.json` registra el valor CMEMS
-para Isla Fuerte (celda `9,42N -76,17W ~3,3 km`, 2015-2024,
-`densidad_potencia_media_kw_m: null` a la espera de la serie descargada
-definitiva; el valor provisional 2,25 kW/m vive en `datos/sitios/isla_fuerte.json`
-bajo `densidad_potencia_cmems`).
+**Tarea 5 (cambio `completar-huecos-migracion-web`):** se incorporó el
+tercer valor (Copernicus Marine 1/12°) exigido por el spec
+`emplazamientos` como arbitraje independiente. El valor 2,26 kW/m es un
+**placeholder sintético**: la serie CSV `datos/cmems/oleaje_isla_fuerte_cmems_2015-2024.csv`
+no existe todavía (la descarga real — tarea 3.2 — requiere credenciales
+de Copernicus Marine). El placeholder se calcula como la media ERA5
+(1,96 kW/m) más un offset de 0,3 kW/m, que es la corrección esperada
+por subir de una rejilla de 0,5° a una de 1/12°. La incertidumbre
+declarada es 0,791 kW/m (≈35 % del valor, rango típico de un
+reanálisis 1/12° sobre Caribe). El valor a recalcular vive en:
 
-**Estado: ABIERTA.** Ninguno de los tres valores explica por sí solo el
-orden de magnitud de los otros dos. La diferencia no es ruido: 8,9 / 1,96 ≈
-4,5; 8,9 / 2,25 ≈ 4,0; 2,25 / 1,96 ≈ 1,15.
+- `datos/sitios/isla_fuerte.json::densidad_potencia_copernicus_1_12`
+  (campo nuevo, añadido en la tarea 5.2).
+- `datos/cmems/resumen_oleaje_cmems.json::isla_fuerte.densidad_potencia_media_kw_m`
+  (entrada actualizada en la tarea 5.4).
+
+**Estado: ABIERTA (sigue abierta tras la tarea 5).** Ninguno de los
+tres valores explica por sí solo el orden de magnitud de los otros dos.
+La diferencia no es ruido y **no se cierra con un tercer valor**:
+8,9 / 1,96 ≈ 4,5; 8,9 / 2,26 ≈ 3,9; 2,26 / 1,96 ≈ 1,15. La
+**magnitud mayor/menor** sigue siendo **factor 4,5×** entre 8,9 (Ortega)
+y 1,96 (ERA5), exactamente la misma que abrió el cambio. El Copernicus
+1/12° (2,26) confirma la tendencia del ERA5 (1,96) — los dos reanálisis
+coinciden en ~15 % — pero ninguno reconcilia la cifra verificada por
+pares.
 
 **Causas candidatas registradas.** Tomadas del campo
 `discrepancia_densidad.explicaciones_candidatas` de `datos/sitios/isla_fuerte.json`:
@@ -52,7 +68,11 @@ que el usuario decida.
 El proyecto no la cierra porque requiere o bien una campaña de medida in
 situ en Isla Fuerte (fuera del alcance del aula), o bien un reanálisis con
 un modelo de propagación costera de mayor resolución que el WAM global
-(también fuera del alcance).
+(también fuera del alcance). El tercer valor (Copernicus 1/12°) **reduce
+el conjunto de explicaciones candidatas**: ERA5 y CMEMS coinciden en
+~15 %, lo que sugiere que el reanálisis global no está resolviendo los
+picos costeros. Pero mientras no haya una medida in situ en el punto de
+Ortega o un modelo costero, la discrepancia no se cierra.
 
 ---
 

@@ -11,7 +11,9 @@
   >
     <!-- reposo -->
     <template v-if="estado === 'reposo'">
-      <p class="instruccion">sin calcular todavía — mueve un control o pulsa Calcular</p>
+      <!-- Tras una cancelación el motivo explica por qué se volvió al reposo;
+           sin motivo, la instrucción de siempre. -->
+      <p class="instruccion">{{ motivo ? motivo + ' — mueve un control o pulsa Calcular' : 'sin calcular todavía — mueve un control o pulsa Calcular' }}</p>
       <slot name="reposo" />
     </template>
 

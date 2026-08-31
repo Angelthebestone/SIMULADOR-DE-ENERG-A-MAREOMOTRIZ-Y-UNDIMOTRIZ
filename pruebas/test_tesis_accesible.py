@@ -66,10 +66,22 @@ def test_8_9_visible_en_ver() -> None:
 
 
 def test_8_9_visible_en_calcular() -> None:
-    """`Calcular.vue` referencia el valor 8,9 como ejemplo o sustitucion."""
+    """En Calcular la cifra llega del calculo, no de un ejemplo escrito a mano.
+
+    El bloque de demostracion con 8,9 incrustado desaparecio: era andamio de
+    prueba. La tarjeta muestra la sustitucion que compone `app/formulas.py`, y
+    el contraste de la tesis sigue accesible desde la barra de indicadores de
+    la carcasa, visible tambien en este nivel.
+    """
     src = _leer(_CALCULAR_VUE)
-    assert "8.9" in src or "8,9" in src, (
-        "Calcular.vue no menciona la cifra 8,9"
+    assert "f.sustitucion" in src, (
+        "Calcular.vue no muestra los valores sustituidos del calculo"
+    )
+    assert "demo" not in src.lower(), (
+        "Calcular.vue conserva andamio de demostracion"
+    )
+    assert "8,9" in _leer(_MAIN_TS), (
+        "la carcasa, visible desde Calcular, no conserva la cifra de la tesis"
     )
 
 

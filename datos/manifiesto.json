@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "entradas": [
+    {
+      "id": "batimetria_sombreada",
+      "tipo": "piramide_raster",
+      "directorio": "gee/batimetria_sombreada",
+      "archivos": 525,
+      "metadata": "metadata.json",
+      "metadata_sha256": "9232dee418db6623ffa53273126489cb0cc73653cd7a076bc050cd5c70854cef",
+      "arbol_sha256": "354ebd12a45ff0b907c5a5cd81734cf34f652fd4d74656940502dfd0ba4a8eee",
+      "fecha_generacion": "2026-08-30T04:19:57Z"
+    },
+    {
+      "id": "sentinel2_mediana",
+      "tipo": "piramide_raster",
+      "directorio": "gee/sentinel2_mediana",
+      "archivos": 525,
+      "metadata": "metadata.json",
+      "metadata_sha256": "772d514f3d6577c295571c7f0633c50c6cf208a4dd88c28539daf092f98a2afb",
+      "arbol_sha256": "2278d8cb6e70f0aa966a27b0ae503d7e99c71f42679b771a4a529233ab1d8606",
+      "fecha_generacion": "2026-08-30T04:20:18Z"
+    },
+    {
+      "id": "relieve_sombreado",
+      "tipo": "piramide_raster",
+      "directorio": "gee/relieve_sombreado",
+      "archivos": 525,
+      "metadata": "metadata.json",
+      "metadata_sha256": "d4fe3b160ed0bbe0e2ea0751b4ccd0de646bd05f02df2f38951c28641a7dd1b9",
+      "arbol_sha256": "aed5e07293dec3c936a424096e94f84928392aad2d07bcb20ede5554ce1e391b",
+      "fecha_generacion": "2026-08-30T04:20:41Z"
+    },
+    {
+      "id": "viirs_nocturno",
+      "tipo": "piramide_raster",
+      "directorio": "gee/viirs_nocturno",
+      "archivos": 147,
+      "metadata": "metadata.json",
+      "metadata_sha256": "18da8c0e3e10bf10ef099054c272cfeb6a1a2a127bfe724d9da21205f913c44c",
+      "arbol_sha256": "dad2fa11a0000210579984db497f384e206b7d4bc2d7e963de609a7a07f962c2",
+      "fecha_generacion": "2026-08-30T04:21:01Z"
+    }
+  ],
+  "fecha_ultima_actualizacion": "2026-08-30T04:21:01Z"
+}

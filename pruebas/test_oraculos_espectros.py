@@ -2,7 +2,7 @@
 
 Requisito: validacion-referencia / Espectros contrastados contra implementacion de referencia.
 Tolerancias declaradas abajo. Solo compara, no sustituye formulas propias.
-Si wavespectra no esta instalado, cada prueba se omite con motivo legible.
+wavespectra es dependencia de desarrollo; si falta, la prueba falla con ImportError ruidoso.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import math
 
 import numpy as np
 import pytest
+from wavespectra.construct.frequency import jonswap, pierson_moskowitz
 
 TOL_DENSIDAD_REL = 0.02
 TOL_HM0_REL = 0.01
@@ -40,9 +41,6 @@ def _omega_grid(freq):
 
 
 def _te_wavespectra_jonswap(freq, fp, hs, gamma):
-    wavespectra = pytest.importorskip("wavespectra", reason="wavespectra no instalado — oraculo de espectros omitido")
-    from wavespectra.construct.frequency import jonswap
-
     ds = jonswap(freq=freq, fp=fp, hs=hs, gamma=gamma)
     m0 = float(ds.spec.momf(0).values)
     mm1 = float(ds.spec.momf(-1).values)
@@ -50,9 +48,6 @@ def _te_wavespectra_jonswap(freq, fp, hs, gamma):
 
 
 def _te_wavespectra_pm(freq, fp, hs):
-    pytest.importorskip("wavespectra", reason="wavespectra no instalado")
-    from wavespectra.construct.frequency import pierson_moskowitz
-
     ds = pierson_moskowitz(freq=freq, fp=fp, hs=hs)
     m0 = float(ds.spec.momf(0).values)
     mm1 = float(ds.spec.momf(-1).values)
@@ -81,9 +76,6 @@ def _fp_para_te_pm(freq, hs, te):
 
 
 def test_3_1_jonswap_densidad_coincide_con_wavespectra():
-    wavespectra = pytest.importorskip("wavespectra", reason="wavespectra no instalado — instala con pip install -e \".[dev]\"")
-    from wavespectra.construct.frequency import jonswap
-
     from nucleo.espectros import espectro_jonswap_para_hm0_te
 
     freq = _freq_grid()
@@ -111,9 +103,6 @@ def test_3_1_jonswap_densidad_coincide_con_wavespectra():
 
 
 def test_3_2_pierson_moskowitz_densidad_coincide():
-    pytest.importorskip("wavespectra", reason="wavespectra no instalado — instala con pip install -e \".[dev]\"")
-    from wavespectra.construct.frequency import pierson_moskowitz
-
     from nucleo.espectros import espectro_pm_para_hm0_te
 
     freq = _freq_grid()
@@ -136,9 +125,6 @@ def test_3_2_pierson_moskowitz_densidad_coincide():
 
 
 def test_3_3_hm0_te_por_momentos_coinciden():
-    pytest.importorskip("wavespectra", reason="wavespectra no instalado")
-    from wavespectra.construct.frequency import jonswap, pierson_moskowitz
-
     from nucleo.espectros import espectro_jonswap_para_hm0_te, espectro_pm_para_hm0_te, parametros_desde_espectro
 
     freq = _freq_grid()
@@ -180,9 +166,6 @@ def test_3_3_hm0_te_por_momentos_coinciden():
 
 
 def test_3_4_alterar_constante_rompe_oraculo_con_mensaje_identificable(monkeypatch):
-    pytest.importorskip("wavespectra", reason="wavespectra no instalado")
-    from wavespectra.construct.frequency import jonswap
-
     import nucleo.espectros as esp
 
     freq = _freq_grid()

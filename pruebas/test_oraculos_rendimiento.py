@@ -1,7 +1,8 @@
 """Oraculos de rendimiento 4.1-4.3, 4.5 — analisis/captura, matriz potencia, corrientes vs MHKiT.
 
 Requisito: validacion-referencia / Metricas de rendimiento contrastadas contra la norma IEC.
-Solo compara, no sustituye. Si mhkit no esta instalado, se omite con motivo legible.
+Solo compara, no sustituye. mhkit es dependencia de desarrollo; si falta, la prueba
+falla con ImportError ruidoso.
 """
 
 from __future__ import annotations
@@ -12,6 +13,11 @@ import pathlib
 
 import numpy as np
 import pytest
+from mhkit.river.performance import circular as mhkit_circular
+from mhkit.river.performance import power_coefficient as mhkit_cp
+from mhkit.tidal.performance import circular as mhkit_circular_tidal
+from mhkit.wave.performance import capture_width as mhkit_cw
+from mhkit.wave.performance import power_matrix as mhkit_pm
 
 TOL_CAPTURA_REL = 1e-9
 TOL_MATRIZ_REL = 1e-9
@@ -30,12 +36,6 @@ def _servicio():  # type: ignore[no-redef]
 
 
 def test_4_1_ancho_captura_coincide_con_mhkit():
-    pytest.importorskip("mhkit", reason="mhkit no instalado — instala con pip install -e \".[dev]\" (requiere statsmodels)")
-    try:
-        from mhkit.wave.performance import capture_width as mhkit_cw
-    except Exception as e:
-        pytest.skip(f"mhkit.wave.performance no importable: {e}")
-
     from analisis.captura import ancho_captura
 
     casos = [
@@ -56,13 +56,6 @@ def test_4_1_ancho_captura_coincide_con_mhkit():
 
 
 def test_4_2_matriz_potencia_vs_mhkit_anclada_a_servicio():
-    pytest.importorskip("mhkit", reason="mhkit no instalado")
-    try:
-        from mhkit.wave.performance import capture_width as mhkit_cw
-        from mhkit.wave.performance import power_matrix as mhkit_pm
-    except Exception as e:
-        pytest.skip(f"mhkit.wave.performance no importable: {e}")
-
     from analisis.captura import ancho_captura
     from nucleo.olas import densidad_potencia_w_m
 
@@ -131,14 +124,6 @@ def test_4_2_matriz_potencia_vs_mhkit_anclada_a_servicio():
 
 
 def test_4_3_metricas_corriente_vs_mhkit():
-    pytest.importorskip("mhkit", reason="mhkit no instalado")
-    try:
-        from mhkit.river.performance import circular as mhkit_circular
-        from mhkit.river.performance import power_coefficient as mhkit_cp
-        from mhkit.tidal.performance import circular as mhkit_circular_tidal
-    except Exception as e:
-        pytest.skip(f"mhkit river/tidal no importable: {e}")
-
     from nucleo.constantes import RHO_AGUA_MAR
     from nucleo.corrientes import potencia_corriente
     from nucleo.dispositivos.turbina_corriente import area_barrida_m2

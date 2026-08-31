@@ -11,6 +11,8 @@
   "resolucion_m": 30,
   "rango": "2021",
   "licencia": "ESA Copernicus DEM, CC BY 4.0",
+  "maxzoom": 12,
+  "zoom_max": 12,
   "niveles": [
     0,
     1,
@@ -21,9 +23,11 @@
     6,
     7,
     8,
-    9
+    9,
+    10,
+    11,
+    12
   ],
-  "zoom_max": 9,
   "fuente": "COPERNICUS/DEM/GLO30 via Google Earth Engine",
   "estimacion_plano": {
     "ancho_m": 1300792,

@@ -11,6 +11,15 @@
 salidas/
 scratchpad_*.py
 
+# Directorios parasitos creados por interpretes de comandos (PowerShell,
+# CMD, shells Unix) interpretando mal un argumento o un alias. Aparecen
+# cuando una utilidad como `mkdir` o `echo` recibe un argumento y se ejecuta
+# en el directorio actual. Si los ves, probablemente algo escribio mal.
+echo/
+mkdir/
+ok/
+done/
+
 # Web frontend: dependencias npm y build output
 web/node_modules/
 web/dist/
@@ -36,3 +45,4 @@ env/
 datos/__pycache__/
 # Documentacion: mantener ignorada (es fuente, no codigo)
 # /documentacion
+.agents/

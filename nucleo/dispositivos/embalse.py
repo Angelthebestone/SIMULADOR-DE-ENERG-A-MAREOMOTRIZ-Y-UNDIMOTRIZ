@@ -137,8 +137,11 @@ def _integrar_modo(
     delta_h = float(nivel_emb[-1] - nivel_emb[0])
     a_medio = _area_h(float(np.mean(nivel_emb)), area_base, curva)
     vol_almacen = float(a_medio * delta_h)
-    vol_net_q = float(np.trapezoid(caudal, tiempo_s))
-    # caudal incluye signo: bombeo negativo, turbinado con signo
+    # Misma cuadratura que el paso de integracion (suma por la derecha): con
+    # trapecio el residuo era el error del metodo, no el del balance, y tapaba
+    # el fallo real de conservacion.
+    vol_net_q = float(np.sum(caudal * dt_arr))
+    # caudal con signo: positivo entra al embalse, negativo sale
     balance_err = abs(vol_net_q - vol_almacen)
     # rango observado
     rango_obs = float(np.max(nivel_mar) - np.min(nivel_mar)) if n else 0.0
@@ -199,7 +202,9 @@ def _paso_generacion(
         dh = float(nivel_mar[i]) - float(nivel_emb[i - 1])
         q_mag = abs(dh * a_eff / dt) if dt > 0 else 0.0
     nivel_emb[i] = float(nivel_emb[i - 1] + dh)
-    caudal[i] = float(q_mag)
+    # Vaciado: el agua sale, dh < 0. El caudal lleva el mismo signo que dh —
+    # convenio unico en todo el modulo, el que exige el balance A*dh = int Q dt.
+    caudal[i] = float(-q_mag)
     potencia[i] = float(rho * g * q_mag * h_cur * eta)
 
 
@@ -252,7 +257,8 @@ def _paso_bombeo(
         dh = max(0.0, float(nivel_mar[i]) + 0.5 - float(nivel_emb[i - 1]))
     nivel_emb[i] = float(nivel_emb[i - 1] + dh)
     q_mag = dh * a_eff / dt if dt > 0 else 0.0
-    caudal[i] = float(-q_mag)
+    # Bombeo: el agua entra, dh > 0, luego el caudal es positivo.
+    caudal[i] = float(q_mag)
     potencia[i] = 0.0
     return float(rho * g * q_mag * max(h_cur, 0.5) / max(eta_b, 0.1) * dt)
 
@@ -409,6 +415,7 @@ class EmbalseMareal(DispositivoBase):
                 "cota_j": float(cota_j),
                 "modo": modo_req,
                 "balance_err_m3": float(balance_err),
+                "vol_turbinado_m3": float(res["vol_turbinado_m3"]),
                 "duracion_s": float(duracion_s),
             },
         )
