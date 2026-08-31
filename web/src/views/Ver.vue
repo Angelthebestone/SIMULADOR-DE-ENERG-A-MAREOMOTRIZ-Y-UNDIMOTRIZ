@@ -2,7 +2,40 @@
   <section class="ver" aria-labelledby="titulo-ver">
     <h1 id="titulo-ver" class="titulo-nivel">Ver</h1>
 
+    <div class="pregunta-bloque" data-testid="pregunta-conductor">
+      <p class="pregunta-linea">
+        <strong>{{ preguntaActiva.pregunta }}</strong>
+      </p>
+      <p class="tarea-linea">
+        <span class="tarea-rotulo">Micro-tarea:</span>
+        {{ preguntaActiva.tarea }}
+      </p>
+      <p
+        v-if="cumpleTarea"
+        class="veredicto-positivo"
+        data-testid="veredicto-positivo"
+        aria-live="polite"
+      >
+        ✓ Micro-tarea cumplida — Hm0 en el rango objetivo
+      </p>
+    </div>
+
+    <div class="cabecera-lienzo">
+      <h2 class="cabecera-lienzo-titulo">Oleaje</h2>
+      <label class="toggle-fondo" data-testid="toggle-fondo-raster-wrap">
+        <input
+          type="checkbox"
+          data-testid="toggle-fondo-raster"
+          :checked="fondoActivo"
+          aria-label="Alternar fondo raster del Caribe colombiano"
+          @change="onToggleFondo(($event.target as HTMLInputElement).checked)"
+        />
+        <span>Fondo raster</span>
+      </label>
+    </div>
+
     <div class="lienzo-wrap">
+      <FondoRaster ref="fondoRef" :activo="fondoActivo" :opacidad="0.6" :sitio="{ lon: -76.18, lat: 9.39 }" @update:activo="v => fondoActivo = v" />
       <canvas ref="canvasRef" class="oleaje" width="900" height="260" aria-label="Animación del oleaje y la boya"></canvas>
       <button class="btn-lienzo" @click="togglePausa" :aria-pressed="pausado ? 'true' : 'false'">
         <Icono :icono="pausado ? 'reproducir' : 'pausar'" />
@@ -57,12 +90,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { onMounted, onBeforeUnmount, ref, watch, computed } from "vue";
 import { AnimacionCanvas, PROFUNDIDAD_M } from "../components/AnimacionCanvas";
 import ControlesFisicos from "../components/ControlesFisicos.vue";
+import FondoRaster from "../components/FondoRaster.vue";
 import Icono from "../components/Icono.vue";
 import { formatearNumero } from "../utils/formato";
 import type { Params } from "../api";
+import { preguntas, evaluar_cumplimiento } from "../contenido/pedagogia";
 
 // Ver ya no llama al servicio: el cálculo lo lanza main.ts una sola vez y
 // alimenta los cuatro niveles. Aquí sólo se dibuja lo que llega.
@@ -100,6 +135,20 @@ const canvasRef = ref<HTMLCanvasElement | null>(null);
 let animacion: AnimacionCanvas | null = null;
 const sinSerie = ref("");
 const pausado = ref(false); // reactivo: el rótulo del botón depende de él
+const fondoActivo = ref(true); // spec: capa activa por defecto, opacidad 60%
+const fondoRef = ref<InstanceType<typeof FondoRaster> | null>(null);
+
+// Pregunta conductora y micro-tarea del nivel 'ver', leídas del mapa de
+// pedagogía. Se actualizan reactivamente cuando cambia el resultado de la
+// simulación y muestran un veredicto positivo al alcanzar el rango objetivo.
+const preguntaActiva = computed(() => preguntas.ver);
+const cumpleTarea = computed(() =>
+  evaluar_cumplimiento('ver', props.resultado as Record<string, unknown> | null)
+);
+
+function onToggleFondo(v: boolean) {
+  fondoActivo.value = v;
+}
 
 function numeroOnda(omega: number, h: number): number {
   // Newton-Raphson liviano, espejo de nucleo.olas.numero_onda — sólo para la k
@@ -186,19 +235,104 @@ watch(() => [props.params, props.resultado], redibujar, { deep: true });
   color: var(--tenue);
 }
 
+/* Pregunta conductora del nivel — bloque discreto bajo el título.
+   El veredicto positivo se enciende cuando la micro-tarea se cumple. */
+.pregunta-bloque {
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  background: var(--panel);
+  box-shadow: var(--sombra-caja);
+  border-inline-start: 3px solid var(--rol-mar-profundo);
+}
+
+.pregunta-linea {
+  margin: 0;
+  font-size: var(--text-cuerpo);
+  color: var(--tinta);
+}
+
+.pregunta-linea strong {
+  font-weight: 600;
+}
+
+.tarea-linea {
+  margin: 0;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+}
+
+.tarea-rotulo {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-inline-end: 4px;
+}
+
+.veredicto-positivo {
+  margin: 0;
+  font-size: var(--text-meta);
+  color: var(--conf-verificado);
+  font-weight: 600;
+}
+
+/* Cabecera del lienzo: rótulo del bloque + toggle del fondo raster. */
+.cabecera-lienzo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
+.cabecera-lienzo-titulo {
+  font-size: var(--text-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tenue);
+  font-weight: 600;
+  margin: 0;
+}
+
+.toggle-fondo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+  cursor: pointer;
+  min-block-size: 1.75rem;
+}
+
+.toggle-fondo input[type="checkbox"] {
+  cursor: pointer;
+  inline-size: 1rem;
+  block-size: 1rem;
+  accent-color: var(--rol-mar-profundo);
+}
+
+.toggle-fondo input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
 /* La animación es el protagonista del nivel: primera y a todo el ancho. */
 .lienzo-wrap {
   position: relative;
+  background: var(--panel);
+  border: 1px solid var(--borde);
+  border-block-start: 3px solid var(--rol-mar-profundo);
+  border-radius: var(--radio-caja);
+  overflow: hidden;
 }
 
 .oleaje {
   inline-size: 100%;
   block-size: min(22rem, 42dvh);
   display: block;
-  background: var(--panel);
-  border: 1px solid var(--borde);
-  border-block-start: 3px solid var(--rol-mar-profundo);
-  border-radius: var(--radio-caja);
+  background: transparent;
+  position: relative;
 }
 
 .btn-lienzo {

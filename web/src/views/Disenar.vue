@@ -49,6 +49,26 @@
       <EstadoBloque :estado="estadoMatriz" :motivo="motivoMatriz" :mostrar-cancelar="cargandoMatriz" @cancelar="cancelarMatriz" />
     </section>
 
+    <section id="sec-supuestos" class="seccion" tabindex="0" aria-labelledby="h-supuestos">
+      <h2 id="h-supuestos">Supuestos del modelo — qué pasa si cambia η_PTO, η_gen, CRF o ρ</h2>
+      <p class="prosa">
+        Cuatro constantes internas del modelo son editables desde aquí para hacer
+        explícito el análisis "¿y si el PTO fuera más eficiente?". Cambiar
+        cualquiera de ellas recalcula la potencia capturada, la producción anual y
+        el LCOE manteniendo el resto constante.
+      </p>
+      <ControlesSupuestos
+        :eta_pto="etaPto"
+        :eta_gen="etaGen"
+        :crf="crf"
+        :rho="rho"
+        @update:eta_pto="v => emitirSupuesto('eta_pto', v)"
+        @update:eta_gen="v => emitirSupuesto('eta_gen', v)"
+        @update:crf="v => emitirSupuesto('crf', v)"
+        @update:rho="v => emitirSupuesto('rho', v)"
+      />
+    </section>
+
     <section id="sec-aep-lcoe" class="seccion" tabindex="0" aria-labelledby="h-aep-lcoe">
       <h2 id="h-aep-lcoe">Producción y coste por MWh</h2>
       <div class="graficas-par">
@@ -72,16 +92,57 @@
               <Icono icono="pendiente" tamano="sm" /><span>pendiente</span>
             </span>
           </div>
-          <div class="cifra-bloque">
-            <span class="cifra-etiqueta">Coste por MWh</span>
-            <span v-if="lcoe!==null" class="cifra-valor cifra-coste" data-testid="lcoe-valor">
+        </div>
+
+        <!-- Tres LCOE en el mismo orden: diésel ZNI, dispositivo marino, SIN nacional.
+             Cada uno con su cifra, su unidad y su fuente bibliográfica. -->
+        <div class="tablero-lcoe" data-testid="tablero-lcoe">
+          <div class="lcoe-col" data-testid="lcoe-diesel-zni">
+            <span class="lcoe-etiqueta">Diésel ZNI</span>
+            <span class="lcoe-valor">{{ formatMiles(dieselCopMwh) }} <small>COP/MWh</small></span>
+            <span class="lcoe-fuente">{{ dieselFuente }}</span>
+          </div>
+          <div class="lcoe-col" data-testid="lcoe-dispositivo">
+            <span class="lcoe-etiqueta">Dispositivo marino</span>
+            <span v-if="lcoe!==null" class="lcoe-valor lcoe-cifra" data-testid="lcoe-valor">
               {{ formatMiles(Math.round(lcoe)) }} <small>COP/MWh</small>
             </span>
-            <span v-else class="cifra-pendiente semaforo semaforo--pendiente" data-testid="lcoe-valor">
+            <span v-else class="lcoe-pendiente semaforo semaforo--pendiente" data-testid="lcoe-valor">
               <Icono icono="pendiente" tamano="sm" /><span>pendiente — falta CAPEX o producción</span>
             </span>
+            <span class="lcoe-fuente">CAPEX y OPEX editables abajo · CRF {{ formatNum(crf, 3) }}</span>
+          </div>
+          <div class="lcoe-col" data-testid="lcoe-sin">
+            <span class="lcoe-etiqueta">SIN nacional</span>
+            <span v-if="lcoeSin && lcoeSin.estado==='verificado' && typeof lcoeSin.valor === 'number'"
+                  class="lcoe-valor">
+              {{ formatMiles(Math.round(lcoeSin.valor)) }} <small>COP/MWh</small>
+            </span>
+            <span v-else class="lcoe-pendiente semaforo semaforo--pendiente">
+              <Icono icono="pendiente" tamano="sm" />
+              <span>{{ lcoeSin?.fuente || 'SIN: pendiente — falta resumen XM' }}</span>
+            </span>
+            <span class="lcoe-fuente">{{ lcoeSin?.fuente || 'XM PrecBolsNaci 2023-2024' }}</span>
           </div>
         </div>
+
+        <!-- Leyenda condicional de la tesis. Cada WHEN del spec
+             `comparacion-red-sin` se traduce en una línea independiente:
+             - LCOE dispositivo > SIN → "marginal frente a la red interconectada"
+             - LCOE dispositivo < diésel ZNI → "competitiva frente al diésel ZNI".
+             Las dos leyendas pueden aparecer a la vez si ambas se cumplen. -->
+        <p v-if="leyendaMarginalRed" class="tesis-line" data-testid="tesis-leyenda-marginal-red">
+          <Icono icono="marca" tamano="sm" />
+          <span>{{ leyendaMarginalRed }}</span>
+        </p>
+        <p v-if="leyendaCompetitivoDiesel" class="tesis-line" data-testid="tesis-leyenda-competitivo-diesel">
+          <Icono icono="marca" tamano="sm" />
+          <span>{{ leyendaCompetitivoDiesel }}</span>
+        </p>
+        <p v-if="!leyendaMarginalRed && !leyendaCompetitivoDiesel" class="tesis-line tesis-line--silente" data-testid="tesis-leyenda">
+          <Icono icono="marca" tamano="sm" />
+          <span>{{ tesisSilente }}</span>
+        </p>
 
         <fieldset class="panel-costes">
           <legend>Inversión</legend>
@@ -93,7 +154,7 @@
             <input type="number" v-model.number="opex" :min="0" :step="10000000" aria-label="OPEX anual en pesos" />
             <span class="unidad">COP/año · {{ formatMiles(opex) }}</span>
           </label>
-          <p class="fuente">Factor de recuperación de capital 8 % · 20 años</p>
+          <p class="fuente">Factor de recuperación de capital {{ formatNum(crf, 3) }} · vida 20 años</p>
         </fieldset>
 
         <p class="tesis-line">Isla Fuerte <strong>8,9 kW/m</strong> verificado frente a <strong>40 kW/m</strong> de umbral de granja.</p>
@@ -127,19 +188,27 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import GraficaPlotly from '../components/GraficaPlotly.vue'
 import EstadoBloque from '../components/EstadoBloque.vue'
 import Icono from '../components/Icono.vue'
+import ControlesSupuestos from '../components/ControlesSupuestos.vue'
 import { formatearNumero } from '../utils/formato'
+import type { Params } from '../api'
 
 const props = defineProps<{
   figuras?: Record<string, { data: unknown[]; layout: Record<string,unknown> } | null>
   resultado?: { produccion_anual_mwh?: number; factor_planta?: number; potencia_nominal_w?: number; disponibilidad?: number; horas_ano?: number; recurso?: Record<string,unknown>; metadatos?: Record<string,unknown> }
   panelSitio?: { nombre?: string; estado_legal?: string; criterios?: Array<{nombre:string; valor:string; estado:string; fuente:string}>; veredicto?: string; fuente_runap?: string } | null
   sitioId?: string
+  params?: Params
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:params', v: Partial<Params>): void
 }>()
 
 const SECCIONES = [
   { id:'sec-resonancia', rotulo:'Resonancia', icono:'resonancia' },
   { id:'sec-limites', rotulo:'Límites', icono:'limite' },
   { id:'sec-matriz', rotulo:'Matriz', icono:'matriz' },
+  { id:'sec-supuestos', rotulo:'Supuestos', icono:'supuesto' },
   { id:'sec-aep-lcoe', rotulo:'Producción y coste', icono:'coste' },
 ] as const
 
@@ -178,16 +247,78 @@ const veredictoMatriz = computed(()=> {
 const aep = computed(()=> props.resultado?.produccion_anual_mwh ?? null)
 const factorPlanta = computed(()=> props.resultado?.factor_planta ?? 0)
 
+// Cuatro supuestos editables. Proceden de props.params (la fuente canónica
+// la lleva main.ts y se serializa al servicio). Si la vista recibe params
+// incompletos, mantenemos los defaults del servicio: hacer que la UI
+// muestre 0 sería peor que mostrar el default declarado.
+const etaPto = computed(()=> props.params?.eta_pto ?? 0.65)
+const etaGen = computed(()=> props.params?.eta_gen ?? 0.90)
+const crf = computed(()=> props.params?.crf ?? 0.08)
+const rho = computed(()=> props.params?.rho ?? 1025)
+
+function emitirSupuesto(clave: 'eta_pto'|'eta_gen'|'crf'|'rho', valor: number){
+  emit('update:params', { [clave]: valor } as Partial<Params>)
+}
+
 const capex = ref(0)
 const opex = ref(0)
 const lcoe = computed(()=> {
   if(aep.value===null || !aep.value || capex.value<=0) return null
-  const crf = 0.08 * Math.pow(1.08,20) / (Math.pow(1.08,20)-1) // 8% 20a — mismo que economia.py _crf
-  const anualizado = capex.value * crf + opex.value
-  // Espejo de economia.calcular_lcoe; en producción el valor viene del servicio.
-  // Sin CAPEX o sin producción no hay cifra: queda pendiente, no un cero.
+  // Espejo de economia.calcular_lcoe: usa el CRF que el usuario está editando,
+  // no el hard-coded 8%. La anualización se hace con la fórmula
+  //   CRF = r·(1+r)^n / ((1+r)^n - 1)
+  // invertida desde el CRF declarado. Sin embargo, el spec dice que CRF es
+  // directamente editable y se mantiene el cálculo coherente con el CRF.
+  const anualizado = capex.value * crf.value + opex.value
   return anualizado / aep.value
 })
+
+// LCOE medio SIN: una sola petición al resumen XM, mismo patrón que Comparar.
+// Si falla la red o el resumen está incompleto, queda en estado pendiente y la
+// columna SIN muestra la causa en vez de una cifra.
+type LcoeSin = { valor: number | null; unidad: string; fuente: string; estado: string }
+const lcoeSin = ref<LcoeSin | null>(null)
+async function cargarLcoeSin(){
+  try{
+    const r = await fetch('/datos/xm/resumen_xm.json')
+    if(!r.ok) return
+    const resumen = await r.json()
+    const campo = resumen?.lcoe_sin_cop_mwh
+    if(campo && typeof campo === 'object'){
+      lcoeSin.value = {
+        valor: typeof campo.valor === 'number' ? campo.valor : null,
+        unidad: String(campo.unidad ?? 'COP/MWh'),
+        fuente: String(campo.fuente ?? ''),
+        estado: String(campo.estado ?? 'pendiente'),
+      }
+    }
+  }catch{}
+}
+
+// LCOE diésel ZNI: 1.000,5 COP/kWh declarado por analisis/economia.DIESEL_ISLA_FUERTE_COP_KWH.
+// Se expone en COP/MWh para alinear la unidad con el resto del tablero.
+const dieselCopKwh = 1000.5
+const dieselCopMwh = computed(()=> Math.round(dieselCopKwh * 1000))
+const dieselFuente = 'Superservicios SOLING DEL SINU ene-jun 2023 — Isla Fuerte'
+
+// Leyenda condicional de la tesis. Cada WHEN del spec `comparacion-red-sin`
+// se traduce en su propia línea: si el LCOE del dispositivo es mayor que el
+// SIN aparece "marginal frente a la red interconectada"; si es menor que el
+// diésel ZNI aparece "competitiva frente al diésel ZNI". Sin LCOE calculado
+// queda la leyenda silente que recuerda qué hace falta.
+const leyendaMarginalRed = computed(()=> {
+  if(lcoe.value === null) return ''
+  const sin = lcoeSin.value
+  if(!sin || sin.estado !== 'verificado' || typeof sin.valor !== 'number') return ''
+  if(lcoe.value > sin.valor) return 'la energía marina en Isla Fuerte es marginal frente a la red interconectada'
+  return ''
+})
+const leyendaCompetitivoDiesel = computed(()=> {
+  if(lcoe.value === null) return ''
+  if(lcoe.value < dieselCopMwh.value) return 'la energía marina en Isla Fuerte es competitiva frente al diésel ZNI'
+  return ''
+})
+const tesisSilente = 'Pendiente de CAPEX, OPEX o resumen XM para enunciar la comparación'
 
 // Estados por sección alcanzables por teclado
 const motivoResonancia = computed(()=> figResonancia.value ? '' : 'sin serie de respuesta — ejecuta simulación')
@@ -263,7 +394,7 @@ function cancelarMatriz(){
 function onCancelarGlobal(){ cancelarMatriz() }
 
 function onScroll(){
-  const ids = ['sec-resonancia','sec-limites','sec-matriz','sec-aep-lcoe']
+  const ids = ['sec-resonancia','sec-limites','sec-matriz','sec-supuestos','sec-aep-lcoe']
   let best = ids[0]
   let min = Infinity
   for(const id of ids){
@@ -279,6 +410,7 @@ onMounted(()=> {
   contenedorScroll = document.getElementById('sec-resonancia')?.closest('[role=tabpanel]') ?? window
   contenedorScroll.addEventListener('scroll', onScroll, { passive:true })
   window.addEventListener('cancelar', onCancelarGlobal)
+  cargarLcoeSin()
 })
 onBeforeUnmount(()=> {
   contenedorScroll.removeEventListener('scroll', onScroll)
@@ -338,6 +470,8 @@ watch(()=> props.figuras, ()=> {
 .graficas-par{ display:grid; grid-template-columns:1fr 1fr; gap: var(--s-4); flex:1 1 auto; min-block-size:13rem }
 @media (max-width: 60rem){ .graficas-par{ grid-template-columns:1fr } }
 
+.prosa{ margin:0; color: var(--tenue); font-size: var(--text-cuerpo); max-inline-size: 60rem }
+
 .veredicto{
   flex:0 0 auto; border-top:1px solid var(--borde-suave); padding-top: var(--s-2);
   font-size: var(--text-cuerpo); background: var(--panel);
@@ -372,6 +506,49 @@ watch(()=> props.figuras, ()=> {
 .cifra-coste{ color: var(--rol-captado) }
 .cifra-pendiente{ display:inline-flex; align-items:center; gap:4px; font-style:italic; color: var(--tenue); font-size: var(--text-meta) }
 
+/* Tres LCOE en el mismo orden: diésel ZNI, dispositivo marino, SIN nacional.
+   Cada columna: etiqueta, cifra, fuente. La cifra del dispositivo usa el
+   acento captado; las otras dos quedan en tinta normal. */
+.tablero-lcoe{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-3);
+  border:1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  padding: var(--s-3);
+  background: var(--panel);
+}
+.lcoe-col{
+  display:flex; flex-direction:column; gap: var(--s-1);
+  padding: var(--s-2);
+  border-inline-start: 3px solid var(--borde-suave);
+}
+.lcoe-col:first-child{ border-inline-start: 0 }
+.lcoe-etiqueta{
+  font-size: var(--text-meta);
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  color: var(--tenue);
+}
+.lcoe-valor{
+  font-size: var(--text-seccion);
+  font-weight:700;
+  line-height:1.1;
+}
+.lcoe-valor small{ font-size:0.6em; font-weight:600; color: var(--tenue) }
+.lcoe-cifra{ color: var(--rol-captado) }
+.lcoe-fuente{
+  font-size: var(--text-meta);
+  color: var(--tenue);
+}
+.lcoe-pendiente{ display:inline-flex; align-items:center; gap:4px; font-style:italic; color: var(--tenue); font-size: var(--text-meta) }
+
+@media (max-width: 60rem){
+  .tablero-lcoe{ grid-template-columns: 1fr; }
+  .lcoe-col{ border-inline-start: 0; border-block-start: 1px solid var(--borde-suave); padding-block-start: var(--s-2) }
+  .lcoe-col:first-child{ border-block-start: 0 }
+}
+
 .panel-costes{
   display:flex; flex-wrap:wrap; align-items:end; gap: var(--s-2) var(--s-4);
   border:1px solid var(--borde-suave); border-radius: var(--radio-caja);
@@ -382,7 +559,8 @@ watch(()=> props.figuras, ()=> {
 .panel-costes input{ inline-size:11rem; font-family: var(--font-mono); color: var(--tinta); padding:4px 8px; border:1px solid var(--borde); border-radius: var(--radio); background: var(--panel) }
 .panel-costes .unidad{ font-family: var(--font-mono); text-transform:none; letter-spacing:0 }
 
-.tesis-line{ margin:0; font-size: var(--text-cuerpo) }
+.tesis-line{ margin:0; font-size: var(--text-cuerpo); display:inline-flex; align-items:center; gap:6px }
+.tesis-line--silente{ color: var(--tenue); font-style: italic }
 .fuente{ font-size: var(--text-meta); color: var(--tenue); margin: var(--s-1) 0 0 }
 
 /* Criterios: tabla compacta, estado a la izquierda con icono y palabra. */

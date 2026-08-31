@@ -103,9 +103,16 @@ function contratoSimulado(params: Record<string, unknown>) {
   const bpto = Number(params.b_pto_ns_m ?? 80_000);
   const profundidad = Number(params.profundidad_m ?? 30);
   const dispositivo = String(params.dispositivo ?? "absorbedor_puntual");
+  // Cuatro supuestos editables: η_PTO, η_gen, CRF y ρ. El mock debe
+  // propagarlos al resultado para que la UI pueda moverlos y ver el
+  // recálculo. Mismas defaults que app/servicio.py::Parametros.
+  const etaPtoParam = Number(params.eta_pto ?? 0.65);
+  const etaGenParam = Number(params.eta_gen ?? 0.90);
+  const crfParam = Number(params.crf ?? 0.08);
+  const rhoParam = Number(params.rho ?? RHO);
 
   // J = rho g^2 Hm0^2 Te / (64 pi) — W por metro de frente de ola
-  const j_w_m = (RHO * G * G * hm0 * hm0 * te) / (64 * Math.PI);
+  const j_w_m = (rhoParam * G * G * hm0 * hm0 * te) / (64 * Math.PI);
   const ancho_m = 10;
   const pRecurso = j_w_m * ancho_m;
 
@@ -113,8 +120,13 @@ function contratoSimulado(params: Record<string, unknown>) {
   const bOptimo = 120_000;
   const desajuste = bpto / bOptimo;
   const etaCaptura = 0.45 * ((2 * desajuste) / (1 + desajuste * desajuste));
-  const etaPto = 0.85;
-  const etaElectrico = 0.92;
+  // Los rendimientos del eslabón PTO y eléctrico se reescalan desde el
+  // default interno del motor (0,85 y 0,92) hacia los supuestos editables.
+  // Mismo patrón que app/servicio.py::_aplicar_rendimientos.
+  const etaPtoInterno = 0.85;
+  const etaElectricoInterno = 0.92;
+  const etaPto = etaPtoInterno * (etaPtoParam / 0.65);
+  const etaElectrico = etaElectricoInterno * (etaGenParam / 0.90);
 
   const pCaptura = pRecurso * etaCaptura;
   const pPto = pCaptura * etaPto;

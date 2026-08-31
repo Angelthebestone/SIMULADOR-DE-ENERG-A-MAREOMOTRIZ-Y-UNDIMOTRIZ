@@ -9,6 +9,7 @@
 
 # Scratchpads y outputs efimeros de la sesion
 salidas/
+scratchpad/
 scratchpad_*.py
 
 # Directorios parasitos creados por interpretes de comandos (PowerShell,

@@ -51,6 +51,8 @@ const TRAZOS: Record<string, string> = {
   limite: 'm12 14 4-4M3.34 19a10 10 0 1 1 17.32 0',
   matriz: 'M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18',
   coste: 'M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 18V6',
+  supuesto: 'M3 3h18v18H3zM12 8v4M12 16h.01',
+  marca: 'M12 22a8 8 0 1 1 0-16 8 8 0 0 1 0 16M12 12h.01',
 }
 
 const props = defineProps<{

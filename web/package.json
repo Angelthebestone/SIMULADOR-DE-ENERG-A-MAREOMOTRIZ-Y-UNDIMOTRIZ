@@ -5,7 +5,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:unit": "node --experimental-strip-types --test src/components/*.test.ts"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "=5.1.4",
@@ -17,6 +18,7 @@
     "vue": "=3.4.38"
   },
   "devDependencies": {
+    "@types/node": "=20.14.10",
     "typescript": "=5.6.3",
     "vite": "=5.4.8"
   }

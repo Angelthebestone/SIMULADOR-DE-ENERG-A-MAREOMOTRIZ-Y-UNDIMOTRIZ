@@ -19,6 +19,7 @@ RUTA_RUNAP = "datos/runap/areas_marinas_protegidas.geojson"
 RUTA_BATIMETRIA = "datos/batimetria/transecto_isla_fuerte_gmrt.csv"
 RUTA_SITIOS = "datos/sitios"
 RUTA_COSTA = "datos/costa/contorno_tierra.geojson"
+RUTA_XM_RESUMEN = "datos/xm/resumen_xm.json"
 
 FUENTE_RUNAP = "RUNAP (PNN) — 37 áreas marinas, 305.335 km²"
 FUENTE_GMRT = "GMRT (Lamont-Doherty) — transecto radial, banda 30–60 m"
@@ -151,3 +152,36 @@ def cargar_sitios(carpeta: str = RUTA_SITIOS) -> list[dict[str, Any]]:
             }
         )
     return sitios
+
+
+_LCOE_SIN_PENDIENTE: dict[str, Any] = {
+    "valor": None,
+    "unidad": "COP/MWh",
+    "fuente": "lcoe_sin_cop_mwh ausente en datos/xm/resumen_xm.json; ejecuta datos/xm/procesar_sin.py",
+    "estado": "pendiente",
+}
+
+
+def cargar_lcoe_sin(ruta: str = RUTA_XM_RESUMEN) -> dict[str, Any]:
+    """Devuelve el dict ``lcoe_sin_cop_mwh`` listo para la vista ``Diseñar``.
+
+    Lectura directa del resumen XM, sin recalcular. Si el archivo no existe
+    o el campo no está, devuelve un dict ``estado=pendiente`` con la causa,
+    para que la UI pueda distinguir "no hay dato" de "hay dato verificado".
+    """
+    archivo = pathlib.Path(ruta)
+    if not archivo.exists():
+        return dict(_LCOE_SIN_PENDIENTE)
+    try:
+        resumen = json.loads(archivo.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return dict(_LCOE_SIN_PENDIENTE)
+    campo = resumen.get("lcoe_sin_cop_mwh")
+    if not isinstance(campo, dict):
+        return dict(_LCOE_SIN_PENDIENTE)
+    return {
+        "valor": campo.get("valor"),
+        "unidad": str(campo.get("unidad", "COP/MWh")),
+        "fuente": str(campo.get("fuente", "")),
+        "estado": str(campo.get("estado", "pendiente")),
+    }

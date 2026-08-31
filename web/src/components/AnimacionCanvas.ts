@@ -138,6 +138,30 @@ export class AnimacionCanvas {
     return z0 + ((z1 - z0) * (tLoop - t0)) / (t1 - t0);
   }
 
+  // J(t) viene de la fórmula J = ρ g² Hm0² Te / (64π); los valores fijos
+  // (ρ=1025 kg/m³, g=9.81 m/s²) están en vite.config.ts (mocks) y en
+  // app/tesis.py (cálculo real) — aquí se mantiene la misma fórmula para que
+  // la cifra mostrada en pantalla coincida con la del servicio.
+  private potenciaInstantaneaW(): number {
+    const RHO = 1025;
+    const G = 9.81;
+    return (RHO * G * G * this.Hm0 * this.Hm0 * this.Te) / (64 * Math.PI);
+  }
+
+  // Altura visible (px CSS) de la flecha Hm0 sobre el nivel medio.
+  alturaFlechaHm0(hLienzo: number): number {
+    return Math.max(20, this.Hm0 * (hLienzo * 0.18));
+  }
+
+  // Posición horizontal (px CSS) de dos crestas separadas un lambda.
+  marcasIntervaloTe(wLienzo: number, dominioM: number): [number, number] {
+    if (this.lambda <= 0 || dominioM <= 0) return [0, 0];
+    const pxPorM = wLienzo / dominioM;
+    const x0 = Math.min(20, wLienzo * 0.15);
+    const x1 = x0 + this.lambda * pxPorM;
+    return [x0, Math.min(x1, wLienzo - 4)];
+  }
+
   private token(nombre: string, fallback: string): string {
     try {
       const v = getComputedStyle(document.documentElement).getPropertyValue(nombre).trim();
@@ -220,6 +244,83 @@ export class AnimacionCanvas {
     ctx.textAlign = "left";
     const lambdaTxt = this.lambda ? `λ = 2·π/k = ${this.lambda.toFixed(0)} m` : "";
     ctx.fillText(lambdaTxt, 8, h - 8);
+
+    this.dibujarAnotaciones(ctx, w, h, nivel);
+  }
+
+  /** Tres anotaciones físicas en vivo: flecha Hm0, intervalo Te, J(t).
+   *  Lee `this.Hm0`, `this.Te` y la serie ya integrada (no recalcula física). */
+  private dibujarAnotaciones(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    nivel: number,
+  ) {
+    const colorOnda = this.token("--rol-onda", "oklch(0.532 0.131 244)");
+    const colorTexto = this.token("--texto-secundario", "oklch(0.495 0.017 245)");
+    const colorTenue = this.token("--tenue", "oklch(0.495 0.017 245)");
+
+    const dominioM = this.lambda > 0 ? 2 * this.lambda : 120;
+
+    // (1) Flecha vertical Hm0 a la izquierda del canvas, doble arrowhead.
+    const altHm0 = this.alturaFlechaHm0(h);
+    const xFlecha = Math.max(18, w * 0.04);
+    const yCentro = nivel;
+    const yTop = yCentro - altHm0 / 2;
+    const yBot = yCentro + altHm0 / 2;
+    ctx.strokeStyle = colorOnda;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(xFlecha, yTop);
+    ctx.lineTo(xFlecha, yBot);
+    ctx.stroke();
+    const tamFlecha = 5;
+    ctx.beginPath();
+    ctx.moveTo(xFlecha - tamFlecha, yTop + tamFlecha);
+    ctx.lineTo(xFlecha, yTop);
+    ctx.lineTo(xFlecha + tamFlecha, yTop + tamFlecha);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(xFlecha - tamFlecha, yBot - tamFlecha);
+    ctx.lineTo(xFlecha, yBot);
+    ctx.lineTo(xFlecha + tamFlecha, yBot - tamFlecha);
+    ctx.stroke();
+    ctx.fillStyle = colorTexto;
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(`Hm0 = ${this.Hm0.toFixed(1).replace(".", ",")} m`, xFlecha - 8, yCentro + 4);
+
+    // (2) Intervalo Te: dos marcas verticales separadas por `lambda`.
+    const [x0, x1] = this.marcasIntervaloTe(w, dominioM);
+    if (this.lambda > 0) {
+      ctx.strokeStyle = colorTenue;
+      ctx.lineWidth = 1;
+      const tickTop = nivel - 8;
+      const tickBot = nivel + 8;
+      ctx.beginPath();
+      ctx.moveTo(x0, tickTop);
+      ctx.lineTo(x0, tickBot);
+      ctx.moveTo(x1, tickTop);
+      ctx.lineTo(x1, tickBot);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x0, nivel);
+      ctx.lineTo(x1, nivel);
+      ctx.stroke();
+      ctx.fillStyle = colorTexto;
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`Te = ${this.Te.toFixed(1).replace(".", ",")} s`, (x0 + x1) / 2, tickTop - 4);
+      ctx.textAlign = "left";
+    }
+
+    // (3) J(t) en esquina superior derecha (W/m, monoespaciada).
+    const jW = this.potenciaInstantaneaW();
+    ctx.fillStyle = colorTexto;
+    ctx.font = `12px ${this.token("--texto-monoespaciado", "ui-monospace, Consolas, monospace")}`;
+    ctx.textAlign = "right";
+    ctx.fillText(`J(t) = ${jW.toFixed(0)} W/m`, w - 8, 16);
+    ctx.textAlign = "left";
   }
 
   /** Punto de entrada normal: pinta siempre un fotograma y anima si procede.

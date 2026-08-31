@@ -28,6 +28,7 @@ from analisis.economia import (
     DIESEL_LOCALIDAD,
     DIESEL_OPERADOR,
     DIESEL_PERIODO,
+    ResultadoLCOE,
     calcular_lcoe,
     comparador_diesel,
     intervalo_sin,
@@ -50,7 +51,7 @@ from nucleo.dispositivos.base import ContextoRecurso, DispositivoBase
 from nucleo.dispositivos.embalse import EmbalseMareal
 from nucleo.dispositivos.owc import OWC
 from nucleo.dispositivos.turbina_corriente import TurbinaCorriente
-from nucleo.resultado import Resultado
+from nucleo.resultado import Eslabon, Resultado
 from nucleo.validacion import acotar
 
 RUTA_SERIE = "datos/oleaje/oleaje_{}_era5_2015-2024.csv"
@@ -77,6 +78,10 @@ class Parametros:
     sitio_id: str = "isla_fuerte"
     dispositivo: str = "absorbedor_puntual"
     completo: bool = False
+    eta_pto: float = 0.65
+    eta_gen: float = 0.90
+    crf: float = 0.08
+    rho: float = 1_025.0
 
 
 def _acotar(params: Parametros) -> tuple[Parametros, list[str]]:
@@ -261,7 +266,7 @@ def _matriz_potencia(
     cancelado: threading.Event,
 ) -> np.ndarray | None:
     """Una integracion por celda: la simulacion mas costosa que admite la aplicacion."""
-    contexto = ContextoRecurso(profundidad_m=params.profundidad_m)
+    contexto = ContextoRecurso(profundidad_m=params.profundidad_m, rho=params.rho)
     matriz = np.zeros((len(hs_centros), len(te_centros)))
     total = matriz.size
     for i, hs in enumerate(hs_centros):
@@ -298,6 +303,55 @@ def _aep_matriz(
     }
 
 
+def _aplicar_rendimientos(resultado: Resultado, eta_pto: float, eta_gen: float) -> Resultado:
+    """Escala la potencia electrica entregada segun los rendimientos supuestos.
+
+    Los dispositivos internos fijan eta_pto=0.65 (hidraulico) y eta_gen=0.90;
+    aqui se reescalan por el cociente para que el usuario pueda mover los
+    supuestos sin tocar el motor de calculo.
+    """
+    if not resultado.eslabones or len(resultado.eslabones) < 3:
+        return resultado
+    factor = (eta_pto / 0.65) * (eta_gen / 0.90)
+    if abs(factor - 1.0) < 1e-12:
+        return resultado
+    eslabones = list(resultado.eslabones)
+    es_gen = eslabones[-1]
+    p_nueva = min(
+        max(0.0, float(es_gen.potencia_salida_w) * factor),
+        float(resultado.potencia_nominal_w),
+    )
+    eslabones[-1] = Eslabon(
+        nombre=es_gen.nombre,
+        potencia_entrada_w=float(es_gen.potencia_entrada_w),
+        potencia_salida_w=float(p_nueva),
+        rendimiento=float(p_nueva / es_gen.potencia_entrada_w)
+        if es_gen.potencia_entrada_w > 0
+        else 0.0,
+        detalle=dict(es_gen.detalle),
+    )
+    horas = float(resultado.horas_ano)
+    disp = float(resultado.disponibilidad)
+    prod_mwh = p_nueva * horas * disp / 1e6
+    factor_planta = (
+        (prod_mwh * 1e6) / (float(resultado.potencia_nominal_w) * horas)
+        if resultado.potencia_nominal_w > 0
+        else 0.0
+    )
+    return Resultado(
+        recurso=resultado.recurso,
+        eslabones=eslabones,
+        potencia_nominal_w=float(resultado.potencia_nominal_w),
+        produccion_anual_mwh=float(prod_mwh),
+        factor_planta=float(factor_planta),
+        disponibilidad=disp,
+        horas_ano=horas,
+        avisos=list(resultado.avisos),
+        series={k: v for k, v in resultado.series.items()},
+        metadatos=dict(resultado.metadatos),
+    )
+
+
 def simular(
     params: Parametros,
     progreso: Callable[[int], None] | None = None,
@@ -310,8 +364,9 @@ def simular(
     if cancel.is_set():
         return _abandonado(params, avisos)
     sitio = cargar_sitio(params.sitio_id)
-    contexto = ContextoRecurso(profundidad_m=params.profundidad_m)
+    contexto = ContextoRecurso(profundidad_m=params.profundidad_m, rho=params.rho)
     resultado = crear_dispositivo(params).resolver(recurso_de(params, sitio), contexto)
+    resultado = _aplicar_rendimientos(resultado, params.eta_pto, params.eta_gen)
     # La animacion necesita un eje de tiempo. Si el dispositivo ya integro su
     # propia posicion, solo se le pone el eje: sobreescribir z_m con una senoide
     # de amplitud Hm0/2 hacia que la boya dibujada fuera la superficie del mar,
@@ -365,7 +420,7 @@ def eslabon_que_separa(a: Resultado, b: Resultado, tolerancia: float = 0.02) -> 
 def comparar_dos(params: Parametros, clave_a: str, clave_b: str) -> dict[str, Any]:
     """Dos tecnologias sobre el mismo emplazamiento, resueltas con el mismo recurso."""
     sitio = cargar_sitio(params.sitio_id)
-    contexto = ContextoRecurso(profundidad_m=params.profundidad_m)
+    contexto = ContextoRecurso(profundidad_m=params.profundidad_m, rho=params.rho)
     recurso = recurso_de(params, sitio)
     salidas = [
         crear_dispositivo(replace(params, dispositivo=clave)).resolver(dict(recurso), contexto)
@@ -386,12 +441,36 @@ def economia_completa(
     potencia_kw: float,
     masa_t: float,
     vida_anos: int = 20,
-    tasa_descuento: float = 0.08,
+    tasa_descuento: float | None = None,
+    crf: float | None = None,
 ) -> dict[str, Any]:
-    """Las dos comparaciones juntas: la favorable (diesel ZNI) y la desfavorable (SIN)."""
+    """Las dos comparaciones juntas: la favorable (diesel ZNI) y la desfavorable (SIN).
+
+    Acepta `tasa_descuento` (calculo interno del CRF) o `crf` directo.
+    Si ambos faltan usa tasa=0.08 (CRF 0.1019 para 20 anos).
+    """
+    if crf is None and tasa_descuento is None:
+        tasa_descuento = 0.08
     if aep_mwh <= 0 or capex_cop <= 0:
         return {"estado": "pendiente", "motivo": "CAPEX pendiente — sin cifra no hay LCOE"}
-    lcoe = calcular_lcoe(capex_cop, opex_anual_cop, aep_mwh, vida_anos, tasa_descuento)
+    if crf is not None:
+        if aep_mwh <= 0:
+            raise ValueError("AEP debe ser positiva")
+        anualizado = capex_cop * crf + opex_anual_cop
+        lcoe_cop_mwh = anualizado / aep_mwh
+        lcoe = ResultadoLCOE(
+            lcoe_cop_mwh=float(lcoe_cop_mwh),
+            lcoe_eur_mwh=None,
+            capex_cop=float(capex_cop),
+            opex_anual_cop=float(opex_anual_cop),
+            aep_mwh=float(aep_mwh),
+            vida_anos=vida_anos,
+            tasa_descuento=0.0,
+            factor_recuperacion=float(crf),
+            detalle=f"LCOE=(CAPEX*CRF+OPEX)/AEP; CRF={crf:.4f}; {lcoe_cop_mwh:.0f} COP/MWh",
+        )
+    else:
+        lcoe = calcular_lcoe(capex_cop, opex_anual_cop, aep_mwh, vida_anos, tasa_descuento)
     return {
         "estado": "listo",
         "lcoe": lcoe,

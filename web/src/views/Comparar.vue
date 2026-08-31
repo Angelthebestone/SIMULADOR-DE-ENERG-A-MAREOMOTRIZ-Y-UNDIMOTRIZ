@@ -39,7 +39,13 @@
 
       <h2>Dispositivos reales y fracasos</h2>
       <div class="grid-fichas" data-testid="fichas-fracasos">
-        <FichaDispositivo v-for="f in fracasos" :key="String(f.id)" :ficha="f as unknown as Record<string,unknown>" tipo="fracaso" />
+        <FichaDispositivo
+          v-for="f in fracasos"
+          :key="String(f.id)"
+          :ficha="f as unknown as Record<string,unknown>"
+          tipo="fracaso"
+          :lcoe-sin="lcoeSin"
+        />
       </div>
       <p class="nota-fracasos">Ninguno falló por física imposible: coste, disponibilidad y capital.</p>
     </div>
@@ -126,6 +132,10 @@ function formatPct(r:number){ return `${formatearNumero(r*100,1)} %` }
 // 8+7 catálogo sin fórmulas — lectura por flag simulable (20.4)
 const catalogo = ref<Record<string,unknown>[]>([])
 const fracasos = ref<Record<string,unknown>[]>([])
+// LCOE medio SIN leído directo de datos/xm/resumen_xm.json (tareas 6.1 y 6.2).
+// La pieza vive en el resumen XM y la expone app.datos_lectura.cargar_lcoe_sin;
+// en la web se sirve bajo /datos/xm/resumen_xm.json (vite.config.ts::datosPlugin).
+const lcoeSin = ref<{ valor: number | null; unidad: string; fuente: string; estado: string } | null>(null)
 const idsCatalogo = [
   'atenuador','absorbedor_puntual_catalogo','owc','owc','owc','rebosamiento','diferencial_presion','onda_bulbo','masa_rotatoria',
   'tidal_eje_horizontal','tidal_eje_vertical','tidal_hidroala','tidal_cometa','tidal_venturi','tidal_tornillo','tidal_otros'
@@ -182,7 +192,27 @@ async function cargarCatalogo(){
   }
   fracasos.value = lf
 }
-onMounted(cargarCatalogo)
+
+// LCOE medio SIN: una sola petición al resumen XM, una sola pieza en la app.
+// Si falla la red o el resumen está incompleto, queda en estado pendiente y la
+// ficha de fracaso muestra la leyenda "SIN: pendiente — falta resumen XM".
+async function cargarLcoeSin(){
+  try{
+    const r = await fetch('/datos/xm/resumen_xm.json')
+    if(!r.ok) return
+    const resumen = await r.json()
+    const campo = resumen?.lcoe_sin_cop_mwh
+    if(campo && typeof campo === 'object'){
+      lcoeSin.value = {
+        valor: typeof campo.valor === 'number' ? campo.valor : null,
+        unidad: String(campo.unidad ?? 'COP/MWh'),
+        fuente: String(campo.fuente ?? ''),
+        estado: String(campo.estado ?? 'pendiente'),
+      }
+    }
+  }catch{}
+}
+onMounted(() => { cargarCatalogo(); cargarLcoeSin() })
 
 // 20.3 comparación dos tecnologías mismo emplazamiento
 const opciones = ['absorbedor_puntual','owc','turbina_corriente','embalse']

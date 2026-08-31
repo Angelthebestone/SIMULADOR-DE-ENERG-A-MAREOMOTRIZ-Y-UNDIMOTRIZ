@@ -10,5 +10,11 @@
   "causa": "Doble: mortalidad sustancial de peces (Canadian Science Advisory Secretariat) + falla componente critico generacion. Puesta en servicio 1984.",
   "origen_causa": "Wikipedia y CBC",
   "coste_hundido": "Nova Scotia Power intento recuperar 27M CAD de usuarios por planta inactiva y perdio primer intento ante regulador - CBC 2021 https://www.cbc.ca/news/canada/nova-scotia/n-s-power-loses-1st-bid-to-get-27m-from-customers-for-idled-annapolis-plant-1.6313798",
-  "destino_coste": "Intento de traslado a tarifa usuarios DENEGADO por regulador - caso docente quien paga activo varado"
+  "destino_coste": "Intento de traslado a tarifa usuarios DENEGADO por regulador - caso docente quien paga activo varado",
+  "lcoe_estimado_cop_mwh": {
+    "valor": 1535.2654452010686,
+    "unidad": "COP/MWh",
+    "fuente": "Isla Fuerte por defecto (Ortega et al. 2013 (verificado, Isla Fuerte 8,9 kW/m)) + catálogo tidal_otros (factor planta 0,25 Handbook mareal); CAPEX 6,000,000 EUR/MW Handbook * 4250 COP/EUR",
+    "estado": "verificado"
+  }
 }

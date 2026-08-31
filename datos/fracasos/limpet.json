@@ -10,5 +10,11 @@
   "causa": "Tecnica/economica - potencia real mitad de nominal de catalogo (500->250 kW). Leccion: potencia nominal != entregable. Columna inclinada reduce turbulencia.",
   "origen_causa": "Wikipedia Islay LIMPET",
   "coste_hundido": "Planta piloto Islay, sin cifra 27M - coste hundido menor escala",
-  "destino_coste": "Queens University / Wavegen - investigacion"
+  "destino_coste": "Queens University / Wavegen - investigacion",
+  "lcoe_estimado_cop_mwh": {
+    "valor": 991.3892839991403,
+    "unidad": "COP/MWh",
+    "fuente": "Isla Fuerte por defecto (Ortega et al. 2013 (verificado, Isla Fuerte 8,9 kW/m)) + catálogo owc (J=8.9 kW/m (Isla Fuerte) * B=25.0 m * CWR=0.29 = 65 kW); CAPEX 4,000,000 EUR/MW Handbook * 4250 COP/EUR",
+    "estado": "verificado"
+  }
 }

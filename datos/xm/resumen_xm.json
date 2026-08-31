@@ -23,5 +23,14 @@
     "archivo": "factorEmisionCO2e_2023-2024.csv",
     "filas": 17544,
     "formato": "fecha_hora (ISO8601), valor (float), id"
+  },
+  "lcoe_sin_cop_mwh": {
+    "valor": 617179.1465230278,
+    "unidad": "COP/MWh",
+    "fuente": "XM PrecBolsNaci 2023-2024 media horaria (17544 registros horarios 2023-2024)",
+    "estado": "verificado",
+    "anio_inicio": 2023,
+    "anio_fin": 2024,
+    "n_registros": 17544
   }
 }

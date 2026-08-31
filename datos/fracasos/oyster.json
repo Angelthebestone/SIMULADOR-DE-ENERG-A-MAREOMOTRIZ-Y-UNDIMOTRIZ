@@ -10,5 +10,11 @@
   "causa": "Economica - sin comprador, cese actividad noviembre 2015 tras administracion octubre 2015. >40 empresas Orkney, >3M GBP, conectado Billia Croo junio 2012.",
   "origen_causa": "En.wikipedia Aquamarine Power",
   "coste_hundido": "Inversion privada perdida, sin recuperacion regulador publicada",
-  "destino_coste": "Capital riesgo privado varado"
+  "destino_coste": "Capital riesgo privado varado",
+  "lcoe_estimado_cop_mwh": {
+    "valor": 3108.1393768621692,
+    "unidad": "COP/MWh",
+    "fuente": "Isla Fuerte por defecto (Ortega et al. 2013 (verificado, Isla Fuerte 8,9 kW/m)) + catálogo owsc (J=8.9 kW/m (Isla Fuerte) * B=20.0 m * CWR=0.37 = 66 kW); CAPEX 4,000,000 EUR/MW Handbook * 4250 COP/EUR",
+    "estado": "verificado"
+  }
 }

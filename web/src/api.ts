@@ -12,6 +12,12 @@ export type Params = {
   profundidad_m: number
   sitio_id: string
   dispositivo: string
+  // Cuatro supuestos editables desde Diseñar (spec supuestos-editables).
+  // El motor de cálculo en app/servicio.py los acepta como parte de Parametros.
+  eta_pto: number
+  eta_gen: number
+  crf: number
+  rho: number
 }
 
 type PuenteApi = {

@@ -1,6 +1,6 @@
 <template>
-  <div class="controles-fisicos">
-    <div v-for="c in controles" :key="c.id" class="control">
+  <div class="controles-supuestos">
+    <div v-for="c in controles" :key="c.id" class="supuesto">
       <label :for="c.id" class="etiqueta">
         {{ c.etiqueta }}
         <Glosario :term="c.simbolo" class="simbolo">{{ c.simbolo }}</Glosario>
@@ -14,7 +14,7 @@
           :max="c.max"
           :step="c.step"
           :value="c.valor"
-          :aria-describedby="c.id + '-valor'"
+          :aria-describedby="c.id + '-meta'"
           @input="c.emitir(($event.target as HTMLInputElement).valueAsNumber)"
         />
         <span class="tope">{{ c.formato(c.max) }}</span>
@@ -22,6 +22,11 @@
       <output :id="c.id + '-valor'" :for="c.id" class="valor">
         {{ c.formato(c.valor) }} <span class="unidad">{{ c.unidad }}</span>
       </output>
+      <p :id="c.id + '-meta'" class="meta">
+        defecto {{ c.formato(c.defecto) }} ·
+        rango {{ c.formato(c.min) }}–{{ c.formato(c.max) }} ·
+        fuente {{ c.fuente }}
+      </p>
     </div>
   </div>
 </template>
@@ -32,63 +37,85 @@ import { formatearNumero } from "../utils/formato";
 import Glosario from "./Glosario.vue";
 
 const props = defineProps<{
-  hm0_m: number;
-  te_s: number;
-  b_pto_ns_m: number;
+  eta_pto: number;
+  eta_gen: number;
+  crf: number;
+  rho: number;
 }>();
 
 const emit = defineEmits<{
-  (e: "update:hm0_m", v: number): void;
-  (e: "update:te_s", v: number): void;
-  (e: "update:b_pto_ns_m", v: number): void;
+  (e: "update:eta_pto", v: number): void;
+  (e: "update:eta_gen", v: number): void;
+  (e: "update:crf", v: number): void;
+  (e: "update:rho", v: number): void;
 }>();
 
-// Una sola descripción por control: la plantilla ya no repite tres bloques
-// casi idénticos y añadir un cuarto parámetro es una línea.
+// Cuatro supuestos editables. Cada control expone valor por defecto, rango
+// plausible, unidad y fuente bibliográfica en una sola línea bajo el control
+// (spec `supuestos-editables`). Sin CDN, sin librería externa: el patrón es
+// espejo de ControlesFisicos.vue.
 const controles = computed(() => [
   {
-    id: "ctrl-hm0",
-    etiqueta: "Qué tan grandes son las olas",
-    simbolo: "Hm0",
-    unidad: "m",
-    min: 0.5,
-    max: 4,
-    step: 0.1,
-    valor: props.hm0_m,
-    formato: (v: number) => formatearNumero(v, 1),
-    emitir: (v: number) => emit("update:hm0_m", v),
+    id: "ctrl-eta-pto",
+    etiqueta: "Rendimiento del PTO",
+    simbolo: "η_PTO",
+    unidad: "",
+    min: 0.4,
+    max: 0.9,
+    step: 0.01,
+    defecto: 0.65,
+    valor: props.eta_pto,
+    formato: (v: number) => formatearNumero(v, 2),
+    fuente: "Falnes 2002 cap. 4",
+    emitir: (v: number) => emit("update:eta_pto", v),
   },
   {
-    id: "ctrl-te",
-    etiqueta: "Cada cuánto llega una ola",
-    simbolo: "Te",
-    unidad: "s",
-    min: 4,
-    max: 12,
-    step: 0.1,
-    valor: props.te_s,
-    formato: (v: number) => formatearNumero(v, 1),
-    emitir: (v: number) => emit("update:te_s", v),
+    id: "ctrl-eta-gen",
+    etiqueta: "Eficiencia del generador",
+    simbolo: "η_gen",
+    unidad: "",
+    min: 0.8,
+    max: 0.95,
+    step: 0.01,
+    defecto: 0.90,
+    valor: props.eta_gen,
+    formato: (v: number) => formatearNumero(v, 2),
+    fuente: "Handbook cap. 1",
+    emitir: (v: number) => emit("update:eta_gen", v),
   },
   {
-    id: "ctrl-bpto",
-    etiqueta: "Qué tan duro frena la boya",
-    simbolo: "B_pto",
-    unidad: "kN·s/m",
-    min: 10_000,
-    max: 500_000,
-    step: 1_000,
-    valor: props.b_pto_ns_m,
-    formato: (v: number) => formatearNumero(v / 1000, 0),
-    emitir: (v: number) => emit("update:b_pto_ns_m", v),
+    id: "ctrl-crf",
+    etiqueta: "Factor de recuperación de capital",
+    simbolo: "CRF",
+    unidad: "",
+    min: 0.04,
+    max: 0.15,
+    step: 0.005,
+    defecto: 0.08,
+    valor: props.crf,
+    formato: (v: number) => formatearNumero(v, 3),
+    fuente: "tasa 8% vida 20 años",
+    emitir: (v: number) => emit("update:crf", v),
+  },
+  {
+    id: "ctrl-rho",
+    etiqueta: "Densidad del agua de mar",
+    simbolo: "rho",
+    unidad: "kg/m³",
+    min: 1000,
+    max: 1050,
+    step: 1,
+    defecto: 1025,
+    valor: props.rho,
+    formato: (v: number) => formatearNumero(v, 0),
+    fuente: "agua de mar nominal",
+    emitir: (v: number) => emit("update:rho", v),
   },
 ]);
 </script>
 
 <style scoped>
-/* Se adapta al ancho del contenedor, no al de la ventana: el mismo bloque
-   sirve en el panel ancho de Ver y en una columna estrecha. */
-.controles-fisicos {
+.controles-supuestos {
   container-type: inline-size;
   display: grid;
   gap: var(--s-4);
@@ -98,7 +125,7 @@ const controles = computed(() => [
   background: var(--panel);
 }
 
-.control {
+.supuesto {
   display: grid;
   grid-template-columns: minmax(12rem, 18rem) 1fr auto;
   align-items: center;
@@ -106,13 +133,10 @@ const controles = computed(() => [
   row-gap: 2px;
 }
 
-/* Ningun hijo bloquea el encogido del grupo: con la escala de sustentacion a
-   320 px, el ancho minimo del valor y de la etiqueta desplazaba el panel. */
-.control > * {
+.supuesto > * {
   min-inline-size: 0;
 }
 
-/* Etiqueta pegada a su control y separada del grupo siguiente. */
 .etiqueta {
   display: flex;
   align-items: baseline;
@@ -166,9 +190,18 @@ const controles = computed(() => [
   color: var(--tenue);
 }
 
+/* Línea única bajo el control con defecto, rango y fuente bibliográfica. */
+.meta {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+  line-height: 1.3;
+}
+
 /* Una columna cuando el contenedor se estrecha. */
 @container (width < 34rem) {
-  .control {
+  .supuesto {
     grid-template-columns: 1fr auto;
   }
 

@@ -20,6 +20,7 @@
             <dd class="unidades">{{ f.unidades }}</dd>
           </template>
         </dl>
+        <p v-if="intuicionDe(String(key))" class="intuicion" data-testid="intuicion">{{ intuicionDe(String(key)) }}</p>
         <p v-if="FUENTES[String(key)]" class="fuente">{{ FUENTES[String(key)] }}</p>
       </article>
     </div>
@@ -36,6 +37,7 @@ import { ref, watch, onMounted, reactive, nextTick } from 'vue'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import EstadoBloque from '../components/EstadoBloque.vue'
+import { intuicionDe } from '../contenido/intuiciones'
 
 /** Variable exacta exigida */
 const FORMULA_DENSIDAD = "J = \\rho g^2 Hm0^2 Te / (64\\pi)"

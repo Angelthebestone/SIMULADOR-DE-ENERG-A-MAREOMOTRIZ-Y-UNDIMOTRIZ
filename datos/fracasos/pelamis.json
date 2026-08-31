@@ -11,5 +11,11 @@
   "causa": "Economica - coste por MWh incompatible con mercado, agotamiento capital riesgo. Entro en administracion noviembre 2014, activos a Wave Energy Scotland. No fallo por fisica imposible.",
   "origen_causa": "En.wikipedia Pelamis Wave Power",
   "coste_hundido": "Propiedad intelectual y activos transferidos a Wave Energy Scotland - coste varado publico escoces, sin cifra 27M especifica (Annapolis es el caso 27M CAD regulador)",
-  "destino_coste": "Asumido por sector publico escoces via Wave Energy Scotland"
+  "destino_coste": "Asumido por sector publico escoces via Wave Energy Scotland",
+  "lcoe_estimado_cop_mwh": {
+    "valor": 1996.5478636093799,
+    "unidad": "COP/MWh",
+    "fuente": "Isla Fuerte por defecto (Ortega et al. 2013 (verificado, Isla Fuerte 8,9 kW/m)) + catálogo atenuador (J=8.9 kW/m (Isla Fuerte) * B=180.0 m * CWR=0.06 = 96 kW); CAPEX 4,000,000 EUR/MW Handbook * 4250 COP/EUR",
+    "estado": "verificado"
+  }
 }

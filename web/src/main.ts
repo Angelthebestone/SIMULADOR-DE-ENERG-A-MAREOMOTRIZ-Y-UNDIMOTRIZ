@@ -99,7 +99,7 @@ const PLANTILLA = `
         @update:params="aplicarParams" />
       <Comparar v-else-if="activa==='comparar'" :resultado="resultado" />
       <Calcular v-else-if="activa==='calcular'" :formulas="formulas" :resultado="resultado" :cargando="cargando" />
-      <Disenar v-else-if="activa==='disenar'" :figuras="figuras" :resultado="resultado" :panel-sitio="panelSitio" :sitio-id="params.sitio_id" />
+      <Disenar v-else-if="activa==='disenar'" :figuras="figuras" :resultado="resultado" :panel-sitio="panelSitio" :sitio-id="params.sitio_id" :params="params" @update:params="aplicarParams" />
       <MapaView v-else-if="activa==='mapa'" />
     </section>
 
@@ -129,6 +129,10 @@ const app = createApp({
         profundidad_m: 30,
         sitio_id: 'isla_fuerte',
         dispositivo: 'absorbedor_puntual',
+        eta_pto: 0.65,
+        eta_gen: 0.90,
+        crf: 0.08,
+        rho: 1025,
       } as Params,
       sitios: SITIOS,
       dispositivos: DISPOSITIVOS,
