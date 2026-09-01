@@ -1,0 +1,32 @@
+{
+  "type": "FeatureCollection",
+  "estado": "verificado",
+  "unidad": "rango_m en metros (amplitud de marea viva), velocidad_ms en m/s (corriente de pico)",
+  "nota": "Puntos mareales documentados en literatura y por los operadores de cada emplazamiento. No es una malla: son los sitios donde la energia mareal esta medida o explotada. Para el resto del oceano el simulador declara la marea como pendiente en vez de interpolar.",
+  "features": [
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-64.4, 45.3] },
+      "properties": { "nombre": "Bahia de Fundy (Minas Passage)", "rango_m": 16.0, "velocidad_ms": 5.2, "fuente": "FORCE Canada / NOAA" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-3.1, 58.7] },
+      "properties": { "nombre": "Pentland Firth", "rango_m": 4.5, "velocidad_ms": 5.0, "fuente": "EMEC / MeyGen" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-2.0, 48.6] },
+      "properties": { "nombre": "Estuario de La Rance", "rango_m": 13.5, "velocidad_ms": 3.8, "fuente": "EDF France (central de 240 MW)" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-2.9, 51.4] },
+      "properties": { "nombre": "Estuario del Severn", "rango_m": 14.2, "velocidad_ms": 3.6, "fuente": "UK Tidal Energy / Severn Estuary Partnership" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [174.6, -41.2] },
+      "properties": { "nombre": "Estrecho de Cook", "rango_m": 2.8, "velocidad_ms": 4.2, "fuente": "NIWA New Zealand" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-70.5, -52.8] },
+      "properties": { "nombre": "Estrecho de Magallanes", "rango_m": 7.8, "velocidad_ms": 4.5, "fuente": "Universidad de Magallanes" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-64.2, -42.4] },
+      "properties": { "nombre": "Golfo San Jose (Peninsula Valdes)", "rango_m": 9.1, "velocidad_ms": 3.4, "fuente": "CNEA Argentina" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [126.6, 37.3] },
+      "properties": { "nombre": "Lago Sihwa", "rango_m": 8.0, "velocidad_ms": 2.8, "fuente": "K-Water South Korea (central de 254 MW)" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-78.9, 1.9] },
+      "properties": { "nombre": "Tumaco", "rango_m": 3.8, "velocidad_ms": 1.6, "fuente": "DIMAR / CCCP" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-77.3, 3.9] },
+      "properties": { "nombre": "Bahia Malaga", "rango_m": 4.2, "velocidad_ms": 2.2, "fuente": "DIMAR / CIOH" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [15.6, 38.2] },
+      "properties": { "nombre": "Estrecho de Messina", "rango_m": 1.4, "velocidad_ms": 3.1, "fuente": "CNR Italia" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [121.9, 30.6] },
+      "properties": { "nombre": "Bahia de Hangzhou", "rango_m": 7.2, "velocidad_ms": 3.0, "fuente": "China Institute of Water Resources" } }
+  ]
+}

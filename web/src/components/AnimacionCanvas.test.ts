@@ -9,13 +9,17 @@ import assert from "node:assert/strict";
 
 import { AnimacionCanvas } from "./AnimacionCanvas.ts";
 
+/** Doble del contexto 2D: registra las llamadas que la prueba necesita medir
+ *  y acepta sin efecto el resto de la API que usa el dibujo (degradados,
+ *  transformaciones, recortes). Lo que no se mide, no se registra. */
 class FakeCtx {
   calls: { method: string; args: unknown[] }[] = [];
-  fillStyle = "";
-  strokeStyle = "";
+  fillStyle: unknown = "";
+  strokeStyle: unknown = "";
   font = "";
   textAlign: CanvasTextAlign = "left";
   lineWidth = 1;
+  globalAlpha = 1;
   beginPath() { this.calls.push({ method: "beginPath", args: [] }); }
   moveTo(x: number, y: number) { this.calls.push({ method: "moveTo", args: [x, y] }); }
   lineTo(x: number, y: number) { this.calls.push({ method: "lineTo", args: [x, y] }); }
@@ -28,7 +32,24 @@ class FakeCtx {
   arc() { this.calls.push({ method: "arc", args: [] }); }
   closePath() { this.calls.push({ method: "closePath", args: [] }); }
   setTransform() { this.calls.push({ method: "setTransform", args: [] }); }
-  measureText?: (text: string) => { width: number };
+  // Sin efecto sobre lo que se mide: basta con que existan.
+  createLinearGradient() { return { addColorStop() {} }; }
+  createRadialGradient() { return { addColorStop() {} }; }
+  fillRect() {}
+  strokeRect() {}
+  rect() {}
+  roundRect() {}
+  ellipse() {}
+  quadraticCurveTo() {}
+  bezierCurveTo() {}
+  clip() {}
+  save() {}
+  restore() {}
+  translate() {}
+  rotate() {}
+  scale() {}
+  setLineDash() {}
+  measureText(text: string) { return { width: text.length * 6 }; }
 }
 
 class FakeCanvas {
@@ -166,67 +187,27 @@ describe("AnimacionCanvas — anotaciones físicas", () => {
     assert.ok(yJ < 40, `J(t) debe pintarse en la parte alta del canvas; y=${yJ}`);
   });
 
-  it("dibujar() redimensiona la flecha al pasar Hm0 de 1,5 a 2,5", () => {
-    // La flecha Hm0 se compone de tres beginPath sobre el mismo x: el del
-    // tronco (moveTo → lineTo), y los dos arrowheads. Medimos el bounding
-    // box de los puntos emitidos por los arrowheads, que cubren exactamente
-    // la altura de la flecha.
-    const medirFlecha = (calls: { method: string; args: unknown[] }[]) => {
-      const ys: number[] = [];
-      let xRef = -1;
-      let subpath: number[][] = [];
-      let abierto = false;
-      const flush = () => {
-        if (subpath.length > 0) {
-          // ¿Es la línea vertical? dos puntos con x idéntico
-          if (subpath.length >= 2 && subpath.every((p) => Math.abs(p[0] - xRef) < 0.01)) {
-            ys.push(subpath[0][1], subpath[subpath.length - 1][1]);
-          }
-        }
-        subpath = [];
-      };
-      for (const c of calls) {
-        if (c.method === "beginPath") { abierto = true; subpath = []; continue; }
-        if (!abierto) continue;
-        if (c.method === "moveTo") {
-          const x = c.args[0] as number;
-          const y = c.args[1] as number;
-          xRef = x;
-          subpath.push([x, y]);
-          continue;
-        }
-        if (c.method === "lineTo") {
-          const x = c.args[0] as number;
-          const y = c.args[1] as number;
-          subpath.push([x, y]);
-          continue;
-        }
-        if (c.method === "stroke") { flush(); abierto = false; continue; }
-      }
-      if (ys.length < 2) return 0;
-      const min = Math.min(...ys);
-      const max = Math.max(...ys);
-      return max - min;
-    };
-
+  it("dibujar() redimensiona la cota al pasar Hm0 de 1,5 a 2,5", () => {
+    // La cota que se pinta la publica el propio dibujo (cotaHm0Px). Medirla
+    // así comprueba lo que interesa —que la anotación siga a Hm0— sin
+    // reconstruir la geometría desde las llamadas al lienzo, que cambian cada
+    // vez que se retoca la escena.
     cargar(anim, 1.5, 7.0, 0.118);
-    canvas.ctx.calls.length = 0;
     anim.dibujar(0);
-    const alt15 = medirFlecha(canvas.ctx.calls);
+    const alt15 = anim.cotaHm0Px;
 
     cargar(anim, 2.5, 7.0, 0.118);
-    canvas.ctx.calls.length = 0;
     anim.dibujar(0);
-    const alt25 = medirFlecha(canvas.ctx.calls);
+    const alt25 = anim.cotaHm0Px;
 
     assert.ok(
       alt15 > 0 && alt25 > alt15,
-      `altura de flecha debe crecer al pasar Hm0 de 1,5 a 2,5; alt15=${alt15} alt25=${alt25}`,
+      `la cota debe crecer al pasar Hm0 de 1,5 a 2,5; alt15=${alt15} alt25=${alt25}`,
     );
     const ratio = alt25 / alt15;
     assert.ok(
-      ratio > 1.5,
-      `ratio debe acercarse a 1.667; fue ${ratio.toFixed(3)}`,
+      Math.abs(ratio - 5 / 3) < 0.05,
+      `ratio esperado ≈1.667; fue ${ratio.toFixed(3)}`,
     );
   });
 

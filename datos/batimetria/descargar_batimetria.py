@@ -64,6 +64,55 @@ def distancia_a_profundidad(perfil: list[tuple[float, float]], objetivo_m: float
     return None
 
 
+BANDA = (-60.0, -30.0)  # profundidades entre 30 y 60 m, con el signo de GMRT
+
+
+def geojson_banda(filas: list) -> dict:
+    """Tramos de cada transecto que caen en la banda de 30-60 m.
+
+    El mapa (`web/src/map/mapa.ts`) pinta esta capa filtrando por
+    `profundidad_m` entre -60 y -30: es la franja donde se fondea un
+    convertidor, ni tan somera que rompa la ola ni tan honda que dispare el
+    coste de amarre. Cada tramo une dos muestras consecutivas del mismo rumbo
+    y lleva la profundidad media de las dos.
+    """
+    rasgos = []
+    por_rumbo: dict[str, list] = {}
+    for nombre, _rumbo, distancia, lat, lon, z in filas:
+        if z is None:
+            continue
+        por_rumbo.setdefault(nombre, []).append((float(distancia), float(lat), float(lon), float(z)))
+
+    for nombre, perfil in por_rumbo.items():
+        perfil.sort()
+        for (d0, lat0, lon0, z0), (d1, lat1, lon1, z1) in zip(perfil, perfil[1:]):
+            media = (z0 + z1) / 2
+            if not (BANDA[0] <= media <= BANDA[1]):
+                continue
+            rasgos.append(
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [[lon0, lat0], [lon1, lat1]],
+                    },
+                    "properties": {
+                        "rumbo": nombre,
+                        "profundidad_m": round(media, 1),
+                        "distancia_km": round((d0 + d1) / 2, 2),
+                    },
+                }
+            )
+
+    return {
+        "type": "FeatureCollection",
+        "fuente": "GMRT (Global Multi-Resolution Topography), Lamont-Doherty Earth Observatory",
+        "estado": "verificado",
+        "banda_m": [30, 60],
+        "features": rasgos,
+    }
+
+
 if __name__ == "__main__":
     carpeta = pathlib.Path(__file__).parent
     filas = []
@@ -81,6 +130,10 @@ if __name__ == "__main__":
         escritor = csv.writer(f)
         escritor.writerow(["rumbo", "rumbo_deg", "distancia_km", "lat", "lon", "profundidad_m"])
         escritor.writerows(filas)
+
+    (carpeta / "transecto_isla_fuerte_gmrt.geojson").write_text(
+        json.dumps(geojson_banda(filas)), encoding="utf-8"
+    )
 
     resumen = {}
     for nombre, perfil in perfiles.items():

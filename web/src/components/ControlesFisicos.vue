@@ -1,27 +1,29 @@
 <template>
   <div class="controles-fisicos">
-    <div v-for="c in controles" :key="c.id" class="control">
-      <label :for="c.id" class="etiqueta">
-        {{ c.etiqueta }}
-        <Glosario :term="c.simbolo" class="simbolo">{{ c.simbolo }}</Glosario>
-      </label>
-      <div class="pista">
-        <span class="tope">{{ c.formato(c.min) }}</span>
-        <input
-          :id="c.id"
-          type="range"
-          :min="c.min"
-          :max="c.max"
-          :step="c.step"
-          :value="c.valor"
-          :aria-describedby="c.id + '-valor'"
-          @input="c.emitir(($event.target as HTMLInputElement).valueAsNumber)"
-        />
-        <span class="tope">{{ c.formato(c.max) }}</span>
+    <div class="controles-grid">
+      <div v-for="c in controlesActivos" :key="c.id" class="control">
+        <label :for="c.id" class="etiqueta">
+          <span>{{ c.etiqueta }}</span>
+          <Glosario :term="c.simbolo" class="simbolo">{{ c.simbolo }}</Glosario>
+        </label>
+        <div class="pista">
+          <span class="tope">{{ c.formato(c.min) }}</span>
+          <input
+            :id="c.id"
+            type="range"
+            :min="c.min"
+            :max="c.max"
+            :step="c.step"
+            :value="c.valor"
+            :aria-describedby="c.id + '-valor'"
+            @input="c.emitir(($event.target as HTMLInputElement).valueAsNumber)"
+          />
+          <span class="tope">{{ c.formato(c.max) }}</span>
+        </div>
+        <output :id="c.id + '-valor'" :for="c.id" class="valor">
+          {{ c.formato(c.valor) }} <span class="unidad">{{ c.unidad }}</span>
+        </output>
       </div>
-      <output :id="c.id + '-valor'" :for="c.id" class="valor">
-        {{ c.formato(c.valor) }} <span class="unidad">{{ c.unidad }}</span>
-      </output>
     </div>
   </div>
 </template>
@@ -31,24 +33,40 @@ import { computed } from "vue";
 import { formatearNumero } from "../utils/formato";
 import Glosario from "./Glosario.vue";
 
-const props = defineProps<{
-  hm0_m: number;
-  te_s: number;
-  b_pto_ns_m: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    hm0_m: number;
+    te_s: number;
+    b_pto_ns_m: number;
+    modoEnergia?: "undimotriz" | "mareomotriz";
+    velocidadCorriente?: number;
+    rangoMarea?: number;
+    profundidad_m?: number;
+    unidades?: number;
+  }>(),
+  {
+    modoEnergia: "undimotriz",
+    velocidadCorriente: 2.2,
+    rangoMarea: 3.5,
+    profundidad_m: 30,
+    unidades: 1,
+  }
+);
 
 const emit = defineEmits<{
   (e: "update:hm0_m", v: number): void;
   (e: "update:te_s", v: number): void;
   (e: "update:b_pto_ns_m", v: number): void;
+  (e: "update:velocidadCorriente", v: number): void;
+  (e: "update:rangoMarea", v: number): void;
+  (e: "update:profundidad_m", v: number): void;
+  (e: "update:unidades", v: number): void;
 }>();
 
-// Una sola descripción por control: la plantilla ya no repite tres bloques
-// casi idénticos y añadir un cuarto parámetro es una línea.
-const controles = computed(() => [
+const controlesOndas = computed(() => [
   {
     id: "ctrl-hm0",
-    etiqueta: "Qué tan grandes son las olas",
+    etiqueta: "Altura de ola significativa",
     simbolo: "Hm0",
     unidad: "m",
     min: 0.5,
@@ -60,7 +78,7 @@ const controles = computed(() => [
   },
   {
     id: "ctrl-te",
-    etiqueta: "Cada cuánto llega una ola",
+    etiqueta: "Periodo medio del oleaje",
     simbolo: "Te",
     unidad: "s",
     min: 4,
@@ -72,7 +90,7 @@ const controles = computed(() => [
   },
   {
     id: "ctrl-bpto",
-    etiqueta: "Qué tan duro frena la boya",
+    etiqueta: "Amortiguamiento del generador",
     simbolo: "B_pto",
     unidad: "kN·s/m",
     min: 10_000,
@@ -83,41 +101,87 @@ const controles = computed(() => [
     emitir: (v: number) => emit("update:b_pto_ns_m", v),
   },
 ]);
+
+const controlesMareas = computed(() => [
+  {
+    id: "ctrl-vel-corriente",
+    etiqueta: "Velocidad de corriente mareal",
+    simbolo: "V_marea",
+    unidad: "m/s",
+    min: 0.5,
+    max: 5.5,
+    step: 0.1,
+    valor: props.velocidadCorriente,
+    formato: (v: number) => formatearNumero(v, 1),
+    emitir: (v: number) => emit("update:velocidadCorriente", v),
+  },
+  {
+    id: "ctrl-rango-marea",
+    etiqueta: "Rango mareal (pleamar - bajamar)",
+    simbolo: "R_marea",
+    unidad: "m",
+    min: 0.5,
+    max: 16.0,
+    step: 0.1,
+    valor: props.rangoMarea,
+    formato: (v: number) => formatearNumero(v, 1),
+    emitir: (v: number) => emit("update:rangoMarea", v),
+  },
+  {
+    id: "ctrl-profundidad",
+    etiqueta: "Profundidad del emplazamiento",
+    simbolo: "h_fondo",
+    unidad: "m",
+    min: 10,
+    max: 80,
+    step: 1,
+    valor: props.profundidad_m,
+    formato: (v: number) => formatearNumero(v, 0),
+    emitir: (v: number) => emit("update:profundidad_m", v),
+  },
+]);
+
+const controlesActivos = computed(() => {
+  if (props.modoEnergia === "mareomotriz") {
+    return controlesMareas.value;
+  }
+  return controlesOndas.value;
+});
 </script>
 
 <style scoped>
-/* Se adapta al ancho del contenedor, no al de la ventana: el mismo bloque
-   sirve en el panel ancho de Ver y en una columna estrecha. */
 .controles-fisicos {
   container-type: inline-size;
-  display: grid;
-  gap: var(--s-4);
-  padding: 12px;
+  padding: var(--s-3);
   border: 1px solid var(--borde-suave);
-  border-radius: 8px;
+  border-radius: var(--radio-caja);
   background: var(--panel);
+  box-shadow: var(--sombra-caja);
+}
+
+.controles-grid {
+  display: grid;
+  gap: var(--s-3);
 }
 
 .control {
   display: grid;
-  grid-template-columns: minmax(12rem, 18rem) 1fr auto;
+  grid-template-columns: minmax(13rem, 19rem) 1fr auto;
   align-items: center;
   column-gap: var(--s-4);
-  row-gap: 2px;
+  row-gap: 4px;
 }
 
-/* Ningun hijo bloquea el encogido del grupo: con la escala de sustentacion a
-   320 px, el ancho minimo del valor y de la etiqueta desplazaba el panel. */
 .control > * {
   min-inline-size: 0;
 }
 
-/* Etiqueta pegada a su control y separada del grupo siguiente. */
 .etiqueta {
   display: flex;
   align-items: baseline;
   gap: 6px;
   font-weight: 600;
+  font-size: var(--text-cuerpo);
   cursor: pointer;
 }
 
@@ -144,6 +208,7 @@ const controles = computed(() => [
   min-inline-size: 0;
   block-size: 1.5rem;
   cursor: pointer;
+  accent-color: var(--rol-recurso);
 }
 
 @media (pointer: coarse) {
@@ -158,15 +223,15 @@ const controles = computed(() => [
   font-weight: 700;
   font-size: var(--text-seccion);
   line-height: 1.1;
+  color: var(--tinta);
 }
 
 .unidad {
   font-size: var(--text-meta);
-  font-weight: 400;
+  font-weight: 600;
   color: var(--tenue);
 }
 
-/* Una columna cuando el contenedor se estrecha. */
 @container (width < 34rem) {
   .control {
     grid-template-columns: 1fr auto;
@@ -187,3 +252,4 @@ const controles = computed(() => [
   }
 }
 </style>
+

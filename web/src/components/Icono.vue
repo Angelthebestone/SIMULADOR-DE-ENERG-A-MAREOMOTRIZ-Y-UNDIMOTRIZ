@@ -30,6 +30,13 @@ const TRAZOS: Record<string, string> = {
   calcular: 'M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2',
   disenar: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4',
   mapa: 'm3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15',
+  // Oleaje y marea: la ola es el recurso que llega del mar; la doble flecha
+  // vertical es el rango entre pleamar y bajamar. Dicen de que va cada modo.
+  oleaje: 'M2 6c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1',
+  marea: 'M2 15c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M12 3v8M9 6l3-3 3 3M12 21v-2',
+  expandir: 'M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3',
+  vivienda: 'M15 21v-8H9v8M3 10a2 2 0 0 1 .7-1.5l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  emision: 'M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10M2 21c0-3 1.9-5.4 5.1-6C9.5 14.5 12 13 13 12',
 
   // Estados de dato
   verificado: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M9 11l3 3L22 4',
@@ -62,6 +69,12 @@ const props = defineProps<{
   nombre?: string
   tamano?: 'sm' | 'md' | 'lg'
 }>()
+
+// La marca y la pestana del simulador comparten el glifo del oleaje: es la
+// misma cosa, el recurso que entra.
+TRAZOS.simulador = TRAZOS.oleaje
+TRAZOS.undimotriz = TRAZOS.oleaje
+TRAZOS.mareomotriz = TRAZOS.marea
 
 const tamano = computed(() => props.tamano ?? 'md')
 const trazado = computed(() => TRAZOS[props.icono] ?? TRAZOS.pendiente)

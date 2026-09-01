@@ -1,6 +1,6 @@
-/* Carcasa de la aplicación: barra, pestañas, barra de indicadores y panel.
-   Tablero denso: la rejilla fija deja el máximo de alto al panel activo, que
-   es donde están el lienzo, las gráficas y el mapa. */
+/* Carcasa de la aplicación: barra, pestañas y escenario.
+   El escenario es la pantalla: carta mundial y simulador comparten superficie,
+   uno a tamaño completo y el otro reducido en la esquina inferior izquierda. */
 
 @layer base, componentes;
 
@@ -60,11 +60,11 @@
 }
 
 @layer componentes {
-  /* La aplicación ocupa la ventana: sólo desplaza el panel activo, de modo que
-     pestañas e indicadores quedan siempre a la vista. */
+  /* La aplicación ocupa la ventana: la barra y las pestañas quedan fijas y
+     todo el alto restante es del escenario. */
   #app {
     display: grid;
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     block-size: 100dvh;
     background: var(--lienzo);
   }
@@ -76,11 +76,11 @@
     min-inline-size: 0;
   }
 
-  /* ---- Barra superior: qué es esto y sobre qué escenario ---- */
+  /* ---- Barra superior ---- */
   .barra {
     display: flex;
     flex-wrap: wrap;
-    align-items: end;
+    align-items: center;
     justify-content: space-between;
     gap: var(--s-4);
     padding: var(--s-2) var(--s-4);
@@ -90,54 +90,27 @@
 
   .marca {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 10px;
     line-height: 1.2;
     min-inline-size: 0;
+    color: var(--rol-mar-profundo);
+  }
+
+  .marca > div {
+    display: flex;
+    flex-direction: column;
+    color: var(--tinta);
   }
 
   .marca strong {
     font-size: var(--text-seccion);
+    color: var(--tinta);
   }
 
   .marca-sub {
     font-size: var(--text-meta);
     color: var(--tenue);
-  }
-
-  .escenario {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: var(--s-4);
-    min-inline-size: 0;
-  }
-
-  /* Etiqueta encima del control: se escanea más rápido y la proximidad
-     agrupa cada par sin ambigüedad. */
-  /* min-inline-size: 0 deja que el campo encoja por debajo del ancho natural
-     del <select>, que lo fija la opcion mas larga. Sin esto, con la escala de
-     sustentacion a 320 px la barra empujaba toda la aplicacion fuera de la
-     pantalla. */
-  .campo {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-inline-size: 0;
-  }
-
-  .campo > span {
-    font-size: var(--text-meta);
-    color: var(--tenue);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .campo select {
-    max-inline-size: 100%;
-    padding: var(--s-1) var(--s-2);
-    border: 1px solid var(--borde);
-    border-radius: var(--radio);
-    background: var(--panel);
   }
 
   .acciones-barra {
@@ -207,85 +180,158 @@
     color: var(--panel);
   }
 
-  /* ---- Barra de indicadores: las cifras del cálculo, en todos los niveles ---- */
-  .kpis {
+  /* ---- Panel activo ---- */
+  .panel--simulador {
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .panel--comparar {
+    overflow: auto;
+    padding: var(--s-4);
+    scroll-padding-block-start: var(--s-4);
+  }
+
+  /* ---- Escenario: los dos visores sobre la misma superficie ---- */
+  .escenario {
+    position: relative;
+    inline-size: 100%;
+    block-size: 100%;
+    background: var(--map-oceano);
+    /* Medidas que los dos visores necesitan conocer para no pisarse: la tira
+       de lectura al pie y la miniatura de la esquina inferior izquierda. */
+    --lectura-alto: 2.9rem;
+    --miniatura-alto: min(10rem, 22vh);
+    --miniatura-ancho: min(17rem, 28vw);
+  }
+
+  .marco {
+    position: absolute;
+    overflow: hidden;
+    background: var(--lienzo);
+    transition: inset var(--dur-media) var(--ease-salida),
+      box-shadow var(--dur-media) var(--ease-salida);
+  }
+
+  .marco--pleno {
+    inset: 0;
+    z-index: 1;
+    border-radius: 0;
+  }
+
+  .marco--reducido {
+    inset-block-start: auto;
+    inset-inline-end: auto;
+    inset-block-end: calc(var(--lectura-alto) + var(--s-2));
+    inset-inline-start: var(--s-2);
+    inline-size: var(--miniatura-ancho);
+    block-size: var(--miniatura-alto);
+    z-index: 3;
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-caja);
+    box-shadow: 0 6px 18px oklch(0.2 0.02 240 / 0.28);
+  }
+
+  .marco-tapa {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-1) var(--s-2);
+    border: none;
+    background: linear-gradient(to top, oklch(0.2 0.02 240 / 0.72) 0 2.2rem, transparent 3.2rem);
+    color: #ffffff;
+    font-size: var(--text-meta);
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .marco-tapa:hover {
+    background: linear-gradient(to top, oklch(0.2 0.02 240 / 0.85) 0 2.6rem, oklch(0.2 0.02 240 / 0.18) 100%);
+  }
+
+  /* ---- Tira de lectura: las cifras de la cadena sobre el escenario ---- */
+  .lectura {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: 4;
     display: flex;
     flex-wrap: wrap;
-    align-items: end;
-    gap: var(--s-2) var(--s-6);
-    padding: var(--s-2) var(--s-4);
-    background: var(--panel);
-    border-block-end: 1px solid var(--borde-suave);
+    align-items: center;
+    gap: 0 var(--s-6);
+    min-block-size: var(--lectura-alto);
+    padding: var(--s-1) var(--s-4);
+    background: oklch(0.24 0.02 238 / 0.92);
+    color: oklch(0.97 0.004 106);
+    border-block-start: 1px solid oklch(1 0 0 / 0.14);
   }
 
   .kpi {
     display: flex;
-    flex-direction: column;
-    gap: 0;
-    min-inline-size: 7rem;
+    align-items: baseline;
+    gap: 6px;
+    min-inline-size: 0;
   }
 
   .kpi-etiqueta {
     font-size: var(--text-meta);
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: var(--tenue);
-    line-height: 1.3;
+    color: oklch(0.78 0.02 235);
   }
 
   .kpi-valor {
-    /* tabular-nums es global: las cifras ya alinean sin la monoespaciada, que
-       a este tamaño separa demasiado la coma decimal del entero. */
-    font-size: var(--text-kpi);
+    font-size: var(--text-seccion);
     font-weight: 600;
-    line-height: 1.05;
-    color: var(--tinta);
+    line-height: 1.1;
   }
 
   .kpi-unidad {
-    font-size: 0.42em;
+    font-size: 0.62em;
     font-weight: 600;
-    color: var(--tenue);
+    color: oklch(0.78 0.02 235);
   }
 
-  /* El indicador de recurso es la entrada del mar; el de potencia, lo captado.
-     El color refuerza el rol, la etiqueta lo nombra. */
+  /* El recurso es lo que entra del mar; la potencia, lo que queda captado.
+     Sólo esos dos llevan color: el resto se lee en blanco. */
   [data-testid='kpi-recurso'] .kpi-valor {
-    color: var(--rol-mar-profundo);
+    color: oklch(0.82 0.10 210);
   }
 
   [data-testid='kpi-potencia'] .kpi-valor {
-    color: var(--rol-captado);
+    color: oklch(0.84 0.13 080);
   }
 
   .kpi-pendiente {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    /* Mismo alto que la cifra: cuando llega el valor la barra no salta. */
-    block-size: calc(var(--text-kpi) * 1.05);
-    font-size: var(--text-cuerpo);
+    font-size: var(--text-meta);
     font-style: italic;
-    color: var(--tenue);
+    color: oklch(0.78 0.02 235);
   }
 
   .kpi-esqueleto {
     display: block;
-    inline-size: 5.5rem;
-    block-size: calc(var(--text-kpi) * 1.05);
+    inline-size: 4.5rem;
+    block-size: calc(var(--text-seccion) * 1.1);
     border-radius: var(--radio);
-    background: linear-gradient(90deg, var(--superficie), var(--borde-suave), var(--superficie));
-    background-size: 200% 100%;
+    background: oklch(1 0 0 / 0.12);
     animation: kpi-latido 1.4s linear infinite;
   }
 
   @keyframes kpi-latido {
     from {
-      background-position: 200% 0;
+      opacity: 0.45;
     }
 
     to {
-      background-position: -200% 0;
+      opacity: 0.9;
     }
   }
 
@@ -295,26 +341,15 @@
     gap: 6px;
     margin: 0;
     margin-inline-start: auto;
-    align-self: center;
     padding: var(--s-1) var(--s-2);
-    border: 1px solid var(--borde-suave);
     border-radius: var(--radio);
-    background: var(--lienzo);
+    background: oklch(1 0 0 / 0.1);
     font-size: var(--text-meta);
-    color: var(--tenue);
   }
 
   .aviso--error {
-    border-color: var(--conf-pendiente);
-    color: var(--conf-pendiente);
+    background: oklch(0.494 0.159 037 / 0.35);
     font-weight: 600;
-  }
-
-  /* ---- Panel activo ---- */
-  #app > [role='tabpanel'] {
-    overflow: auto;
-    padding: var(--s-4);
-    scroll-padding-block-start: var(--s-4);
   }
 
   @media (width <= 40rem) {
@@ -322,16 +357,50 @@
       align-items: start;
     }
 
-    .kpi {
-      min-inline-size: 6rem;
+    /* En pantalla estrecha la lectura no se parte en cuatro filas: se
+       desplaza en horizontal y conserva su alto, que es el que reservan la
+       carta y la miniatura. */
+    .lectura {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 0 var(--s-4);
     }
 
-    .kpis {
-      gap: var(--s-2) var(--s-4);
-    }
-
-    .aviso {
-      margin-inline-start: 0;
+    .escenario {
+      --miniatura-alto: 8rem;
+      --miniatura-ancho: 12rem;
     }
   }
+}
+
+/* Sin capa a propósito: estas reglas compiten con hojas que tampoco están en
+   ninguna capa (maplibre-gl.css), y una declaración sin capa gana siempre a
+   otra que sí la tiene, por específica que sea. */
+.marco--reducido .maplibregl-control-container {
+  display: none;
+}
+
+.popup-mapa .maplibregl-popup-content {
+  padding: var(--s-2);
+  border-radius: var(--radio);
+  border: 1px solid var(--borde);
+  box-shadow: var(--sombra-caja);
+  font-family: var(--font-sans);
+  font-size: var(--text-meta);
+  color: var(--tinta);
+}
+
+.popup-cuerpo strong {
+  display: block;
+  margin-block-end: 4px;
+}
+
+.popup-fila {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-4);
+}
+
+.popup-fila > :first-child {
+  color: var(--tenue);
 }
