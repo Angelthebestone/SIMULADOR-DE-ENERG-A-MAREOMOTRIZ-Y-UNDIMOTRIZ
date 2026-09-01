@@ -60,11 +60,11 @@
 }
 
 @layer componentes {
-  /* La aplicación ocupa la ventana: la barra y las pestañas quedan fijas y
-     todo el alto restante es del escenario. */
+  /* La aplicación ocupa la ventana: la barra queda fija y todo el alto
+     restante es del escenario. */
   #app {
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     block-size: 100dvh;
     background: var(--lienzo);
   }
@@ -142,54 +142,9 @@
     background: var(--acento-suave);
   }
 
-  /* ---- Pestañas ---- */
-  .tabs {
-    display: flex;
-    gap: var(--s-1);
-    padding: var(--s-1) var(--s-4);
-    border-block-end: 1px solid var(--borde-suave);
-    overflow-x: auto;
-    background: var(--lienzo);
-  }
-
-  .tabs [role='tab'] {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: var(--s-1) 12px;
-    border: 1px solid transparent;
-    border-radius: var(--radio);
-    background: transparent;
-    color: var(--tenue);
-    font-weight: 600;
-    line-height: 1.15;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: color var(--dur-rapida) var(--ease-salida),
-      background-color var(--dur-rapida) var(--ease-salida);
-  }
-
-  .tabs [role='tab']:hover:not([aria-selected='true']) {
-    color: var(--tinta);
-    background: var(--superficie);
-  }
-
-  .tabs [role='tab'][aria-selected='true'] {
-    background: var(--rol-mar-profundo);
-    border-color: var(--rol-mar-profundo);
-    color: var(--panel);
-  }
-
   /* ---- Panel activo ---- */
-  .panel--simulador {
+  .panel {
     overflow: hidden;
-    padding: 0;
-  }
-
-  .panel--comparar {
-    overflow: auto;
-    padding: var(--s-4);
-    scroll-padding-block-start: var(--s-4);
   }
 
   /* ---- Escenario: los dos visores sobre la misma superficie ---- */

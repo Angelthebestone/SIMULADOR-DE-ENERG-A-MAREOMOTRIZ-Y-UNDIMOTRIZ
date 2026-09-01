@@ -4,7 +4,6 @@ import './styles/semaforo.css'
 import './styles/app.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Ver from './views/Ver.vue'
-import Comparar from './views/Comparar.vue'
 import MapaView from './components/MapaView.vue'
 import Icono from './components/Icono.vue'
 import DialogoFuentes from './components/DialogoFuentes.vue'
@@ -38,19 +37,12 @@ const PLANTILLA = `
       </div>
     </header>
 
-    <nav class="tabs" role="tablist" aria-label="Pantallas del simulador">
-      <button v-for="(t,i) in tabs" :key="t.id" role="tab" :id="'tab-'+t.id" :aria-controls="'panel-'+t.id" :aria-selected="activa===t.id ? 'true':'false'" :tabindex="activa===t.id ? 0 : -1" @click="alClickTab(t.id)" @keydown="alTecla($event,i)" :ref="el=>{ if(el) tabRefs[i]=el }">
-        <Icono :icono="t.id" />
-        <span class="tab-label">{{ t.label }}</span>
-      </button>
-    </nav>
-
-    <section :id="'panel-'+activa" :class="'panel panel--'+activa" role="tabpanel" :aria-labelledby="'tab-'+activa" tabindex="0" @keydown="alTeclaPanel">
+    <main class="panel">
       <!-- Carta y simulador comparten pantalla: uno ocupa el escenario y el
            otro queda reducido abajo a la izquierda. Pulsar el reducido los
            intercambia; ninguno se desmonta, así que el mapa conserva su
            encuadre y la animación su fotograma. -->
-      <div v-show="activa==='simulador'" class="escenario">
+      <div class="escenario">
         <div class="marco" :class="pleno==='mapa' ? 'marco--pleno' : 'marco--reducido'">
           <MapaView
             :reducido="pleno!=='mapa'"
@@ -96,8 +88,7 @@ const PLANTILLA = `
         </div>
       </div>
 
-      <Comparar v-if="activa==='comparar'" :resultado="resultado" :cargando="cargando" />
-    </section>
+    </main>
 
     <DialogoFuentes ref="dialogoFuentes" :cita="citaLarga" />
   </div>
@@ -105,10 +96,9 @@ const PLANTILLA = `
 
 const app = createApp({
   template: PLANTILLA,
-  components: { Ver, Comparar, MapaView, Icono, DialogoFuentes },
+  components: { Ver, MapaView, Icono, DialogoFuentes },
   data() {
     return {
-      activa: 'simulador' as string,
       /** Cuál de los dos ocupa el escenario; el otro queda reducido. */
       pleno: 'mapa' as 'mapa' | 'ver',
       sustentacion: false,
@@ -129,11 +119,6 @@ const app = createApp({
         crf: 0.08,
         rho: 1025,
       } as Params,
-      tabs: [
-        { id: 'simulador', label: 'Simulador' },
-        { id: 'comparar', label: 'Comparar tecnologías' },
-      ] as Array<{id:string; label:string}>,
-      tabRefs: [] as HTMLElement[],
       citaLarga: CITA,
       temporizador: 0 as unknown as ReturnType<typeof setTimeout>,
     }
@@ -220,36 +205,6 @@ const app = createApp({
         root.style.setProperty('--escala', '1')
         root.style.fontSize = ''
         window.dispatchEvent(new CustomEvent('sustentacion', { detail: { escala: 1 } }))
-      }
-    },
-    alTecla(e: KeyboardEvent, i: number) {
-      const n = this.tabs.length
-      if (e.key === 'ArrowRight') { e.preventDefault(); const j = (i + 1) % n; this.activa = this.tabs[j].id; this.$nextTick(()=> this.enfocarEncabezado()) }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); const j = (i - 1 + n) % n; this.activa = this.tabs[j].id; this.$nextTick(()=> this.enfocarEncabezado()) }
-      else if (e.key === 'Home') { e.preventDefault(); this.activa = this.tabs[0].id; this.$nextTick(()=> this.enfocarEncabezado()) }
-      else if (e.key === 'End') { e.preventDefault(); this.activa = this.tabs[n-1].id; this.$nextTick(()=> this.enfocarEncabezado()) }
-    },
-    /** El foco vive en el encabezado del panel tras conmutar; las flechas
-     *  tienen que seguir recorriendo las pantallas desde ahí. Sólo cuando el
-     *  foco está en el encabezado: dentro del panel las flechas son de los
-     *  controles (deslizadores, listas), no de las pestañas. */
-    alTeclaPanel(e: KeyboardEvent) {
-      const destino = e.target as HTMLElement | null
-      if (!destino || destino.id !== 'titulo-' + this.activa) return
-      const i = this.tabs.findIndex(t => t.id === this.activa)
-      if (i >= 0) this.alTecla(e, i)
-    },
-    alClickTab(id: string) {
-      this.activa = id
-      // Tras click el foco se queda en el botón, que es lo esperado con ratón.
-    },
-    enfocarEncabezado() {
-      // WAI-ARIA tabs: el foco pasa al contenido del nuevo tabpanel.
-      const panel = document.getElementById('panel-' + this.activa)
-      const heading = panel?.querySelector('h1, h2, [role="heading"]') as HTMLElement | null
-      if (heading) {
-        if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1')
-        heading.focus({ preventScroll: false })
       }
     },
     onKey(e: KeyboardEvent) {
