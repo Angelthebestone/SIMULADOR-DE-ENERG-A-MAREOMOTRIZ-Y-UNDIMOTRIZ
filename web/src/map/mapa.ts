@@ -349,13 +349,18 @@ export function crearMapa(container: string | HTMLElement, sitios: SitioMapa[] =
     if (id) map.fire("sitio_seleccionado" as never, { id } as never);
   });
 
-  // Click en cualquier parte del océano global para posicionar la simulación
+  // Click en cualquier parte del océano global para posicionar la simulación.
+  // En tierra no hay nada que simular: el contorno de Natural Earth ya está
+  // dibujado, así que se pregunta a esa misma capa si el punto cae dentro.
   map.on("click", (e) => {
     if (isDragging) return;
-    const features = map.queryRenderedFeatures(e.point, { layers: ["emplazamientos"] });
-    if (features.length > 0) return;
+    if (map.queryRenderedFeatures(e.point, { layers: ["emplazamientos"] }).length > 0) return;
 
     const { lng, lat } = e.lngLat;
+    if (map.queryRenderedFeatures(e.point, { layers: ["tierra"] }).length > 0) {
+      map.fire("punto_en_tierra" as never, { lon: lng, lat } as never);
+      return;
+    }
     map.fire("coordenada_seleccionada" as never, { lon: lng, lat } as never);
   });
 

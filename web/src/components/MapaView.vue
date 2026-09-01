@@ -17,6 +17,15 @@
         <span>{{ plegado ? 'Emplazamientos' : 'Ocultar panel' }}</span>
       </button>
 
+      <p v-if="consultando" class="rail-estado">
+        <Icono icono="calculando" tamano="sm" />
+        <span>consultando el reanálisis en ese punto…</span>
+      </p>
+      <p v-else-if="avisoTierra" class="rail-estado" role="status">
+        <Icono icono="pendiente" tamano="sm" />
+        <span>{{ avisoTierra }}</span>
+      </p>
+
       <div v-show="!plegado" class="rail-cuerpo">
         <div class="escala">
           <div class="escala-titulo">Potencia del frente de ola</div>
@@ -73,10 +82,6 @@
           </button>
         </div>
 
-        <p v-if="consultando" class="rail-estado">
-          <Icono icono="calculando" tamano="sm" />
-          <span>consultando el reanálisis en ese punto…</span>
-        </p>
       </div>
     </div>
   </section>
@@ -106,6 +111,8 @@ const sitioActivo = ref("isla_fuerte");
 const regionActiva = ref("todos");
 const plegado = ref(false);
 const consultando = ref(false);
+const avisoTierra = ref("");
+let temporizadorAviso = 0 as unknown as ReturnType<typeof setTimeout>;
 
 const REGIONES = [
   { id: "todos", label: "Todos" },
@@ -178,7 +185,16 @@ onMounted(() => {
 
   map.on("sitio_seleccionado" as never, (e: { id: string }) => alSeleccionar(e.id));
   map.on("coordenada_seleccionada" as never, (e: { lon: number; lat: number }) => {
+    avisoTierra.value = "";
     void puntoLibre(e.lon, e.lat);
+  });
+
+  // Pulsar tierra no crea emplazamiento: se dice por qué en vez de dejar el
+  // click sin respuesta, que se lee como que la aplicación no reaccionó.
+  map.on("punto_en_tierra" as never, () => {
+    avisoTierra.value = "ese punto cae en tierra firme; el recurso marino sólo se evalúa sobre el mar";
+    clearTimeout(temporizadorAviso);
+    temporizadorAviso = setTimeout(() => (avisoTierra.value = ""), 5000);
   });
 });
 
@@ -463,14 +479,16 @@ function confirmarSeleccionYSimular() {
 
 .rail-estado {
   display: flex;
-  align-items: center;
+  align-items: start;
   gap: 6px;
   margin: 0;
-  padding: var(--s-1) var(--s-2);
+  padding: var(--s-2);
+  border: 1px solid var(--borde);
   border-radius: var(--radio);
   background: var(--panel);
+  box-shadow: var(--sombra-caja);
   font-size: var(--text-meta);
-  color: var(--tenue);
+  color: var(--tinta);
 }
 
 @media (width <= 52rem) {

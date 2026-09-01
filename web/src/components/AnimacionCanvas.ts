@@ -275,12 +275,11 @@ export class AnimacionCanvas {
     const superficieY = (px: number) =>
       nivelMarMedio - this.eta((px / w) * dominioM, t, omega, k) * escalaOla;
 
-    /** Cota del terreno: fondo plano mar adentro, talud continuo hasta la
-     *  orilla y meseta tierra adentro. Todo lo que se apoya en el suelo —
-     *  cimentaciones, cajón, dique — lee su altura de aquí. */
+    /** Perfil natural del terreno: fondo plano mar adentro, talud continuo
+     *  hasta la orilla y meseta tierra adentro. */
     const yPlaya = nivelMarMedio + 6;
     const yMeseta = nivelMarMedio - h * 0.15;
-    const terrenoY = (px: number): number => {
+    const perfilNatural = (px: number): number => {
       if (px <= xPieTalud) return fondoMarY + Math.sin(px * 0.013) * 2.5;
       if (px <= xCosta) {
         const u = (px - xPieTalud) / (xCosta - xPieTalud);
@@ -290,35 +289,77 @@ export class AnimacionCanvas {
       return yPlaya + (yMeseta - yPlaya) * (u * u * (3 - 2 * u));
     };
 
-    this.dibujarCielo(ctx, w, horizonteY, nivelMarMedio);
-    this.dibujarAgua(ctx, w, h, nivelMarMedio, fondoMarY, xCosta, t, superficieY, terrenoY);
-    this.dibujarTerreno(ctx, w, h, nivelMarMedio, terrenoY);
-    this.dibujarEspumaCosta(ctx, superficieY, terrenoY, xCosta, nivelMarMedio, t);
-
+    // Cada dispositivo se fondea donde le corresponde: la boya en agua abierta,
+    // la turbina a media profundidad y el cajón y el dique en el somero.
     const xDispositivo =
       this.dispositivo === "owc"
-        ? xPieTalud + (xCosta - xPieTalud) * 0.6
+        ? xPieTalud + (xCosta - xPieTalud) * 0.66
         : this.dispositivo === "embalse"
-          ? xPieTalud + (xCosta - xPieTalud) * 0.45
+          ? xPieTalud + (xCosta - xPieTalud) * 0.6
           : xCosta * 0.55;
+
+    /** Banqueta de cimentación. Un cajón o un dique no se apoyan en la
+     *  pendiente: primero se draga y se rellena una plataforma horizontal. Sin
+     *  ella la obra queda colgando por el lado hondo y hundida por el somero. */
+    const conBanqueta = this.dispositivo === "owc" || this.dispositivo === "embalse";
+    const yBanqueta = perfilNatural(xDispositivo);
+    const bx0 = xDispositivo - 200;
+    // La banqueta no llega a comerse la playa: la orilla la dibuja el perfil.
+    const bx1 = Math.min(xDispositivo + 150, xCosta - 55);
+    // Transición larga: es un dragado con talud, no un escalón vertical.
+    const transicion = 165;
+    const terrenoY = (px: number): number => {
+      const natural = perfilNatural(px);
+      if (!conBanqueta || px < bx0 - transicion || px > bx1 + transicion) return natural;
+      let f = 1;
+      if (px < bx0) f = (px - (bx0 - transicion)) / transicion;
+      else if (px > bx1) f = 1 - (px - bx1) / transicion;
+      const u = f * f * (3 - 2 * f);
+      return natural + (yBanqueta - natural) * u;
+    };
+
+    // Orilla: donde el perfil corta la línea de mar. Separa la arena del suelo
+    // seco y es el ancla de la espuma y de todo lo que se apoya en la playa.
+    let xOrilla = xCosta;
+    for (let px = xPieTalud; px <= w; px += 3) {
+      if (terrenoY(px) <= nivelMarMedio) {
+        xOrilla = px;
+        break;
+      }
+    }
+
+    /** Cota de apoyo de una obra: el punto más hondo de su huella, no el de su
+     *  eje. Apoyar en el eje deja el pie de aguas afuera colgando. */
+    const apoyoHuella = (desde: number, hasta: number): number => {
+      let y = terrenoY(desde);
+      for (let px = desde; px <= hasta; px += 5) y = Math.max(y, terrenoY(px));
+      return Math.max(y, terrenoY(hasta));
+    };
+
+    this.dibujarCielo(ctx, w, horizonteY, nivelMarMedio);
+    this.dibujarAgua(ctx, w, h, nivelMarMedio, fondoMarY, xCosta, t, superficieY, terrenoY);
+    this.dibujarTerreno(ctx, w, h, nivelMarMedio, xOrilla, terrenoY);
+    this.dibujarEspumaCosta(ctx, superficieY, terrenoY, xCosta, nivelMarMedio, t);
+
     const yApoyo = terrenoY(xDispositivo);
 
-    this.dibujarCableSubmarino(ctx, xDispositivo, yApoyo - 6, xCosta + w * 0.035, yMeseta - 26, t);
+    this.dibujarCableSubmarino(ctx, xDispositivo, yApoyo - 6, xCosta + w * 0.035, terrenoY(xCosta + w * 0.035) - 26, t);
 
     if (this.modoEnergia === "mareomotriz") {
       if (this.dispositivo === "embalse") {
-        this.dibujarPresaMareal(ctx, xDispositivo, nivelMarMedio, yApoyo, t, escalaOla, xCosta, terrenoY);
+        this.dibujarPresaMareal(ctx, xDispositivo, nivelMarMedio, yApoyo, t, escalaOla, xOrilla, terrenoY, apoyoHuella);
       } else {
         this.dibujarTurbinaCorriente(ctx, xDispositivo, nivelMarMedio, yApoyo, t, superficieY);
       }
     } else if (this.dispositivo === "owc") {
-      this.dibujarOWC(ctx, xDispositivo, nivelMarMedio, yApoyo, t, omega, escalaOla);
+      this.dibujarOWC(ctx, xDispositivo, nivelMarMedio, yApoyo, t, omega, escalaOla, apoyoHuella, terrenoY);
     } else {
       const boyaZ = this.muestrearSerie(t) ?? this.eta((xDispositivo / w) * dominioM, t, omega, k) * 0.6;
       this.dibujarBoya(ctx, xDispositivo, nivelMarMedio, yApoyo, boyaZ, t, escalaOla, superficieY);
     }
 
-    this.dibujarRedElectrica(ctx, w, yMeseta, xCosta, t);
+    this.dibujarRedElectrica(ctx, w, xCosta, terrenoY, t);
+    void yMeseta;
     // En miniatura las anotaciones se pisan unas a otras y no se leen: a ese
     // tamaño el lienzo enseña la escena y nada más.
     if (w >= 460) {
@@ -343,14 +384,16 @@ export class AnimacionCanvas {
     ctx.fillRect(0, horizonteY - 18, w, 28);
   }
 
-  /** Una sola masa de terreno: el mismo perfil bajo el agua y fuera de ella.
-   *  Bajo la línea de mar va arena y roca; por encima, suelo. Así la orilla es
-   *  una playa continua y no una pared que corta el mar. */
+  /** Una sola masa de terreno con el mismo perfil dentro y fuera del agua. El
+   *  cambio de material va en la orilla, no en la línea de mar: a un lado
+   *  arena, al otro suelo seco, con una franja de arena mojada entre los dos.
+   *  Partirlo por la horizontal dejaba una banda plana cruzando toda la tierra. */
   private dibujarTerreno(
     ctx: CanvasRenderingContext2D,
     w: number,
     h: number,
     nivelMar: number,
+    xOrilla: number,
     terrenoY: (px: number) => number
   ) {
     const perfil = () => {
@@ -369,17 +412,22 @@ export class AnimacionCanvas {
     ctx.fillStyle = arena;
     ctx.fill();
 
-    // Suelo seco: el mismo perfil, recortado por encima de la línea de mar.
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, w, nivelMar);
-    ctx.clip();
     perfil();
-    const suelo = ctx.createLinearGradient(0, nivelMar - h * 0.16, 0, nivelMar);
+    ctx.clip();
+
+    const suelo = ctx.createLinearGradient(0, nivelMar - h * 0.2, 0, h);
     suelo.addColorStop(0, C.tierra);
     suelo.addColorStop(1, C.tierraSombra);
     ctx.fillStyle = suelo;
-    ctx.fill();
+    ctx.fillRect(xOrilla + 40, 0, w, h);
+
+    // Arena mojada: la transición no es un corte, es una franja.
+    const franja = ctx.createLinearGradient(xOrilla - 8, 0, xOrilla + 40, 0);
+    franja.addColorStop(0, "rgba(201,195,180,0)");
+    franja.addColorStop(1, C.tierra);
+    ctx.fillStyle = franja;
+    ctx.fillRect(xOrilla - 8, 0, 48, h);
     ctx.restore();
 
     ctx.beginPath();
@@ -393,7 +441,7 @@ export class AnimacionCanvas {
     ctx.fillStyle = C.roca;
     ctx.globalAlpha = 0.5;
     for (let i = 0; i < 18; i++) {
-      const rx = (((i * 97) % 100) / 100) * w * 0.6 + 8;
+      const rx = (((i * 97) % 100) / 100) * (xOrilla - 20) + 8;
       const escala = 4 + ((i * 37) % 8);
       ctx.beginPath();
       ctx.ellipse(rx, terrenoY(rx) + 5 + ((i * 13) % 6), escala, escala * 0.5, 0, 0, Math.PI * 2);
@@ -520,17 +568,30 @@ export class AnimacionCanvas {
 
   // ---- Red eléctrica -------------------------------------------------------
 
+  /** Todo lo que hay en tierra se apoya en la cota del terreno **en su propia
+   *  abscisa**. Con una cota única el transformador quedaba flotando sobre la
+   *  rampa de la playa, que todavía no ha llegado a la meseta. */
   private dibujarRedElectrica(
     ctx: CanvasRenderingContext2D,
     w: number,
-    yTierra: number,
     xCosta: number,
+    terrenoY: (px: number) => number,
     t: number
   ) {
-
     // Subestación: transformador con radiadores, aisladores pasantes y valla.
-    const xSub = xCosta + w * 0.035;
-    const ySub = yTierra - 34;
+    const xSub = xCosta + w * 0.045;
+    const sueloSub = terrenoY(xSub + 20);
+    const ySub = sueloSub - 34;
+
+    // Explanada bajo el transformador: una obra no se posa sobre la pendiente.
+    ctx.fillStyle = C.tierraSombra;
+    ctx.beginPath();
+    ctx.moveTo(xSub - 10, sueloSub + 8);
+    ctx.lineTo(xSub - 6, sueloSub);
+    ctx.lineTo(xSub + 46, sueloSub);
+    ctx.lineTo(xSub + 50, sueloSub + 8);
+    ctx.closePath();
+    ctx.fill();
     ctx.fillStyle = C.obraOscura;
     ctx.fillRect(xSub, ySub + 10, 40, 24);
     ctx.fillStyle = C.obra;
@@ -563,9 +624,9 @@ export class AnimacionCanvas {
 
     // Torre de celosía: montantes que convergen, tres tramos de arriostrado
     // y dos crucetas con aisladores.
-    const xT = xCosta + w * 0.105;
-    const yBase = yTierra;
-    const yTop = yTierra - 108;
+    const xT = xCosta + w * 0.115;
+    const yBase = terrenoY(xT);
+    const yTop = yBase - 108;
     const anchoBase = 17;
     const anchoTop = 5;
     const montante = (s: number, y: number) => xT + s * (anchoTop + (anchoBase - anchoTop) * ((y - yTop) / (yBase - yTop)));
@@ -635,13 +696,14 @@ export class AnimacionCanvas {
     for (let i = 0; i < anchos.length && ex < w; i++) {
       const ancho = anchos[i];
       const alto = alturas[i];
-      const ey = yTierra - alto;
+      const sueloEdificio = terrenoY(ex + ancho / 2);
+      const ey = sueloEdificio - alto;
       ctx.fillStyle = i % 2 === 0 ? C.obraOscura : C.obraSombra;
       ctx.fillRect(ex, ey, ancho, alto);
       ctx.fillStyle = "rgba(255,255,255,0.12)";
       ctx.fillRect(ex, ey, ancho, 3);
 
-      for (let wy = ey + 8; wy < yTierra - 8; wy += 12) {
+      for (let wy = ey + 8; wy < sueloEdificio - 8; wy += 12) {
         for (let wx = ex + 5; wx < ex + ancho - 6; wx += 9) {
           const fase = Math.sin(wx * 0.7 + wy * 0.3 + t * 0.6);
           ctx.fillStyle = fase > 0.25 ? C.acentoClaro : "rgba(255,255,255,0.10)";
@@ -796,6 +858,11 @@ export class AnimacionCanvas {
     this.rotuloDispositivo(ctx, x, yTapa - 40, "Absorbedor puntual");
   }
 
+  /** Columna de agua oscilante. Cajón apoyado en el talud con una abertura
+   *  sumergida en la pared de mar: la ola entra por ahí, la lámina interior
+   *  sube y baja y bombea el aire de la cámara por el conducto de la turbina.
+   *  El ancho se deriva del alto, como en el dique, porque la vertical va
+   *  exagerada ×3 y de otro modo el cajón saldría como una torre. */
   private dibujarOWC(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -803,79 +870,107 @@ export class AnimacionCanvas {
     fondoY: number,
     t: number,
     omega: number,
-    escalaOla: number
+    escalaOla: number,
+    apoyoHuella: (desde: number, hasta: number) => number,
+    terrenoY: (px: number) => number
   ) {
-    // El cajón se apoya en el talud: su alto lo fija el calado del punto, no
-    // una constante, así que en agua somera sale bajo, como en obra.
-    const calado = Math.max(30, fondoY - nivelMedio);
-    const ancho = Math.max(84, Math.min(140, calado * 1.6));
+    // El cajón se apoya en el fondo de su eje y su losa sigue el terreno: con
+    // una base horizontal a la cota más honda de la huella crecía hacia abajo
+    // sobre el talud hasta perder toda proporción.
+    const talon = 22; // saliente del pie de la pared de mar
+    const base = fondoY;
+    const franco = Math.max(38, Math.min((base - nivelMedio) * 0.5, 2.2 * escalaOla));
+    const yCoronacion = nivelMedio - franco;
+    const altoTotal = Math.max(80, base - yCoronacion);
+    const ancho = Math.min(215, Math.max(115, altoTotal * 1.1));
     const x0 = x - ancho / 2;
     const x1 = x + ancho / 2;
-    const yCoronacion = nivelMedio - Math.max(34, calado * 0.5);
-    const espesor = Math.max(11, ancho * 0.12);
-    const losa = Math.max(10, espesor * 0.9);
+    void apoyoHuella;
 
-    // Silueta del cajón: pared frontal en talud hacia el mar, pared trasera
-    // vertical y losa de fondo. Una sola pieza de hormigón.
-    ctx.beginPath();
-    ctx.moveTo(x0, yCoronacion);
-    ctx.lineTo(x1, yCoronacion);
-    ctx.lineTo(x1, fondoY);
-    ctx.lineTo(x0 - 14, fondoY);
-    ctx.closePath();
-    const hormigon = ctx.createLinearGradient(x0 - 14, 0, x1, 0);
-    hormigon.addColorStop(0, C.obra);
-    hormigon.addColorStop(0.55, "#adb8c6");
-    hormigon.addColorStop(1, C.obraOscura);
-    ctx.fillStyle = hormigon;
-    ctx.fill();
-    ctx.strokeStyle = C.obraSombra;
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-
-    // Cámara: hueco de aire entre el techo y la lámina interior.
-    const camIzq = x0 + espesor + 4;
+    const espesor = Math.max(13, ancho * 0.11);
+    const losa = Math.max(12, espesor * 0.85);
+    const camIzq = x0 + espesor;
     const camDer = x1 - espesor;
     const techo = yCoronacion + losa;
-    const sueloCam = fondoY - losa;
-    ctx.fillStyle = "#0d2735";
-    ctx.fillRect(camIzq, techo, camDer - camIzq, sueloCam - techo);
+    const suelo = base - losa;
+    const abertura = Math.min(52, Math.max(24, (suelo - techo) * 0.3));
+    const yAbertura = suelo - abertura;
 
-    // Lámina interior, desfasada respecto al mar de fuera: es lo que bombea
-    // el aire por el conducto.
+    // Cámara: primero el hueco, para que las paredes se recorten contra él.
+    ctx.fillStyle = "#0b1f2b";
+    ctx.fillRect(camIzq, techo, camDer - camIzq, suelo - techo);
+
+    // Lámina interior, desfasada respecto al mar de fuera: es lo que bombea el
+    // aire por el conducto.
     const etaInterior = (this.Hm0 / 2) * Math.cos(-omega * t + 0.9);
     const yInterior = Math.min(
-      sueloCam - 6,
-      Math.max(techo + 10, nivelMedio - etaInterior * escalaOla * 1.4)
+      suelo - 8,
+      Math.max(techo + 12, nivelMedio - etaInterior * escalaOla * 1.4)
     );
-    const columna = ctx.createLinearGradient(0, yInterior, 0, sueloCam);
-    columna.addColorStop(0, "#3d7f9c");
-    columna.addColorStop(1, C.aguaFondo);
+    const columna = ctx.createLinearGradient(0, yInterior, 0, suelo);
+    columna.addColorStop(0, "#4a8fa8");
+    columna.addColorStop(1, "#123c52");
     ctx.fillStyle = columna;
-    ctx.fillRect(camIzq, yInterior, camDer - camIzq, sueloCam - yInterior);
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(camIzq, yInterior, camDer - camIzq, suelo - yInterior);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.fillRect(camIzq, yInterior - 1.5, camDer - camIzq, 3);
 
-    // Abertura sumergida por la que entra el oleaje.
-    ctx.fillStyle = "#3d7f9c";
-    ctx.fillRect(x0 - 12, sueloCam - 34, espesor + 18, 28);
+    // Agua de mar entrando por la abertura: el hueco es real, no un parche.
+    ctx.fillStyle = "#2f6f8a";
+    ctx.fillRect(x0, yAbertura, espesor, abertura);
 
-    // Losa de coronación y conducto.
+    const hormigon = ctx.createLinearGradient(x0, 0, x1, 0);
+    hormigon.addColorStop(0, C.obra);
+    hormigon.addColorStop(0.5, "#adb8c6");
+    hormigon.addColorStop(1, C.obraOscura);
+    ctx.fillStyle = hormigon;
+    ctx.strokeStyle = C.obraSombra;
+    ctx.lineWidth = 1.3;
+
+    // Pared de mar, partida por la abertura, con talón en el pie.
+    ctx.beginPath();
+    ctx.rect(x0, yCoronacion, espesor, yAbertura - yCoronacion);
+    ctx.fill();
+    ctx.stroke();
+
+    // Pared de trasdós y losa de fondo.
+    ctx.beginPath();
+    ctx.rect(camDer, yCoronacion, espesor, base - yCoronacion);
+    ctx.fill();
+    ctx.stroke();
+
+    // Losa de fondo: sigue el terreno, así que apoya en todo su ancho.
+    ctx.beginPath();
+    ctx.moveTo(x0 - talon, suelo);
+    ctx.lineTo(x1, suelo);
+    // Canto acotado: sin tope, sobre el talud la losa se estiraba hacia el
+    // fondo y salía una cuña más grande que el propio cajón.
+    for (let px = x1; px >= x0 - talon; px -= 6) {
+      ctx.lineTo(px, Math.min(Math.max(base, terrenoY(px)), base + 32) + 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Losa de coronación.
+    ctx.beginPath();
+    ctx.rect(x0 - 6, yCoronacion, ancho + 12, losa);
+    ctx.fill();
+    ctx.stroke();
+
+    // Conducto y grupo turbina-generador sobre la cámara.
+    const xDucto = x + ancho * 0.06;
     ctx.fillStyle = C.obraOscura;
-    ctx.fillRect(x0 - 2, yCoronacion - 12, ancho + 4, 13);
-    const xDucto = x + ancho * 0.08;
-    ctx.fillRect(xDucto - 13, yCoronacion - 36, 26, 25);
+    ctx.fillRect(xDucto - 14, yCoronacion - 26, 28, 27);
 
-    // Carcasa de la turbina Wells: anillo fijo con el rodete dentro, para que
-    // se lea como una máquina en un conducto y no como un aspa suelta.
-    const yEje = yCoronacion - 46;
+    const yEje = yCoronacion - 40;
     ctx.fillStyle = C.obraSombra;
     ctx.beginPath();
-    ctx.roundRect(xDucto - 26, yEje - 13, 52, 26, 5);
+    ctx.roundRect(xDucto - 28, yEje - 14, 56, 28, 5);
     ctx.fill();
     ctx.fillStyle = C.obra;
     ctx.beginPath();
-    ctx.arc(xDucto, yEje, 12, 0, Math.PI * 2);
+    ctx.arc(xDucto, yEje, 13, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = C.obraSombra;
     ctx.lineWidth = 2;
@@ -889,23 +984,23 @@ export class AnimacionCanvas {
       const ang = (i * Math.PI) / 3;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.lineTo(9 * Math.cos(ang), 9 * Math.sin(ang));
+      ctx.lineTo(10 * Math.cos(ang), 10 * Math.sin(ang));
       ctx.stroke();
     }
     ctx.restore();
     ctx.fillStyle = C.obraSombra;
     ctx.beginPath();
-    ctx.arc(xDucto, yEje, 3, 0, Math.PI * 2);
+    ctx.arc(xDucto, yEje, 3.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Flujo de aire: la punta de la flecha sigue el sentido en que se mueve la
-    // columna, que es lo que hace que la turbina Wells gire siempre igual.
+    // Flujo de aire: la punta sigue el sentido en que se mueve la columna, que
+    // es lo que hace que la turbina Wells gire siempre en el mismo sentido.
     const sube = Math.sin(-omega * t + 0.9) < 0;
-    ctx.strokeStyle = "rgba(30,41,59,0.55)";
-    ctx.fillStyle = "rgba(30,41,59,0.55)";
+    ctx.strokeStyle = "rgba(30,41,59,0.6)";
+    ctx.fillStyle = "rgba(30,41,59,0.6)";
     ctx.lineWidth = 1.4;
-    for (const dx of [-8, 8]) {
-      const yA = yEje - 16;
+    for (const dx of [-9, 9]) {
+      const yA = yEje - 18;
       ctx.beginPath();
       ctx.moveTo(xDucto + dx, yA);
       ctx.lineTo(xDucto + dx, yA - 14);
@@ -924,15 +1019,16 @@ export class AnimacionCanvas {
       ctx.fill();
     }
 
-    // Escollera al pie de la pared frontal.
+    // Escollera al pie de la pared de mar.
     ctx.fillStyle = C.roca;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 11; i++) {
       ctx.beginPath();
-      ctx.ellipse(x0 - 22 + i * 5, fondoY - 3 - ((i * 11) % 9), 5, 3.4, 0, 0, Math.PI * 2);
+      const rx = x0 - talon - 16 + i * 7;
+      ctx.ellipse(rx, Math.max(base, terrenoY(rx)) - 2 - ((i * 11) % 7), 6, 3.8, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    this.rotuloDispositivo(ctx, x, yEje - 40, "Columna de agua oscilante");
+    this.rotuloDispositivo(ctx, x, yEje - 34, "Columna de agua oscilante");
   }
 
   private dibujarTurbinaCorriente(
@@ -946,49 +1042,6 @@ export class AnimacionCanvas {
     const yRotor = nivelMedio + (fondoY - nivelMedio) * 0.55;
     const yTorreta = nivelMedio - 34;
 
-    // Cimentación: cada opción tiene su forma, no sólo su rótulo.
-    if (this.cimentacion === "gravedad") {
-      ctx.fillStyle = C.obraOscura;
-      ctx.beginPath();
-      ctx.moveTo(x - 54, fondoY);
-      ctx.lineTo(x - 40, fondoY - 26);
-      ctx.lineTo(x + 40, fondoY - 26);
-      ctx.lineTo(x + 54, fondoY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = C.obraSombra;
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
-      this.rotulo(ctx, "Bloque de gravedad", x, fondoY - 10, "center", C.espuma, 9);
-    } else if (this.cimentacion === "tripode") {
-      ctx.strokeStyle = C.obraOscura;
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(x, fondoY - 62);
-      ctx.lineTo(x - 52, fondoY);
-      ctx.moveTo(x, fondoY - 62);
-      ctx.lineTo(x + 52, fondoY);
-      ctx.moveTo(x, fondoY - 62);
-      ctx.lineTo(x + 8, fondoY);
-      ctx.stroke();
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x - 34, fondoY - 24);
-      ctx.lineTo(x + 34, fondoY - 24);
-      ctx.stroke();
-      ctx.fillStyle = C.obraSombra;
-      for (const dx of [-52, 8, 52]) ctx.fillRect(x + dx - 6, fondoY - 6, 12, 8);
-      this.rotulo(ctx, "Trípode", x, fondoY - 30, "center", C.espuma, 9);
-    } else {
-      ctx.fillStyle = C.obraOscura;
-      ctx.fillRect(x - 9, fondoY - 12, 18, 14);
-      ctx.fillStyle = C.obraSombra;
-      ctx.beginPath();
-      ctx.ellipse(x, fondoY, 26, 6, 0, 0, Math.PI * 2);
-      ctx.fill();
-      this.rotulo(ctx, "Pilote clavado", x + 34, fondoY - 4, "left", C.espuma, 9);
-    }
-
     // Torreta hasta la superficie, con plataforma de acceso y baliza.
     const torre = ctx.createLinearGradient(x - 9, 0, x + 9, 0);
     torre.addColorStop(0, C.obraSombra);
@@ -996,6 +1049,53 @@ export class AnimacionCanvas {
     torre.addColorStop(1, C.obraOscura);
     ctx.fillStyle = torre;
     ctx.fillRect(x - 9, yTorreta, 18, fondoY - yTorreta);
+
+    // La cimentación se dibuja DESPUÉS del fuste: es la pieza que lo abraza por
+    // el pie, así que va delante. Antes quedaba detrás y no se veía.
+    if (this.cimentacion === "gravedad") {
+      ctx.fillStyle = C.obraOscura;
+      ctx.beginPath();
+      ctx.moveTo(x - 58, fondoY);
+      ctx.lineTo(x - 42, fondoY - 28);
+      ctx.lineTo(x + 42, fondoY - 28);
+      ctx.lineTo(x + 58, fondoY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = C.obraSombra;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      // Lastre visible: es lo que sujeta la turbina, y por eso es un bloque.
+      ctx.fillStyle = "rgba(255,255,255,0.10)";
+      for (let i = 0; i < 5; i++) ctx.fillRect(x - 34 + i * 17, fondoY - 24, 12, 20);
+      this.rotulo(ctx, "Bloque de gravedad", x + 66, fondoY - 8, "left", C.espuma, 9);
+    } else if (this.cimentacion === "tripode") {
+      ctx.strokeStyle = C.obraOscura;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(x, fondoY - 66);
+      ctx.lineTo(x - 54, fondoY);
+      ctx.moveTo(x, fondoY - 66);
+      ctx.lineTo(x + 54, fondoY);
+      ctx.stroke();
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(x - 36, fondoY - 26);
+      ctx.lineTo(x + 36, fondoY - 26);
+      ctx.moveTo(x - 20, fondoY - 46);
+      ctx.lineTo(x + 20, fondoY - 46);
+      ctx.stroke();
+      ctx.fillStyle = C.obraSombra;
+      for (const dx of [-54, 54]) ctx.fillRect(x + dx - 8, fondoY - 8, 16, 10);
+      this.rotulo(ctx, "Trípode", x + 66, fondoY - 20, "left", C.espuma, 9);
+    } else {
+      ctx.fillStyle = C.obraOscura;
+      ctx.fillRect(x - 13, fondoY - 16, 26, 20);
+      ctx.fillStyle = C.obraSombra;
+      ctx.beginPath();
+      ctx.ellipse(x, fondoY, 28, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      this.rotulo(ctx, "Pilote clavado", x + 36, fondoY - 4, "left", C.espuma, 9);
+    }
 
     ctx.fillStyle = C.obraSombra;
     ctx.beginPath();
@@ -1080,6 +1180,10 @@ export class AnimacionCanvas {
     this.rotuloDispositivo(ctx, x, yTorreta - 30, "Turbina de corriente mareal");
   }
 
+  /** Dique mareal. El corte exagera la vertical ×3, así que una obra dibujada a
+   *  escala horizontal real saldría como una torre. El ancho se deriva del alto
+   *  para que la sección conserve la proporción de un dique de verdad: base
+   *  ancha, taludes tendidos y coronación estrecha. */
   private dibujarPresaMareal(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -1087,50 +1191,59 @@ export class AnimacionCanvas {
     fondoY: number,
     t: number,
     escalaOla: number,
-    xCosta: number,
-    terrenoY: (px: number) => number
+    xOrilla: number,
+    terrenoY: (px: number) => number,
+    apoyoHuella: (desde: number, hasta: number) => number
   ) {
-    const coronacion = nivelMedio - 44;
-    const semiancho = 58;
-    // El dique se apoya en el punto más hondo de su huella, no en el de su eje:
-    // si no, el pie de aguas afuera queda colgando sobre la arena.
-    const pieIzq = x - semiancho - 34;
-    let base = fondoY;
-    for (let px = pieIzq; px <= x + semiancho; px += 6) base = Math.max(base, terrenoY(px));
+    // La base sigue el fondo. Apoyarla en una horizontal a la cota más honda de
+    // la huella hacía que, sobre un talud, el dique creciera hacia abajo hasta
+    // convertirse en una torre.
+    const base = fondoY;
+    const coronacion = nivelMedio - Math.max(30, (base - nivelMedio) * 0.3);
+    const alto = Math.max(70, base - coronacion);
+    const semiMar = Math.min(210, Math.max(95, alto * 1.25));
+    const semiEmb = semiMar * 0.5;
+    const semiCresta = Math.max(28, semiMar * 0.2);
 
-    // Desnivel entre mar y embalse: es la variable que mueve la turbina, así
-    // que se ve, y oscila con el ciclo mareal.
+    const seccionDique = () => {
+      ctx.beginPath();
+      ctx.moveTo(x - semiMar, terrenoY(x - semiMar) + 2);
+      ctx.lineTo(x - semiCresta, coronacion);
+      ctx.lineTo(x + semiCresta, coronacion);
+      ctx.lineTo(x + semiEmb, terrenoY(x + semiEmb) + 2);
+      for (let px = x + semiEmb; px >= x - semiMar; px -= 6) ctx.lineTo(px, terrenoY(px) + 2);
+      ctx.closePath();
+    };
+    void apoyoHuella;
+
+    // Desnivel: la lámina del mar es la que dibuja el oleaje, así que la que se
+    // mueve aquí es la del embalse. El salto que se rotula es esa diferencia.
     const fase = Math.sin(t * 0.5);
     const salto = (this.rangoMarea / 2) * escalaOla * 0.9;
-    const yMar = nivelMedio - fase * salto;
     const yEmbalse = nivelMedio + fase * salto;
 
-    // El embalse ocupa sólo el tramo entre el dique y la orilla.
-    // Embalse: lámina entre el trasdós del dique y la orilla del vaso, con el
-    // fondo siguiendo el terreno. Un rectángulo dejaría agua sobre la arena.
-    const xIni = x + semiancho - 4;
+    // Embalse: lámina entre el trasdós y la orilla del vaso, con el fondo
+    // siguiendo el terreno. Un rectángulo dejaría agua sobre la arena.
+    const xIni = x + semiEmb - 6;
     let xFin = xIni;
-    while (xFin < xCosta + 40 && terrenoY(xFin) > yEmbalse) xFin += 4;
-    if (xFin > xIni) {
+    while (xFin < xOrilla + 30 && terrenoY(xFin) > yEmbalse) xFin += 4;
+    if (xFin > xIni + 4) {
       ctx.beginPath();
       ctx.moveTo(xIni, yEmbalse);
       ctx.lineTo(xFin, yEmbalse);
       for (let px = xFin; px >= xIni; px -= 4) ctx.lineTo(px, terrenoY(px) + 2);
       ctx.closePath();
-      ctx.fillStyle = "rgba(31,90,118,0.92)";
+      const vaso = ctx.createLinearGradient(0, yEmbalse, 0, base);
+      vaso.addColorStop(0, "#4a8fa8");
+      vaso.addColorStop(1, "#164a63");
+      ctx.fillStyle = vaso;
       ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
       ctx.fillRect(xIni, yEmbalse - 1.5, xFin - xIni, 3);
     }
 
-    // Cuerpo del dique: talud de escollera hacia el mar, muro vertical hacia
-    // el embalse y central sobre la coronación.
-    ctx.beginPath();
-    ctx.moveTo(pieIzq, base);
-    ctx.lineTo(x - semiancho, coronacion);
-    ctx.lineTo(x + semiancho, coronacion);
-    ctx.lineTo(x + semiancho, base);
-    ctx.closePath();
+    // Sección del dique: talud tendido al mar, talud corto al embalse.
+    seccionDique();
     const cuerpo = ctx.createLinearGradient(0, coronacion, 0, base);
     cuerpo.addColorStop(0, C.obra);
     cuerpo.addColorStop(1, C.obraSombra);
@@ -1140,36 +1253,60 @@ export class AnimacionCanvas {
     ctx.lineWidth = 1.4;
     ctx.stroke();
 
+    // Escollera sobre el talud de aguas afuera: es la cara que rompe la ola.
     ctx.fillStyle = C.roca;
-    for (let i = 0; i < 24; i++) {
-      const p = i / 24;
-      const rx = pieIzq + p * 34 + ((i * 7) % 5);
-      const ry = base - p * (base - coronacion) + ((i * 13) % 7);
+    for (let i = 0; i <= 26; i++) {
+      const u = i / 26;
+      const rx = x - semiMar + u * (semiMar - semiCresta) + ((i * 7) % 6) - 3;
+      const yTalud = terrenoY(x - semiMar) + u * (coronacion - terrenoY(x - semiMar));
+      const ry = yTalud + ((i * 13) % 8) - 2;
       ctx.beginPath();
-      ctx.ellipse(rx, ry, 5, 3.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(rx, ry, 6, 4, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
+    // Coronación: vía sobre el dique y edificio de la central.
     ctx.fillStyle = C.obraOscura;
-    ctx.fillRect(x - 34, coronacion - 20, 68, 20);
+    ctx.fillRect(x - semiCresta - 6, coronacion - 7, semiCresta * 2 + 12, 8);
     ctx.fillStyle = C.obraSombra;
-    ctx.fillRect(x - 34, coronacion - 24, 68, 5);
-    for (let i = 0; i < 4; i++) {
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
-      ctx.fillRect(x - 26 + i * 15, coronacion - 15, 9, 8);
+    ctx.fillRect(x - semiCresta * 0.75, coronacion - 30, semiCresta * 1.5, 24);
+    ctx.strokeStyle = C.obraOscura;
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(x - semiCresta * 0.75, coronacion - 30, semiCresta * 1.5, 24);
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.fillRect(x - semiCresta * 0.55 + i * semiCresta * 0.42, coronacion - 24, 12, 9);
     }
 
-    // Conducto con el grupo bulbo dentro y el sentido del paso de agua.
-    const yTunel = base - 42;
+    // Conducto con el grupo bulbo. Va bajo la coronación, no en el fondo:
+    // el agua pasa por el cuerpo del dique de un lado al otro.
+    const yTunel = coronacion + (base - coronacion) * 0.58;
+    const medioTunel = 22;
+    // El conducto se recorta contra la sección: atraviesa el dique, no asoma
+    // al agua abierta como una caja pegada al talud.
+    ctx.save();
+    seccionDique();
+    ctx.clip();
     ctx.fillStyle = "#0b2233";
-    ctx.fillRect(x - semiancho - 10, yTunel - 15, semiancho * 2 + 20, 30);
-    ctx.strokeStyle = C.obraSombra;
-    ctx.lineWidth = 1.4;
-    ctx.strokeRect(x - semiancho - 10, yTunel - 15, semiancho * 2 + 20, 30);
+    ctx.fillRect(x - semiMar, yTunel - medioTunel, semiMar + semiEmb, medioTunel * 2);
+    ctx.restore();
+    ctx.save();
+    seccionDique();
+    ctx.clip();
+    ctx.strokeStyle = C.obraOscura;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(x - semiMar, yTunel - medioTunel);
+    ctx.lineTo(x + semiEmb, yTunel - medioTunel);
+    ctx.moveTo(x - semiMar, yTunel + medioTunel);
+    ctx.lineTo(x + semiEmb, yTunel + medioTunel);
+    ctx.stroke();
+    ctx.restore();
 
+    // Grupo bulbo: bulbo, carcasa y rodete.
     ctx.fillStyle = C.obraOscura;
     ctx.beginPath();
-    ctx.ellipse(x + 24, yTunel, 18, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 26, yTunel, 20, 10, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = C.obra;
     ctx.lineWidth = 1.4;
@@ -1177,12 +1314,11 @@ export class AnimacionCanvas {
 
     ctx.fillStyle = C.obra;
     ctx.beginPath();
-    ctx.arc(x, yTunel, 14, 0, Math.PI * 2);
+    ctx.arc(x, yTunel, 15, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = C.obraSombra;
     ctx.lineWidth = 2;
     ctx.stroke();
-
     ctx.save();
     ctx.translate(x, yTunel);
     ctx.rotate(t * 5);
@@ -1192,7 +1328,7 @@ export class AnimacionCanvas {
       const ang = (i * Math.PI) / 3;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.lineTo(10.5 * Math.cos(ang), 10.5 * Math.sin(ang));
+      ctx.lineTo(11.5 * Math.cos(ang), 11.5 * Math.sin(ang));
       ctx.stroke();
     }
     ctx.restore();
@@ -1201,32 +1337,47 @@ export class AnimacionCanvas {
     ctx.arc(x, yTunel, 4, 0, Math.PI * 2);
     ctx.fill();
 
+    // Sentido del paso de agua: llena el vaso o lo vacía según el ciclo.
     const haciaEmbalse = fase > 0;
-    ctx.fillStyle = "rgba(226,242,245,0.7)";
+    ctx.fillStyle = "rgba(226,242,245,0.75)";
     for (let i = 0; i < 3; i++) {
-      const fx = x - 44 + i * 30 + (haciaEmbalse ? 0 : 12);
-      const s = haciaEmbalse ? 1 : -1;
+      const fx = x - semiCresta - 18 + i * 24;
+      const sgn = haciaEmbalse ? 1 : -1;
       ctx.beginPath();
-      ctx.moveTo(fx + s * 8, yTunel + 10);
-      ctx.lineTo(fx, yTunel + 6);
-      ctx.lineTo(fx, yTunel + 14);
+      ctx.moveTo(fx + sgn * 9, yTunel + 15);
+      ctx.lineTo(fx, yTunel + 11);
+      ctx.lineTo(fx, yTunel + 19);
       ctx.closePath();
       ctx.fill();
     }
 
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
-    ctx.fillRect(Math.max(0, x - semiancho - 220), yMar - 1.5, 220, 3);
+    // Cota del salto entre las dos láminas: es la variable que mueve la turbina.
+    const xCota = x + semiEmb + 26;
+    const yAlta = Math.min(nivelMedio, yEmbalse);
+    const yBaja = Math.max(nivelMedio, yEmbalse);
+    if (yBaja - yAlta > 3) {
+      ctx.strokeStyle = "rgba(232,242,245,0.85)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(xCota, yAlta);
+      ctx.lineTo(xCota, yBaja);
+      ctx.moveTo(xCota - 4, yAlta + 4);
+      ctx.lineTo(xCota, yAlta);
+      ctx.lineTo(xCota + 4, yAlta + 4);
+      ctx.moveTo(xCota - 4, yBaja - 4);
+      ctx.lineTo(xCota, yBaja);
+      ctx.lineTo(xCota + 4, yBaja - 4);
+      ctx.stroke();
+    }
 
-    this.rotulo(
+    const saltoM = this.rangoMarea * Math.abs(fase) * 0.5;
+    this.chip(
       ctx,
-      `Salto ${(this.rangoMarea * Math.abs(fase)).toFixed(1).replace(".", ",")} m de ${this.rangoMarea.toFixed(1).replace(".", ",")} m de rango`,
+      `Salto ${saltoM.toFixed(1).replace(".", ",")} m · rango ${this.rangoMarea.toFixed(1).replace(".", ",")} m`,
       x,
-      coronacion - 32,
-      "center",
-      C.tinta,
-      10
+      coronacion - 44
     );
-    this.rotuloDispositivo(ctx, x, coronacion - 48, "Dique mareal");
+    this.rotuloDispositivo(ctx, x, coronacion - 66, "Dique mareal");
   }
 
   // ---- Rótulos y anotación -------------------------------------------------
