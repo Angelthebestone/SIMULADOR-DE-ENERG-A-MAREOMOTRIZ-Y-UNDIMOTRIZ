@@ -37,9 +37,10 @@
   --text-kpi: 30px;
 
   /* Espaciado base 4 px — ritmo 1·4·9: --s-1:4px, --s-4:16px, --s-9:36px, --s-13:52px
-     Los pasos --s-2 y --s-6 cubren la densidad de tablero entre 4 y 16. */
+     Los pasos --s-2, --s-3 y --s-6 cubren la densidad de tablero entre 4 y 16. */
   --s-1: 4px;
   --s-2: 8px;
+  --s-3: 12px;
   --s-4: 16px;
   --s-6: 24px;
   --s-9: 36px;
@@ -55,14 +56,13 @@
   --dur-media: 220ms;
   --ease-salida: cubic-bezier(0.2, 0, 0, 1);
 
-  /* Tokens para el mapa: la paleta de relleno del fondo y de la tierra sale
-     de aquí, no de literales en mapa.ts. Los valores se declaran en oklch
-     para que el mapa lea el mismo vocabulario que el resto de la interfaz. */
-  --map-bg: oklch(0.945 0.003 106);
+  /* Tokens del mapa: el relleno del mar y de la tierra sale de aquí, no de
+     literales en mapa.ts. El mar va oscuro y la tierra clara para que el dato
+     encima —la mancha de recurso y los emplazamientos— sea lo que destaca.
+     Los tres valores en oklch, el mismo vocabulario que el resto. */
+  --map-oceano: oklch(0.360 0.055 240);
   --map-tierra-fill: oklch(0.910 0.005 106);
   --map-tierra-stroke: oklch(0.470 0.012 245);
-  --map-stroke-tinta: oklch(0.245 0.020 238);
-  --map-fallback: oklch(0.500 0.005 106);
 }
 
 [data-sustentacion] {

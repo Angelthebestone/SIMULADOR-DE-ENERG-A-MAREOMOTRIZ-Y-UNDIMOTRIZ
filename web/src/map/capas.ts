@@ -1,4 +1,12 @@
-// capas.ts — dos límites distintos (base vs ráster)
+// capas.ts — procedencia de las capas de contexto (base vs ráster)
+//
+// El mapa ya no ofrece conmutadores de capas: su estilo es uno solo (mar,
+// tierra, recurso, áreas protegidas y emplazamientos), así que ningún módulo
+// importa ya esta tabla. Se conserva porque es donde está declarada la
+// procedencia de cada pirámide —fuente, resolución, niveles y fecha— y esa
+// declaración sigue siendo parte del repositorio aunque la capa no se pinte.
+//
+// dos límites distintos (base vs ráster)
 // Base vectorial admite zoom profundo (rótulos nítidos); rásteres limitados por resolución nativa.
 // Fuente y zoom_max declarados por capa; leyenda muestra fuente, resolución, niveles pirámide y fecha/rango.
 

@@ -30,29 +30,27 @@
       </div>
     </div>
 
-    <!-- Catálogo EMEC: 8 undimotriz + 7 de corriente, sin fórmulas -->
-    <div class="fichas-bloque">
-      <h2>Catálogo EMEC</h2>
-      <div class="grid-fichas" data-testid="catalogo-fichas" data-origen="simulable">
-        <FichaDispositivo v-for="f in catalogo" :key="String(f.id)" :ficha="f as unknown as Record<string,unknown>" />
-      </div>
-
-      <h2>Dispositivos reales y fracasos</h2>
-      <div class="grid-fichas" data-testid="fichas-fracasos">
-        <FichaDispositivo
-          v-for="f in fracasos"
-          :key="String(f.id)"
-          :ficha="f as unknown as Record<string,unknown>"
-          tipo="fracaso"
-          :lcoe-sin="lcoeSin"
-        />
-      </div>
-      <p class="nota-fracasos">Ninguno falló por física imposible: coste, disponibilidad y capital.</p>
+    <!-- Catálogo de convertidores: la simulabilidad la declara cada ficha, no
+         la deduce la pantalla. -->
+    <div class="grid-fichas">
+      <FichaDispositivo v-for="f in catalogo" :key="String(f.id)" :ficha="f" tipo="dispositivo" />
     </div>
+
+    <div class="grid-fichas">
+      <FichaDispositivo
+        v-for="f in fracasos"
+        :key="String(f.id)"
+        :ficha="f"
+        tipo="fracaso"
+        :lcoe-sin="lcoeSin"
+      />
+    </div>
+    <p class="nota-fracasos">
+      Cada ficha de cierre trae la causa que lo paró y quién asumió el coste.
+    </p>
 
     <!-- Dos tecnologías sobre el mismo recurso, cadenas alineadas por nombre -->
     <div class="comparacion-paralelo">
-      <h2>Dos tecnologías en paralelo — mismo recurso</h2>
       <div class="controles-comparar">
         <label> Tecnología A
           <select v-model="claveA" aria-label="Tecnología A">
@@ -89,7 +87,6 @@
 
     <!-- Isla Fuerte: los tres valores juntos, sin promediar -->
     <div class="discrepancia">
-      <h2>Isla Fuerte — tres valores juntos</h2>
       <table class="tabla-discrepancia">
         <thead><tr><th>Fuente</th><th>Valor</th><th>Estado</th><th>Resolución</th><th>Distancia celda</th></tr></thead>
         <tbody>
@@ -136,14 +133,8 @@ const fracasos = ref<Record<string,unknown>[]>([])
 // La pieza vive en el resumen XM y la expone app.datos_lectura.cargar_lcoe_sin;
 // en la web se sirve bajo /datos/xm/resumen_xm.json (vite.config.ts::datosPlugin).
 const lcoeSin = ref<{ valor: number | null; unidad: string; fuente: string; estado: string } | null>(null)
-const idsCatalogo = [
-  'atenuador','absorbedor_puntual_catalogo','owc','owc','owc','rebosamiento','diferencial_presion','onda_bulbo','masa_rotatoria',
-  'tidal_eje_horizontal','tidal_eje_vertical','tidal_hidroala','tidal_cometa','tidal_venturi','tidal_tornillo','tidal_otros'
-]
 // Carga real: fetch de /datos/catalogo/*.json y /datos/fracasos/*.json (sin fórmulas en fichas)
 async function cargarCatalogo(){
-  const base = ['atenuador','absorbedor_puntual_catalogo','owc','owc','owc','rebosamiento','diferencial_presion','onda_bulbo','masa_rotatoria','owc','owc','owc','tidal_eje_horizontal','tidal_eje_vertical','tidal_hidroala','tidal_cometa','tidal_venturi','tidal_tornillo','tidal_otros']
-  // En producción: import.meta.glob('/datos/catalogo/*.json') — aquí fetch por id para mantener mínimo sin sobreingeniería
   const candidatos = ['atenuador','diferencial_presion','masa_rotatoria','onda_bulbo','owc','rebosamiento','tidal_cometa','tidal_eje_horizontal','tidal_eje_vertical','tidal_hidroala','tidal_otros','tidal_tornillo','tidal_venturi','absorbedor_puntual_catalogo','owc']
   // Deduplicar y limitar a 15 existentes
   const unicos = [...new Set(candidatos)].slice(0,15)
@@ -231,8 +222,7 @@ const divergencia = ref('— selecciona dos tecnologías y pulsa Comparar')
  * Tolerancia por defecto 0.02 (2%).
  */
 function eslabon_que_separa(a: Eslabon[], b: Eslabon[], tolerancia=0.02): string {
-  const mapaB = new Map(a.length && b.length ? b.map(e=>[e.nombre, e] as const) : [])
-  // Construir mapa de b por nombre
+  // Mapa de b por nombre: las cadenas se alinean por nombre, no por índice.
   const mb = new Map<string, Eslabon>()
   for(const e of b) mb.set(e.nombre, e)
   const nombresA = new Set(a.map(e=>e.nombre))
@@ -306,9 +296,6 @@ async function comparar(){
       const mk = (clave:string): Eslabon[] => base.map(e=> ({ ...e, rendimiento: Math.max(0, Math.min(1, e.rendimiento + (variacion[clave]||0) + (e.nombre==='captura' ? (clave==='owc'?0.03:0):0) )) }))
       a = mk(claveA.value)
       b = mk(claveB.value)
-      // Si turbina_corriente y sitio sin dato corriente, bloquear (no inventar valores — Dato pendiente bloquea cálculo)
-      const sitioRec = (props.resultado.recurso as Record<string,unknown>) || {}
-      // corriente pendiente ya viene como estado en sitio; aquí no hay sitio cargado, así que no bloquear en fallback
     }
     resA.value = { eslabones: a }
     resB.value = { eslabones: b }
