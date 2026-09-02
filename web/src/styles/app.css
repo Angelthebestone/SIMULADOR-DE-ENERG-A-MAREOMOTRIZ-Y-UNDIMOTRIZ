@@ -1,6 +1,7 @@
-/* Carcasa de la aplicación: barra, pestañas y escenario.
-   El escenario es la pantalla: carta mundial y simulador comparten superficie,
-   uno a tamaño completo y el otro reducido en la esquina inferior izquierda. */
+/* Carcasa de la aplicación: tablero y lectura.
+   El tablero son dos columnas fijas —emplazamiento a la izquierda, escena a la
+   derecha— sobre un marco oscuro que las enmarca y cierra por abajo la cadena
+   de lectura. Sin barra superior: el pie carga también con las acciones. */
 
 @layer base, componentes;
 
@@ -15,15 +16,12 @@
     line-height: 1.5;
   }
 
-  /* Un solo anillo de foco para toda la aplicación. */
   :focus-visible {
     outline: 2px solid var(--foco);
     outline-offset: 2px;
     border-radius: 4px;
   }
 
-  /* Los controles nativos heredan el acento del proyecto en vez de el del
-     sistema: sliders, casillas y selects quedan en la misma paleta. */
   :root {
     accent-color: var(--rol-recurso);
     color-scheme: light;
@@ -34,14 +32,14 @@
   h3 {
     text-wrap: balance;
     margin-block: 0 var(--s-1);
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
 
   p {
     text-wrap: pretty;
   }
 
-  /* Objetivo táctil mínimo WCAG 2.5.8 AA. Con padding, no con alto fijo,
-     para que el contenido pueda crecer pero nunca encoger el objetivo. */
   button,
   select,
   input:not([type='range']) {
@@ -60,62 +58,22 @@
 }
 
 @layer componentes {
-  /* La aplicación ocupa la ventana: la barra queda fija y todo el alto
-     restante es del escenario. */
   #app {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
     block-size: 100dvh;
-    background: var(--lienzo);
+    background: var(--marco);
   }
 
-  /* Una fila de la rejilla no baja del contenido de su hijo salvo que se le
-     diga. Sin esto, con la escala de sustentacion a 320 px la tira de pestanas
-     ensanchaba toda la aplicacion en vez de desplazarse ella sola. */
   #app > * {
     min-inline-size: 0;
   }
 
-  /* ---- Barra superior ---- */
-  .barra {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s-4);
-    padding: var(--s-2) var(--s-4);
-    background: var(--panel);
-    border-block-end: 1px solid var(--borde-suave);
-  }
-
-  .marca {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    line-height: 1.2;
-    min-inline-size: 0;
-    color: var(--rol-mar-profundo);
-  }
-
-  .marca > div {
-    display: flex;
-    flex-direction: column;
-    color: var(--tinta);
-  }
-
-  .marca strong {
-    font-size: var(--text-seccion);
-    color: var(--tinta);
-  }
-
-  .marca-sub {
-    font-size: var(--text-meta);
-    color: var(--tenue);
-  }
-
+  /* Acciones de la aplicación, al pie junto a la cadena de lectura. */
   .acciones-barra {
     display: flex;
     gap: var(--s-2);
+    margin-inline-start: auto;
   }
 
   .btn-barra {
@@ -123,10 +81,12 @@
     align-items: center;
     gap: 6px;
     padding: var(--s-1) 10px;
-    border: 1px solid var(--borde);
+    border: 1px solid var(--marco-linea);
     border-radius: var(--radio);
-    background: var(--panel);
+    background: var(--marco-alto);
+    color: var(--marco-tinta);
     font-size: var(--text-meta);
+    font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
     transition: border-color var(--dur-rapida) var(--ease-salida),
@@ -134,149 +94,129 @@
   }
 
   .btn-barra:hover {
-    border-color: var(--foco);
+    border-color: var(--marco-recurso);
   }
 
   .btn-barra[aria-pressed='true'] {
-    border-color: var(--foco);
-    background: var(--acento-suave);
+    border-color: var(--marco-captado);
+    color: var(--marco-captado);
   }
 
-  /* ---- Panel activo ---- */
-  .panel {
-    overflow: hidden;
+  /* ---- Tablero: dos columnas sobre el marco ---- */
+  .tablero {
+    display: grid;
+    grid-template-columns: minmax(19rem, 31%) minmax(0, 1fr);
+    gap: var(--s-3);
+    padding: var(--s-3);
+    min-block-size: 0;
   }
 
-  /* ---- Escenario: los dos visores sobre la misma superficie ---- */
-  .escenario {
-    position: relative;
-    inline-size: 100%;
-    block-size: 100%;
-    background: var(--map-oceano);
-    /* Medidas que los dos visores necesitan conocer para no pisarse: la tira
-       de lectura al pie y la miniatura de la esquina inferior izquierda. */
-    --lectura-alto: 2.9rem;
-    --miniatura-alto: min(10rem, 22vh);
-    --miniatura-ancho: min(17rem, 28vw);
+  .tablero > * {
+    min-inline-size: 0;
+    min-block-size: 0;
   }
 
-  .marco {
-    position: absolute;
-    overflow: hidden;
-    background: var(--lienzo);
-    transition: inset var(--dur-media) var(--ease-salida),
-      box-shadow var(--dur-media) var(--ease-salida);
-  }
-
-  .marco--pleno {
-    inset: 0;
-    z-index: 1;
-    border-radius: 0;
-  }
-
-  .marco--reducido {
-    inset-block-start: auto;
-    inset-inline-end: auto;
-    inset-block-end: calc(var(--lectura-alto) + var(--s-2));
-    inset-inline-start: var(--s-2);
-    inline-size: var(--miniatura-ancho);
-    block-size: var(--miniatura-alto);
-    z-index: 3;
-    border: 1px solid var(--borde);
-    border-radius: var(--radio-caja);
-    box-shadow: 0 6px 18px oklch(0.2 0.02 240 / 0.28);
-  }
-
-  .marco-tapa {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
+  .columna {
     display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: var(--s-2);
-    padding: var(--s-1) var(--s-2);
-    border: none;
-    background: linear-gradient(to top, oklch(0.2 0.02 240 / 0.72) 0 2.2rem, transparent 3.2rem);
-    color: #ffffff;
-    font-size: var(--text-meta);
-    font-weight: 600;
-    text-align: start;
-    cursor: pointer;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--radio-escena);
+    background: var(--lienzo);
+    box-shadow: var(--sombra-escena);
   }
 
-  .marco-tapa:hover {
-    background: linear-gradient(to top, oklch(0.2 0.02 240 / 0.85) 0 2.6rem, oklch(0.2 0.02 240 / 0.18) 100%);
-  }
-
-  /* ---- Tira de lectura: las cifras de la cadena sobre el escenario ---- */
+  /* ---- Cadena de lectura: las cuatro cifras como eslabones ---- */
   .lectura {
-    position: absolute;
-    inset-inline: 0;
-    inset-block-end: 0;
-    z-index: 4;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0 var(--s-6);
-    min-block-size: var(--lectura-alto);
-    padding: var(--s-1) var(--s-4);
-    background: oklch(0.24 0.02 238 / 0.92);
-    color: oklch(0.97 0.004 106);
-    border-block-start: 1px solid oklch(1 0 0 / 0.14);
+    gap: var(--s-2) var(--s-4);
+    padding: var(--s-2) var(--s-4);
+    color: var(--marco-tinta);
+    background: var(--marco);
+    border-block-start: 1px solid var(--marco-linea);
   }
 
-  .kpi {
+  .cadena {
     display: flex;
-    align-items: baseline;
-    gap: 6px;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: var(--s-1);
     min-inline-size: 0;
   }
 
+  .kpi {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'etiqueta etiqueta'
+      'valor valor';
+    align-content: center;
+    gap: 0 6px;
+    min-inline-size: 0;
+    padding: 4px var(--s-3);
+    border-radius: var(--radio);
+  }
+
   .kpi-etiqueta {
-    font-size: var(--text-meta);
-    letter-spacing: 0.05em;
+    grid-area: etiqueta;
+    font-size: 11px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: oklch(0.78 0.02 235);
+    color: var(--marco-tenue);
+    white-space: nowrap;
   }
 
   .kpi-valor {
-    font-size: var(--text-seccion);
+    grid-area: valor;
+    font-family: var(--font-display);
+    font-size: var(--text-kpi);
     font-weight: 600;
-    line-height: 1.1;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
   }
 
   .kpi-unidad {
-    font-size: 0.62em;
+    font-family: var(--font-sans);
+    font-size: 0.45em;
     font-weight: 600;
-    color: oklch(0.78 0.02 235);
+    letter-spacing: 0;
+    color: var(--marco-tenue);
   }
 
   /* El recurso es lo que entra del mar; la potencia, lo que queda captado.
      Sólo esos dos llevan color: el resto se lee en blanco. */
   [data-testid='kpi-recurso'] .kpi-valor {
-    color: oklch(0.82 0.10 210);
+    color: var(--marco-recurso);
   }
 
   [data-testid='kpi-potencia'] .kpi-valor {
-    color: oklch(0.84 0.13 080);
+    color: var(--marco-captado);
+  }
+
+  .eslabon {
+    align-self: center;
+    color: var(--marco-tenue);
+    opacity: 0.7;
   }
 
   .kpi-pendiente {
+    grid-area: valor;
     display: inline-flex;
     align-items: center;
     gap: 4px;
     font-size: var(--text-meta);
     font-style: italic;
-    color: oklch(0.78 0.02 235);
+    color: var(--marco-tenue);
   }
 
   .kpi-esqueleto {
+    grid-area: valor;
     display: block;
     inline-size: 4.5rem;
-    block-size: calc(var(--text-seccion) * 1.1);
+    block-size: calc(var(--text-kpi) * 1.05);
     border-radius: var(--radio);
-    background: oklch(1 0 0 / 0.12);
+    background: var(--marco-linea);
     animation: kpi-latido 1.4s linear infinite;
   }
 
@@ -298,7 +238,7 @@
     margin-inline-start: auto;
     padding: var(--s-1) var(--s-2);
     border-radius: var(--radio);
-    background: oklch(1 0 0 / 0.1);
+    background: var(--marco-linea);
     font-size: var(--text-meta);
   }
 
@@ -307,34 +247,22 @@
     font-weight: 600;
   }
 
-  @media (width <= 40rem) {
-    .barra {
-      align-items: start;
+  /* Pantalla estrecha: una columna, el tablero se desplaza. */
+  @media (width <= 64rem) {
+    .tablero {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(22rem, 42vh) minmax(0, 1fr);
+      overflow: auto;
     }
 
-    /* En pantalla estrecha la lectura no se parte en cuatro filas: se
-       desplaza en horizontal y conserva su alto, que es el que reservan la
-       carta y la miniatura. */
     .lectura {
       flex-wrap: nowrap;
       overflow-x: auto;
-      gap: 0 var(--s-4);
-    }
-
-    .escenario {
-      --miniatura-alto: 8rem;
-      --miniatura-ancho: 12rem;
     }
   }
 }
 
-/* Sin capa a propósito: estas reglas compiten con hojas que tampoco están en
-   ninguna capa (maplibre-gl.css), y una declaración sin capa gana siempre a
-   otra que sí la tiene, por específica que sea. */
-.marco--reducido .maplibregl-control-container {
-  display: none;
-}
-
+/* Sin capa a propósito: compite con maplibre-gl.css, que tampoco tiene capa. */
 .popup-mapa .maplibregl-popup-content {
   padding: var(--s-2);
   border-radius: var(--radio);
@@ -358,4 +286,9 @@
 
 .popup-fila > :first-child {
   color: var(--tenue);
+}
+
+.maplibregl-ctrl-group {
+  border-radius: var(--radio) !important;
+  box-shadow: var(--sombra-caja) !important;
 }

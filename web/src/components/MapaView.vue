@@ -2,87 +2,61 @@
   <section class="mapa-seccion" aria-labelledby="titulo-mapa">
     <h1 id="titulo-mapa" class="rotulo-oculto">Carta mundial de recurso marino</h1>
 
-    <div
-      ref="contenedor"
-      class="mapa"
-      role="application"
-      aria-label="Mapa navegable mundial: arrastra para desplazar, rueda para zoom, pulsa cualquier zona marina para simular"
-    ></div>
+    <!-- Carta: arriba, con la leyenda del recurso encima y nada más. -->
+    <div class="carta">
+      <div
+        ref="contenedor"
+        class="mapa"
+        role="application"
+        aria-label="Mapa navegable mundial: arrastra para desplazar, rueda para zoom, pulsa cualquier zona marina para simular"
+      ></div>
 
-    <!-- Rail de decisión: escala del recurso, dónde estoy y qué se simula.
-         Un solo panel; el mapa no lleva conmutadores de capas. -->
-    <div v-if="!reducido" class="rail" :class="{ plegado }">
-      <button class="rail-tirador" @click="plegado = !plegado" :aria-expanded="plegado ? 'false' : 'true'">
-        <Icono :icono="plegado ? 'expandir' : 'cerrar'" tamano="sm" />
-        <span>{{ plegado ? 'Emplazamientos' : 'Ocultar panel' }}</span>
-      </button>
+      <div class="escala" aria-label="Leyenda: potencia del frente de ola">
+        <div class="escala-titulo">Frente de ola</div>
+        <div class="escala-barra"></div>
+        <div class="escala-topes"><span>0</span><span>20</span><span>45</span><span>80+ kW/m</span></div>
+      </div>
 
-      <p v-if="consultando" class="rail-estado">
+      <p v-if="consultando" class="estado-carta">
         <Icono icono="calculando" tamano="sm" />
         <span>consultando el reanálisis en ese punto…</span>
       </p>
-      <p v-else-if="avisoTierra" class="rail-estado" role="status">
+      <p v-else-if="avisoTierra" class="estado-carta" role="status">
         <Icono icono="pendiente" tamano="sm" />
         <span>{{ avisoTierra }}</span>
       </p>
+    </div>
 
-      <div v-show="!plegado" class="rail-cuerpo">
-        <div class="escala">
-          <div class="escala-titulo">Potencia del frente de ola</div>
-          <div class="escala-barra"></div>
-          <div class="escala-topes"><span>0</span><span>20</span><span>45</span><span>80+ kW/m</span></div>
-          <p class="escala-nota">
-            Reanálisis de oleaje ERA5-Ocean / MFWAM vía Open-Meteo Marine, rejilla de 8°, medias
-            estacionales de 2023. Los aros ámbar marcan emplazamientos mareales medidos.
-            Contorno de tierra: Natural Earth.
-          </p>
+    <!-- Ficha del emplazamiento activo: la selección se hace en la carta, así
+         que la lista y los filtros de región desaparecieron. -->
+    <div v-if="sitioActual" class="ficha-sitio">
+      <div class="ficha-cabecera">
+        <div>
+          <span class="ficha-tag">{{ sitioActual.pais || "Océano global" }}</span>
+          <h2 class="ficha-titulo">{{ sitioActual.nombre }}</h2>
         </div>
-
-        <div class="filtro-regiones" role="group" aria-label="Filtrar emplazamientos por región">
-          <button
-            v-for="r in REGIONES"
-            :key="r.id"
-            class="btn-region"
-            :class="{ activo: regionActiva === r.id }"
-            :aria-pressed="regionActiva === r.id ? 'true' : 'false'"
-            @click="regionActiva = r.id"
-          >
-            {{ r.label }}
-          </button>
-        </div>
-
-        <ListaSitios :sitios="sitiosFiltrados" :activo="sitioActivo" @seleccionar="alSeleccionar" />
-
-        <div v-if="sitioActual" class="ficha-sitio">
-          <div class="ficha-cabecera">
-            <div>
-              <span class="ficha-tag">{{ sitioActual.pais || "Océano global" }}</span>
-              <h2 class="ficha-titulo">{{ sitioActual.nombre }}</h2>
-            </div>
-            <span class="semaforo" :class="'semaforo--' + sitioActual.estado">
-              <span class="semaforo__simbolo" :class="'semaforo__simbolo--' + sitioActual.estado" aria-hidden="true"></span>
-              <span>{{ sitioActual.estado }}</span>
-            </span>
-          </div>
-
-          <dl class="ficha-metricas">
-            <div v-for="m in metricasSitio" :key="m.rotulo" class="metrica">
-              <dt>{{ m.rotulo }}</dt>
-              <dd :data-pendiente="m.valor === null ? '' : null">
-                <template v-if="m.valor !== null">{{ m.valor }} <span class="metrica-unidad">{{ m.unidad }}</span></template>
-                <template v-else>sin dato</template>
-              </dd>
-            </div>
-          </dl>
-
-          <p class="ficha-fuente">{{ sitioActual.fuente }}</p>
-
-          <button class="btn-simular" @click="confirmarSeleccionYSimular">
-            Simular este emplazamiento
-          </button>
-        </div>
-
+        <span class="semaforo" :class="'semaforo--' + sitioActual.estado">
+          <span class="semaforo__simbolo" :class="'semaforo__simbolo--' + sitioActual.estado" aria-hidden="true"></span>
+          <span>{{ sitioActual.estado }}</span>
+        </span>
       </div>
+
+      <dl class="ficha-metricas">
+        <div v-for="m in metricasSitio" :key="m.rotulo" class="metrica">
+          <dt>{{ m.rotulo }}</dt>
+          <dd :data-pendiente="m.valor === null ? '' : null">
+            <template v-if="m.valor !== null">{{ m.valor }} <span class="metrica-unidad">{{ m.unidad }}</span></template>
+            <template v-else>sin dato</template>
+          </dd>
+        </div>
+      </dl>
+
+      <p class="ficha-fuente">{{ sitioActual.fuente }}</p>
+
+      <button class="btn-simular" @click="confirmarSeleccionYSimular">
+        <span>Simular este emplazamiento</span>
+        <Icono icono="eslabon" tamano="sm" />
+      </button>
     </div>
   </section>
 </template>
@@ -92,12 +66,11 @@ import { onMounted, ref, computed, watch } from "vue";
 import { crearMapa, flyToSitio, actualizarSitios, type SitioMapa } from "../map/mapa";
 import { consultarOleaje, consultarMarea } from "../datos/marino";
 import { formatearNumero } from "../utils/formato";
-import ListaSitios from "./ListaSitios.vue";
 import Icono from "./Icono.vue";
 
 const props = defineProps<{
-  /** Reducido a miniatura en la esquina: se deja sólo la carta. */
-  reducido?: boolean;
+  /** Emplazamiento que la carcasa tiene activo, para que la carta lo refleje. */
+  sitioActivo?: string;
 }>();
 
 const emit = defineEmits<{
@@ -107,21 +80,10 @@ const emit = defineEmits<{
 
 const contenedor = ref<HTMLElement | null>(null);
 let map: ReturnType<typeof crearMapa> | null = null;
-const sitioActivo = ref("isla_fuerte");
-const regionActiva = ref("todos");
-const plegado = ref(false);
+const sitioActivoLocal = ref(props.sitioActivo ?? "isla_fuerte");
 const consultando = ref(false);
 const avisoTierra = ref("");
 let temporizadorAviso = 0 as unknown as ReturnType<typeof setTimeout>;
-
-const REGIONES = [
-  { id: "todos", label: "Todos" },
-  { id: "colombia", label: "Colombia" },
-  { id: "america", label: "América" },
-  { id: "europa", label: "Europa" },
-  { id: "asia_oceania", label: "Asia y Oceanía" },
-  { id: "africa", label: "África" },
-];
 
 const sitios = ref<SitioMapa[]>([
   // Colombia
@@ -156,12 +118,7 @@ const sitios = ref<SitioMapa[]>([
   { id: "cape_point", nombre: "Cape Point (Ciudad del Cabo)", pais: "Sudáfrica", region: "africa", lon: 18.49, lat: -34.35, valor: 64.0, unidad: "kW/m", fuente: "CSIR South Africa", estado: "verificado", tipo: "undimotriz", hm0_m: 3.0, te_s: 9.5, rango_m: 2.0, velocidad_ms: 1.2, profundidad_m: 48 },
 ]);
 
-const sitiosFiltrados = computed(() => {
-  if (regionActiva.value === "todos") return sitios.value;
-  return sitios.value.filter((s) => s.region === regionActiva.value);
-});
-
-const sitioActual = computed(() => sitios.value.find((s) => s.id === sitioActivo.value) ?? sitios.value[0]);
+const sitioActual = computed(() => sitios.value.find((s) => s.id === sitioActivoLocal.value) ?? sitios.value[0]);
 
 /** Cada métrica declara su ausencia. Un emplazamiento sin campaña de oleaje no
  *  recibe una cifra de relleno: la fila queda en «sin dato». */
@@ -188,9 +145,6 @@ onMounted(() => {
     avisoTierra.value = "";
     void puntoLibre(e.lon, e.lat);
   });
-
-  // Pulsar tierra no crea emplazamiento: se dice por qué en vez de dejar el
-  // click sin respuesta, que se lee como que la aplicación no reaccionó.
   map.on("punto_en_tierra" as never, () => {
     avisoTierra.value = "ese punto cae en tierra firme; el recurso marino sólo se evalúa sobre el mar";
     clearTimeout(temporizadorAviso);
@@ -198,9 +152,14 @@ onMounted(() => {
   });
 });
 
-/** Punto cualquiera del océano: se consulta el recurso real en esa coordenada.
- *  Si no hay fuente que lo cubra, el emplazamiento entra como pendiente y sin
- *  cifras en vez de con una estimación inventada. */
+watch(
+  () => props.sitioActivo,
+  (id) => {
+    if (id && id !== sitioActivoLocal.value && sitios.value.some((s) => s.id === id)) sitioActivoLocal.value = id;
+  }
+);
+
+/** Punto cualquiera del océano: se consulta el recurso real en esa coordenada. */
 async function puntoLibre(lon: number, lat: number) {
   consultando.value = true;
   try {
@@ -210,7 +169,7 @@ async function puntoLibre(lon: number, lat: number) {
       id: `punto_${Date.now()}`,
       nombre: `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(2)}° ${lon >= 0 ? "E" : "O"}`,
       pais: "Océano global",
-      region: regionActiva.value,
+      region: "libre",
       lon,
       lat,
       valor: hayOleaje ? oleaje.kw_m : null,
@@ -227,7 +186,7 @@ async function puntoLibre(lon: number, lat: number) {
       profundidad_m: undefined,
     };
     sitios.value = [nuevo, ...sitios.value];
-    sitioActivo.value = nuevo.id;
+    sitioActivoLocal.value = nuevo.id;
     if (map) actualizarSitios(map, sitios.value);
     if (hayOleaje) emit("seleccionar-sitio", nuevo);
   } finally {
@@ -235,24 +194,8 @@ async function puntoLibre(lon: number, lat: number) {
   }
 }
 
-// Al reducirse el visor, MapLibre conserva centro y zoom, así que en la
-// miniatura se vería sólo un recorte. Se guarda el recuadro visible antes de
-// que cambie el tamaño y se restaura después: la miniatura enseña lo mismo.
-watch(
-  () => props.reducido,
-  () => {
-    if (!map) return;
-    const recuadro = map.getBounds();
-    requestAnimationFrame(() => {
-      if (!map) return;
-      map.resize();
-      map.fitBounds(recuadro, { animate: false, padding: 4 });
-    });
-  }
-);
-
 function alSeleccionar(id: string) {
-  sitioActivo.value = id;
+  sitioActivoLocal.value = id;
   const s = sitios.value.find((x) => x.id === id);
   if (!s) return;
   if (map) flyToSitio(map, s.lon, s.lat, s.id.startsWith("punto_") ? 5 : 7);
@@ -266,9 +209,11 @@ function confirmarSeleccionYSimular() {
 
 <style scoped>
 .mapa-seccion {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   inline-size: 100%;
   block-size: 100%;
+  min-block-size: 0;
   overflow: hidden;
 }
 
@@ -281,123 +226,79 @@ function confirmarSeleccionYSimular() {
   white-space: nowrap;
 }
 
+/* ---- Carta ---- */
+.carta {
+  position: relative;
+  flex: 1 1 auto;
+  min-block-size: 13rem;
+  background: var(--map-oceano);
+}
+
 .mapa {
   inline-size: 100%;
   block-size: 100%;
 }
 
-/* ---- Rail de decisión ---- */
-.rail {
+.escala {
   position: absolute;
-  inset-block-start: var(--s-2);
-  /* --lectura-alto lo declara el escenario (app.css): el rail no se mete
-     debajo de la tira de lectura. */
-  inset-block-end: calc(var(--lectura-alto, 0px) + var(--s-2));
-  inset-inline-end: var(--s-2);
-  inline-size: min(22rem, 40vw);
-  max-block-size: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-  z-index: 4;
+  inset-block-end: var(--s-2);
+  inset-inline-start: var(--s-2);
+  inline-size: 11rem;
+  padding: 6px var(--s-2);
+  border-radius: var(--radio);
+  background: oklch(1 0 0 / 0.86);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--sombra-caja);
   pointer-events: none;
 }
 
-.rail > * {
-  pointer-events: auto;
-}
-
-.rail.plegado {
-  inline-size: auto;
-}
-
-.rail-tirador {
-  align-self: end;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: var(--s-1) 10px;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--panel);
-  font-size: var(--text-meta);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.rail-cuerpo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-  min-block-size: 0;
-  /* Las secciones del rail no se comprimen entre sí: si no cabe todo, el rail
-     desplaza, que es lo que se espera de una lista. */
-  overflow: auto;
-  padding: var(--s-3);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-caja);
-  background: var(--panel);
-  box-shadow: var(--sombra-caja);
-}
-
-.rail-cuerpo > * {
-  flex: none;
-}
-
 .escala-titulo {
-  font-size: var(--text-meta);
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--tenue);
 }
 
 .escala-barra {
-  block-size: 8px;
-  margin-block: 4px;
+  block-size: 6px;
+  margin-block: 4px 3px;
   border-radius: 2px;
-  background: linear-gradient(to right, #0e7490, #2dd4bf, #eab308, #d9461e);
+  background: linear-gradient(to right, var(--rampa-0), var(--rampa-1), var(--rampa-2), var(--rampa-3));
 }
 
 .escala-topes {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--tenue);
 }
 
-.escala-nota {
-  margin: var(--s-1) 0 0;
-  font-size: 11px;
-  color: var(--tenue);
-}
-
-.filtro-regiones {
+.estado-carta {
+  position: absolute;
+  inset-block-start: var(--s-2);
+  inset-inline: var(--s-2) var(--s-2);
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.btn-region {
-  padding: 2px 8px;
+  align-items: start;
+  gap: 6px;
+  margin: 0;
+  padding: var(--s-2);
   border-radius: var(--radio);
-  border: 1px solid var(--borde-suave);
-  background: var(--lienzo);
+  background: oklch(1 0 0 / 0.9);
+  box-shadow: var(--sombra-caja);
   font-size: var(--text-meta);
-  cursor: pointer;
-}
-
-.btn-region.activo {
-  background: var(--rol-mar-profundo);
-  color: var(--panel);
-  border-color: var(--rol-mar-profundo);
-  font-weight: 600;
+  color: var(--tinta);
 }
 
 /* ---- Ficha del emplazamiento activo ---- */
 .ficha-sitio {
-  border-block-start: 1px solid var(--borde-suave);
-  padding-block-start: var(--s-2);
+  flex: none;
+  margin: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  background: var(--panel);
+  box-shadow: var(--sombra-caja);
 }
 
 .ficha-cabecera {
@@ -416,17 +317,17 @@ function confirmarSeleccionYSimular() {
 }
 
 .ficha-titulo {
-  font-size: var(--text-cuerpo);
-  font-weight: 700;
+  font-size: var(--text-seccion);
+  font-weight: 600;
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .ficha-metricas {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px var(--s-2);
-  margin: var(--s-2) 0 0;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-2) var(--s-2);
+  margin: var(--s-3) 0 0;
 }
 
 .metrica dt {
@@ -438,17 +339,20 @@ function confirmarSeleccionYSimular() {
 
 .metrica dd {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-cuerpo);
   font-weight: 600;
 }
 
 .metrica dd[data-pendiente] {
+  font-family: var(--font-sans);
   font-weight: 400;
   font-style: italic;
   color: var(--tenue);
 }
 
 .metrica-unidad {
+  font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 400;
   color: var(--tenue);
@@ -461,15 +365,19 @@ function confirmarSeleccionYSimular() {
 }
 
 .btn-simular {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   inline-size: 100%;
-  margin-block-start: var(--s-2);
-  padding: 6px 12px;
+  margin-block-start: var(--s-3);
+  padding: 8px 12px;
   border: 1px solid var(--rol-mar-profundo);
   border-radius: var(--radio);
   background: var(--rol-mar-profundo);
   color: var(--panel);
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--ease-salida);
 }
 
 .btn-simular:hover {
@@ -477,23 +385,10 @@ function confirmarSeleccionYSimular() {
   border-color: var(--rol-mar-medio);
 }
 
-.rail-estado {
-  display: flex;
-  align-items: start;
-  gap: 6px;
-  margin: 0;
-  padding: var(--s-2);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--panel);
-  box-shadow: var(--sombra-caja);
-  font-size: var(--text-meta);
-  color: var(--tinta);
-}
-
-@media (width <= 52rem) {
-  .rail {
-    inline-size: min(18rem, 62vw);
+@media (width <= 64rem) {
+  .carta {
+    flex: 1 1 auto;
+    min-block-size: 16rem;
   }
 }
 </style>

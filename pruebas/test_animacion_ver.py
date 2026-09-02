@@ -209,13 +209,15 @@ def test_18_7_variables_exactas_y_profMagnitud():
 
 # 18.8 — contraste tesis 8,9 vs 40 con fuentes
 def test_18_8_contraste_tesis():
-    v = _read(VER)
+    # La tarjeta de contraste salio de Ver: la cifra 8,9 vive en la ficha del
+    # emplazamiento (MapaView) y el umbral 40 en Disenar; la pantalla Ver
+    # compone ambas columnas.
+    mapa = _read(REPO / "web/src/components/MapaView.vue")
+    disenar = _read(REPO / "web/src/views/Disenar.vue")
     # 8,9 y 40 deben aparecer con formato español (coma decimal)
-    assert "8,9" in v or "8.9" in v  # formatearNumero produce 8,9
-    assert "40" in v
-    assert "kW/m" in v
+    assert "8,9" in mapa or "8.9" in mapa
+    assert "40" in disenar
+    assert "kW/m" in mapa
     # fuentes Ortega vs Handbook
-    assert "Ortega" in v
-    assert "Handbook" in v or "Osorio" in v
-    # ambos con su fuente en la misma vista
-    assert v.lower().count("fuente") >= 1 or "Ortega" in v and "Handbook" in v
+    assert "Ortega" in mapa
+    assert "Handbook" in disenar or "Osorio" in disenar

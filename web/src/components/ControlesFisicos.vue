@@ -6,6 +6,9 @@
           <span>{{ c.etiqueta }}</span>
           <Glosario :term="c.simbolo" class="simbolo">{{ c.simbolo }}</Glosario>
         </label>
+        <output :id="c.id + '-valor'" :for="c.id" class="valor">
+          {{ c.formato(c.valor) }} <span class="unidad">{{ c.unidad }}</span>
+        </output>
         <div class="pista">
           <span class="tope">{{ c.formato(c.min) }}</span>
           <input
@@ -16,13 +19,11 @@
             :step="c.step"
             :value="c.valor"
             :aria-describedby="c.id + '-valor'"
+            :style="{ '--p': ((c.valor - c.min) / (c.max - c.min)) * 100 + '%' }"
             @input="c.emitir(($event.target as HTMLInputElement).valueAsNumber)"
           />
           <span class="tope">{{ c.formato(c.max) }}</span>
         </div>
-        <output :id="c.id + '-valor'" :for="c.id" class="valor">
-          {{ c.formato(c.valor) }} <span class="unidad">{{ c.unidad }}</span>
-        </output>
       </div>
     </div>
   </div>
@@ -142,9 +143,7 @@ const controlesMareas = computed(() => [
 ]);
 
 const controlesActivos = computed(() => {
-  if (props.modoEnergia === "mareomotriz") {
-    return controlesMareas.value;
-  }
+  if (props.modoEnergia === "mareomotriz") return controlesMareas.value;
   return controlesOndas.value;
 });
 </script>
@@ -161,15 +160,17 @@ const controlesActivos = computed(() => {
 
 .controles-grid {
   display: grid;
-  gap: var(--s-3);
+  gap: var(--s-4);
 }
 
+/* Cada control: etiqueta y cifra en la misma fila, la pista debajo a todo
+   el ancho. La cifra grande a la derecha es lo que se lee al mover. */
 .control {
   display: grid;
-  grid-template-columns: minmax(13rem, 19rem) 1fr auto;
-  align-items: center;
-  column-gap: var(--s-4);
-  row-gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--s-3);
+  row-gap: 6px;
 }
 
 .control > * {
@@ -178,20 +179,43 @@ const controlesActivos = computed(() => {
 
 .etiqueta {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
   font-weight: 600;
   font-size: var(--text-cuerpo);
   cursor: pointer;
+  overflow-wrap: anywhere;
 }
 
 .simbolo {
+  font-family: var(--font-mono);
   font-size: var(--text-meta);
   font-weight: 400;
   color: var(--tenue);
 }
 
+.valor {
+  font-family: var(--font-display);
+  text-align: end;
+  font-weight: 600;
+  font-size: var(--text-nivel);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--tinta);
+  white-space: nowrap;
+}
+
+.unidad {
+  font-family: var(--font-sans);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--tenue);
+}
+
 .pista {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -199,16 +223,77 @@ const controlesActivos = computed(() => {
 }
 
 .tope {
-  font-size: var(--text-meta);
+  font-size: 11px;
   color: var(--tenue);
+  min-inline-size: 1.6rem;
 }
 
+.tope:last-child {
+  text-align: end;
+}
+
+/* Deslizador propio: pista fina con el tramo recorrido en el azul del
+   recurso, tirador redondo con anillo. La fracción --p la pone la plantilla. */
 .pista input[type="range"] {
   flex: 1;
   min-inline-size: 0;
   block-size: 1.5rem;
+  margin: 0;
   cursor: pointer;
-  accent-color: var(--rol-recurso);
+  appearance: none;
+  background: transparent;
+}
+
+.pista input[type="range"]::-webkit-slider-runnable-track {
+  block-size: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--rol-recurso) var(--p, 0%), var(--superficie) var(--p, 0%));
+}
+
+.pista input[type="range"]::-moz-range-track {
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--superficie);
+}
+
+.pista input[type="range"]::-moz-range-progress {
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--rol-recurso);
+}
+
+.pista input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  inline-size: 18px;
+  block-size: 18px;
+  margin-block-start: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--rol-recurso);
+  box-shadow: 0 1px 3px oklch(0.2 0.02 240 / 0.3);
+  transition: transform var(--dur-rapida) var(--ease-salida);
+}
+
+.pista input[type="range"]::-moz-range-thumb {
+  inline-size: 14px;
+  block-size: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--rol-recurso);
+  box-shadow: 0 1px 3px oklch(0.2 0.02 240 / 0.3);
+}
+
+.pista input[type="range"]:hover::-webkit-slider-thumb,
+.pista input[type="range"]:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.pista input[type="range"]:focus-visible {
+  outline: none;
+}
+
+.pista input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px var(--acento-suave), 0 0 0 5px var(--foco);
 }
 
 @media (pointer: coarse) {
@@ -216,40 +301,4 @@ const controlesActivos = computed(() => {
     block-size: 2.75rem;
   }
 }
-
-.valor {
-  min-inline-size: 6.5rem;
-  text-align: end;
-  font-weight: 700;
-  font-size: var(--text-seccion);
-  line-height: 1.1;
-  color: var(--tinta);
-}
-
-.unidad {
-  font-size: var(--text-meta);
-  font-weight: 600;
-  color: var(--tenue);
-}
-
-@container (width < 34rem) {
-  .control {
-    grid-template-columns: 1fr auto;
-  }
-
-  .pista {
-    grid-column: 1 / -1;
-    order: 3;
-  }
-
-  .valor {
-    text-align: end;
-    min-inline-size: 0;
-  }
-
-  .etiqueta {
-    overflow-wrap: anywhere;
-  }
-}
 </style>
-

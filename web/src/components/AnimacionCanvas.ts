@@ -21,26 +21,28 @@ const HM0_TOPE_M = 4;
 export type TipoCimentacion = "pilote" | "gravedad" | "tripode";
 export type ModoEnergia = "undimotriz" | "mareomotriz";
 
-/** Paleta del corte. Tres familias: cielo, agua y obra. El ámbar es el único
- *  acento y marca sólo lo que produce o transporta energía. */
+/** Paleta del corte. Tres familias: cielo, agua y obra. Colores del manual de
+ *  identidad UTS: cielo en crema Pantone 451 C, agua en los verdes profundos
+ *  5535/2266 C, y el lima 382 C como único acento, marcando sólo lo que
+ *  produce o transporta energía. La baliza roja es señal reglamentaria. */
 const C = {
-  cieloAlto: "#dce7f0",
-  cieloBajo: "#f2f0ea",
-  aguaSuperficie: "#4a8fa8",
-  aguaMedia: "#1f5a76",
-  aguaFondo: "#0d2f45",
-  espuma: "#e8f2f5",
-  arenaAlta: "#b8a07a",
-  arenaBaja: "#6e5c42",
-  roca: "#57534e",
-  obra: "#94a3b8",
-  obraOscura: "#475569",
-  obraSombra: "#334155",
-  tinta: "#1e293b",
-  acento: "#d98324",
-  acentoClaro: "#f2b544",
-  tierra: "#c9c3b4",
-  tierraSombra: "#a8a294",
+  cieloAlto: "oklch(0.93 0.018 95)",
+  cieloBajo: "oklch(0.955 0.028 85)",
+  aguaSuperficie: "oklch(0.62 0.085 165)",
+  aguaMedia: "oklch(0.42 0.07 168)",
+  aguaFondo: "oklch(0.27 0.035 165)",
+  espuma: "oklch(0.96 0.022 115)",
+  arenaAlta: "oklch(0.76 0.05 85)",
+  arenaBaja: "oklch(0.5 0.055 80)",
+  roca: "oklch(0.45 0.008 100)",
+  obra: "oklch(0.7 0 0)",
+  obraOscura: "oklch(0.45 0 0)",
+  obraSombra: "oklch(0.33 0 0)",
+  tinta: "oklch(0.28 0.02 165)",
+  acento: "oklch(0.72 0.15 120)",
+  acentoClaro: "oklch(0.85 0.17 118)",
+  tierra: "oklch(0.8 0.02 100)",
+  tierraSombra: "oklch(0.68 0.02 100)",
 };
 
 export class AnimacionCanvas {
@@ -70,6 +72,10 @@ export class AnimacionCanvas {
    *  el dibujo para que se pueda comprobar sin reconstruirlo desde las
    *  llamadas al lienzo. */
   cotaHm0Px = 0;
+
+  /** Alto en píxeles reservado al pie del lienzo para una tira superpuesta.
+   *  La carcasa actual no superpone nada: Ver.vue lo pone a 0. */
+  pie = 54;
 
   private rafId: number | null = null;
   private t0: number | null = null;
@@ -257,7 +263,7 @@ export class AnimacionCanvas {
 
     // La tira de lectura de la carcasa se superpone al pie del lienzo: nada
     // que haya que leer se dibuja dentro de esa banda.
-    const pie = 54;
+    const pie = this.pie;
     const horizonteY = h * 0.20;
     const nivelMarMedio = h * 0.42;
     const fondoMarY = h - pie - 26;
@@ -343,7 +349,10 @@ export class AnimacionCanvas {
 
     const yApoyo = terrenoY(xDispositivo);
 
-    this.dibujarCableSubmarino(ctx, xDispositivo, yApoyo - 6, xCosta + w * 0.035, terrenoY(xCosta + w * 0.035) - 26, t);
+    // La subestación vive en la meseta, ya pasada la rampa de la playa; el
+    // cable submarino remata en su base para que la conexión se lea.
+    const xSub = xCosta + (w - xCosta) * 0.18;
+    this.dibujarCableSubmarino(ctx, xDispositivo, yApoyo - 6, xSub + 6, terrenoY(xSub) - 2, t);
 
     if (this.modoEnergia === "mareomotriz") {
       if (this.dispositivo === "embalse") {
@@ -489,7 +498,7 @@ export class AnimacionCanvas {
     // Haces de luz: pocos, muy tenues, inclinados. Marcan que hay superficie
     // encima sin convertir el agua en un fondo de pantalla.
     ctx.globalAlpha = 0.07;
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "oklch(1 0 0)";
     for (let i = 0; i < 5; i++) {
       const x0 = ((i * 0.23 + t * 0.012) % 1) * w;
       ctx.beginPath();
@@ -569,8 +578,8 @@ export class AnimacionCanvas {
   // ---- Red eléctrica -------------------------------------------------------
 
   /** Todo lo que hay en tierra se apoya en la cota del terreno **en su propia
-   *  abscisa**. Con una cota única el transformador quedaba flotando sobre la
-   *  rampa de la playa, que todavía no ha llegado a la meseta. */
+   *  abscisa**. La subestación va sobre la meseta —más allá de la rampa— para
+   *  que no vuelva a quedar flotando sobre la pendiente de la playa. */
   private dibujarRedElectrica(
     ctx: CanvasRenderingContext2D,
     w: number,
@@ -579,7 +588,7 @@ export class AnimacionCanvas {
     t: number
   ) {
     // Subestación: transformador con radiadores, aisladores pasantes y valla.
-    const xSub = xCosta + w * 0.045;
+    const xSub = xCosta + (w - xCosta) * 0.18;
     const sueloSub = terrenoY(xSub + 20);
     const ySub = sueloSub - 34;
 
@@ -624,7 +633,7 @@ export class AnimacionCanvas {
 
     // Torre de celosía: montantes que convergen, tres tramos de arriostrado
     // y dos crucetas con aisladores.
-    const xT = xCosta + w * 0.115;
+    const xT = xCosta + (w - xCosta) * 0.42;
     const yBase = terrenoY(xT);
     const yTop = yBase - 108;
     const anchoBase = 17;
@@ -689,7 +698,7 @@ export class AnimacionCanvas {
 
     // Núcleo urbano: alturas y anchos desiguales, ventanas que se encienden
     // despacio. Es la carga al final de la cadena, no decoración.
-    const xCiudad = xCosta + w * 0.15;
+    const xCiudad = xCosta + (w - xCosta) * 0.62;
     const anchos = [26, 18, 34, 22];
     const alturas = [58, 84, 44, 70];
     let ex = xCiudad;
@@ -794,9 +803,9 @@ export class AnimacionCanvas {
     // Cuerpo del flotador: cilindro con tapa elíptica y línea de flotación.
     const yTapa = yFlotador - 14;
     const cuerpo = ctx.createLinearGradient(x - radio, 0, x + radio, 0);
-    cuerpo.addColorStop(0, "#9a4a1c");
+    cuerpo.addColorStop(0, "oklch(0.47 0.1 45)");
     cuerpo.addColorStop(0.4, C.acento);
-    cuerpo.addColorStop(1, "#8a4118");
+    cuerpo.addColorStop(1, "oklch(0.44 0.095 42)");
     ctx.fillStyle = cuerpo;
     ctx.beginPath();
     ctx.moveTo(x - radio, yTapa);
@@ -810,7 +819,7 @@ export class AnimacionCanvas {
     ctx.beginPath();
     ctx.ellipse(x, yTapa, radio, 6, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "#7a3712";
+    ctx.strokeStyle = "oklch(0.38 0.08 42)";
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
@@ -832,7 +841,7 @@ export class AnimacionCanvas {
     ctx.moveTo(x, yTapa);
     ctx.lineTo(x, yTapa - 24);
     ctx.stroke();
-    ctx.fillStyle = Math.sin(t * 3) > 0.4 ? "#e2493a" : "#7d2f27";
+    ctx.fillStyle = Math.sin(t * 3) > 0.4 ? "oklch(0.62 0.19 30)" : "oklch(0.44 0.11 32)";
     ctx.beginPath();
     ctx.arc(x, yTapa - 26, 3, 0, Math.PI * 2);
     ctx.fill();
@@ -897,7 +906,7 @@ export class AnimacionCanvas {
     const yAbertura = suelo - abertura;
 
     // Cámara: primero el hueco, para que las paredes se recorten contra él.
-    ctx.fillStyle = "#0b1f2b";
+    ctx.fillStyle = "oklch(0.22 0.025 190)";
     ctx.fillRect(camIzq, techo, camDer - camIzq, suelo - techo);
 
     // Lámina interior, desfasada respecto al mar de fuera: es lo que bombea el
@@ -908,20 +917,20 @@ export class AnimacionCanvas {
       Math.max(techo + 12, nivelMedio - etaInterior * escalaOla * 1.4)
     );
     const columna = ctx.createLinearGradient(0, yInterior, 0, suelo);
-    columna.addColorStop(0, "#4a8fa8");
-    columna.addColorStop(1, "#123c52");
+    columna.addColorStop(0, "oklch(0.62 0.085 165)");
+    columna.addColorStop(1, "oklch(0.36 0.05 190)");
     ctx.fillStyle = columna;
     ctx.fillRect(camIzq, yInterior, camDer - camIzq, suelo - yInterior);
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.fillRect(camIzq, yInterior - 1.5, camDer - camIzq, 3);
 
     // Agua de mar entrando por la abertura: el hueco es real, no un parche.
-    ctx.fillStyle = "#2f6f8a";
+    ctx.fillStyle = "oklch(0.52 0.07 175)";
     ctx.fillRect(x0, yAbertura, espesor, abertura);
 
     const hormigon = ctx.createLinearGradient(x0, 0, x1, 0);
     hormigon.addColorStop(0, C.obra);
-    hormigon.addColorStop(0.5, "#adb8c6");
+    hormigon.addColorStop(0.5, "oklch(0.76 0.01 240)");
     hormigon.addColorStop(1, C.obraOscura);
     ctx.fillStyle = hormigon;
     ctx.strokeStyle = C.obraSombra;
@@ -1116,7 +1125,7 @@ export class AnimacionCanvas {
     ctx.lineTo(x + 26, yTorreta - 9);
     ctx.stroke();
 
-    ctx.fillStyle = Math.sin(t * 3) > 0.4 ? "#e2493a" : "#7d2f27";
+    ctx.fillStyle = Math.sin(t * 3) > 0.4 ? "oklch(0.62 0.19 30)" : "oklch(0.44 0.11 32)";
     ctx.beginPath();
     ctx.arc(x, yTorreta - 13, 3, 0, Math.PI * 2);
     ctx.fill();
@@ -1234,8 +1243,8 @@ export class AnimacionCanvas {
       for (let px = xFin; px >= xIni; px -= 4) ctx.lineTo(px, terrenoY(px) + 2);
       ctx.closePath();
       const vaso = ctx.createLinearGradient(0, yEmbalse, 0, base);
-      vaso.addColorStop(0, "#4a8fa8");
-      vaso.addColorStop(1, "#164a63");
+      vaso.addColorStop(0, "oklch(0.62 0.085 165)");
+      vaso.addColorStop(1, "oklch(0.38 0.06 200)");
       ctx.fillStyle = vaso;
       ctx.fill();
       ctx.fillStyle = "rgba(255,255,255,0.6)";
@@ -1287,7 +1296,7 @@ export class AnimacionCanvas {
     ctx.save();
     seccionDique();
     ctx.clip();
-    ctx.fillStyle = "#0b2233";
+    ctx.fillStyle = "oklch(0.23 0.03 195)";
     ctx.fillRect(x - semiMar, yTunel - medioTunel, semiMar + semiEmb, medioTunel * 2);
     ctx.restore();
     ctx.save();

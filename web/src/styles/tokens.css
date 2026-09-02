@@ -5,28 +5,55 @@
   --tenue: oklch(0.495 0.017 245);
   --borde: oklch(0.781 0.008 107);
   --borde-suave: oklch(0.9 0.008 235);
-  --foco: oklch(0.532 0.131 244);
-  --acento-suave: oklch(0.96 0.02 235);
+  /* Foco en el verde bosque de marca (Pantone 2266 C, #34531F). El azul
+     anterior — oklch(0.532 0.131 244) — queda fuera del manual de identidad. */
+  --foco: oklch(0.37 0.065 145);
+  --acento-suave: oklch(0.96 0.04 125);
   --fondo: oklch(0.960 0.004 106);
   --escala: 1;
 
-  /* Paleta marina de dominio. Azules profundos para el recurso que entra del
-     mar; ámbar solar para la energía que el dispositivo consigue captar. Es
-     vocabulario de rol, disjunto del semáforo de estado (--conf-*). */
-  --rol-mar-profundo: oklch(0.402 0.079 236);
-  --rol-mar-medio: oklch(0.500 0.100 226);
-  --rol-captado: oklch(0.520 0.130 062);
+  /* Paleta de dominio según el manual de identidad UTS. Verdes profundos para
+     el recurso que entra del mar; el lima Pantone 382 C oscurecido a olive
+     legible para la energía que el dispositivo consigue captar. Es vocabulario
+     de rol, disjunto del semáforo de estado (--conf-*). */
+  --rol-mar-profundo: oklch(0.37 0.065 145);
+  --rol-mar-medio: oklch(0.52 0.095 145);
+  --rol-captado: oklch(0.47 0.11 125);
 
   /* Superficie de trabajo del tablero: un escalón por debajo del panel para
      separar rejilla de contenido sin recurrir a una sombra más. */
-  --superficie: oklch(0.930 0.006 235);
+  --superficie: oklch(0.930 0.006 120);
 
-  /* Tipografía — pila del sistema, sin CDN (Segoe UI Variable / Segoe UI / system-ui).
-     La política de origen único prohíbe traer Fira Sans / Fira Code de un CDN,
-     así que la intención de tablero técnico se resuelve con la pila local más
-     numerales tabulares. */
-  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+  /* Marco oscuro de la aplicación: barra superior y cadena de lectura. Es el
+     verde profundo de marca (Pantone 5535 C, #132F20 ≈ oklch(0.265 0.03 160)),
+     para que la carcasa enmarque y el contenido claro sea lo que respira. */
+  --marco: oklch(0.265 0.03 160);
+  --marco-alto: oklch(0.33 0.04 158);
+  --marco-linea: oklch(1 0 0 / 0.12);
+  --marco-tinta: oklch(0.97 0.004 106);
+  /* Gris Cool Gray 5 C (#B3B3B3), el que el manual destina a fondos oscuros. */
+  --marco-tenue: oklch(0.77 0.005 120);
+  --marco-recurso: oklch(0.84 0.11 140);
+  /* Lima Pantone 382 C (#C3D730): el manual lo destina a fondos oscuros. */
+  --marco-captado: oklch(0.85 0.17 118);
+
+  /* Rampa del recurso undimotriz (0 → 20 → 45 → 80+ kW/m), del verde bosque de
+     marca al lima y al óxido cálido del extremo. Un solo lugar para la leyenda
+     del rail y para las capas de mapa.ts. */
+  --rampa-0: oklch(0.55 0.085 155);
+  --rampa-1: oklch(0.68 0.115 142);
+  --rampa-2: oklch(0.80 0.15 120);
+  --rampa-3: oklch(0.62 0.15 45);
+
+  /* Tipografía. Dos familias empaquetadas en web/src/assets/fonts (ver
+     fuentes.css): IBM Plex Sans para el cuerpo, con numerales tabulares, y
+     Bricolage Grotesque para títulos y cifras grandes. La pila del sistema
+     (Segoe UI Variable / Segoe UI / system-ui) queda detrás como respaldo:
+     sin las fuentes en disco la interfaz sigue siendo la misma. Nada se pide
+     a un CDN. */
+  --font-sans: "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
 
   /* Escala tipográfica: pasos distinguibles */
   --text-meta: 12px;
@@ -35,6 +62,7 @@
   --text-nivel: 27px;
   --text-cifra: 36px;
   --text-kpi: 30px;
+  --text-heroe: 56px;
 
   /* Espaciado base 4 px — ritmo 1·4·9: --s-1:4px, --s-4:16px, --s-9:36px, --s-13:52px
      Los pasos --s-2, --s-3 y --s-6 cubren la densidad de tablero entre 4 y 16. */
@@ -49,7 +77,9 @@
   /* Radios y elevación: una sola escala para toda la interfaz. */
   --radio: 6px;
   --radio-caja: 10px;
+  --radio-escena: 14px;
   --sombra-caja: 0 1px 2px oklch(0.2 0.02 240 / 0.07);
+  --sombra-escena: 0 12px 32px oklch(0.2 0.03 240 / 0.18), 0 1px 2px oklch(0.2 0.02 240 / 0.1);
 
   /* Movimiento sutil: dos duraciones y una curva de salida. */
   --dur-rapida: 120ms;
@@ -57,12 +87,12 @@
   --ease-salida: cubic-bezier(0.2, 0, 0, 1);
 
   /* Tokens del mapa: el relleno del mar y de la tierra sale de aquí, no de
-     literales en mapa.ts. El mar va oscuro y la tierra clara para que el dato
-     encima —la mancha de recurso y los emplazamientos— sea lo que destaca.
-     Los tres valores en oklch, el mismo vocabulario que el resto. */
-  --map-oceano: oklch(0.360 0.055 240);
-  --map-tierra-fill: oklch(0.910 0.005 106);
-  --map-tierra-stroke: oklch(0.470 0.012 245);
+     literales en mapa.ts. El mar va en el verde profundo de marca y la tierra
+     clara tibia para que el dato encima —la mancha de recurso y los
+     emplazamientos— sea lo que destaca. */
+  --map-oceano: oklch(0.32 0.04 165);
+  --map-tierra-fill: oklch(0.93 0.014 90);
+  --map-tierra-stroke: oklch(0.52 0.035 145);
 }
 
 [data-sustentacion] {
@@ -92,6 +122,7 @@ html {
   font-size: var(--text-cuerpo);
   color: var(--tinta);
   background: var(--lienzo);
+  -webkit-font-smoothing: antialiased;
 }
 
 * {

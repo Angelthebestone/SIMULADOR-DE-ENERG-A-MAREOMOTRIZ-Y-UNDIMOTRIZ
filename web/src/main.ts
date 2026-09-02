@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import './styles/tokens.css'
+import './styles/fuentes.css'
 import './styles/semaforo.css'
 import './styles/app.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -12,62 +13,38 @@ import { simular, cancelar, type Params } from './api'
 import { formatearNumero } from './utils/formato'
 
 const CITA = `SIMULADOR DE ENERGÍA MARINA — RECURSO, CAPTURA Y COSTES
-Ortega et al. (2013) · ERA5-Ocean vía Open-Meteo Marine · GMRT Lamont-Doherty · RUNAP · XM
+Ortega et al. (2013) · 8,9 kW/m en Isla Fuerte frente a 40 kW/m de umbral de granja (Osorio et al. 2016 / Handbook cap. 1)
+ERA5-Ocean vía Open-Meteo Marine · GMRT Lamont-Doherty · RUNAP · XM
 Natural Earth para el contorno de tierra. Repositorio público con datos reproducibles.`
 
 const PLANTILLA = `
   <div id="app" :data-sustentacion="sustentacion ? '' : null" style="--escala:1">
-    <header class="barra">
-      <div class="marca">
-        <Icono icono="simulador" tamano="lg" />
-        <div>
-          <strong>Simulador de Energía Marina</strong>
-          <span class="marca-sub">Oleaje y mareas · recurso, captura y red</span>
-        </div>
-      </div>
-      <div class="acciones-barra">
-        <button class="btn-barra" @click="abrirFuentes">
-          <Icono icono="fuentes" />
-          <span>Fuentes</span>
-        </button>
-        <button class="btn-barra" data-testid="sustentacion" @click="toggleSustentacion" :aria-pressed="sustentacion ? 'true':'false'" title="Modo presentación (Ctrl+E, ESC para salir)">
-          <Icono icono="proyector" />
-          <span>{{ sustentacion ? '2,1×' : '1×' }}</span>
-        </button>
-      </div>
-    </header>
+    <!-- Tablero: emplazamiento a la izquierda, escena a la derecha. Los dos
+         siempre a la vista, ninguno se desmonta ni se reduce a miniatura.
+         Sin barra superior: el título vive en la pestaña y las dos acciones
+         bajan al pie, ganando una franja completa para el tablero. -->
+    <main class="tablero">
+      <section class="columna" aria-label="Emplazamiento">
+        <MapaView
+          :sitio-activo="params.sitio_id"
+          @seleccionar-sitio="alSeleccionarSitioMapa"
+          @ir-a-simulador="alIrASimulador" />
+      </section>
 
-    <main class="panel">
-      <!-- Carta y simulador comparten pantalla: uno ocupa el escenario y el
-           otro queda reducido abajo a la izquierda. Pulsar el reducido los
-           intercambia; ninguno se desmonta, así que el mapa conserva su
-           encuadre y la animación su fotograma. -->
-      <div class="escenario">
-        <div class="marco" :class="pleno==='mapa' ? 'marco--pleno' : 'marco--reducido'">
-          <MapaView
-            :reducido="pleno!=='mapa'"
-            @seleccionar-sitio="alSeleccionarSitioMapa"
-            @ir-a-simulador="alIrASimulador" />
-          <button v-if="pleno!=='mapa'" class="marco-tapa" @click="intercambiar('mapa')" aria-label="Ampliar la carta mundial">
-            <span>Carta mundial</span>
-            <Icono icono="expandir" tamano="sm" />
-          </button>
-        </div>
+      <section class="columna" aria-label="Simulador">
+        <Ver
+          ref="ver"
+          :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
+          @update:params="aplicarParams" />
+      </section>
+    </main>
 
-        <div class="marco" :class="pleno==='ver' ? 'marco--pleno' : 'marco--reducido'">
-          <Ver
-            :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
-            :reducido="pleno!=='ver'"
-            @update:params="aplicarParams" />
-          <button v-if="pleno!=='ver'" class="marco-tapa" @click="intercambiar('ver')" aria-label="Ampliar el simulador">
-            <span>Simulador</span>
-            <Icono icono="expandir" tamano="sm" />
-          </button>
-        </div>
-
-        <!-- Lectura de la cadena, siempre a la vista sobre el escenario. -->
-        <div class="lectura" role="status" aria-live="polite" data-testid="barra-kpis">
-          <div v-for="k in kpis" :key="k.id" class="kpi" :data-testid="'kpi-'+k.id" :data-estado="k.pendiente ? 'pendiente' : 'ok'">
+    <!-- Cadena de lectura: las cuatro cifras encadenadas, siempre a la vista. -->
+    <footer class="lectura" role="status" aria-live="polite" data-testid="barra-kpis">
+      <div class="cadena">
+        <template v-for="(k, i) in kpis" :key="k.id">
+          <Icono v-if="i > 0" icono="eslabon" tamano="sm" class="eslabon" />
+          <div class="kpi" :data-testid="'kpi-'+k.id" :data-estado="k.pendiente ? 'pendiente' : 'ok'">
             <span class="kpi-etiqueta">{{ k.etiqueta }}</span>
             <span v-if="cargando" class="kpi-esqueleto" aria-hidden="true"></span>
             <span v-else-if="k.pendiente" class="kpi-pendiente semaforo semaforo--pendiente">
@@ -76,19 +53,29 @@ const PLANTILLA = `
             </span>
             <span v-else class="kpi-valor">{{ k.valor }} <small class="kpi-unidad">{{ k.unidad }}</small></span>
           </div>
-
-          <p v-if="error" class="aviso aviso--error" data-testid="aviso-error">
-            <Icono icono="error" tamano="sm" />
-            <span>{{ error }}</span>
-          </p>
-          <p v-else-if="offline" class="aviso" data-testid="aviso-offline">
-            <Icono icono="offline" tamano="sm" />
-            <span>sin conexión — datos locales</span>
-          </p>
-        </div>
+        </template>
       </div>
 
-    </main>
+      <p v-if="error" class="aviso aviso--error" data-testid="aviso-error">
+        <Icono icono="error" tamano="sm" />
+        <span>{{ error }}</span>
+      </p>
+      <p v-else-if="offline" class="aviso" data-testid="aviso-offline">
+        <Icono icono="offline" tamano="sm" />
+        <span>sin conexión — datos locales</span>
+      </p>
+
+      <div class="acciones-barra">
+        <button class="btn-barra" data-testid="abrir-fuentes" @click="abrirFuentes">
+          <Icono icono="fuentes" />
+          <span>Fuentes</span>
+        </button>
+        <button class="btn-barra" data-testid="sustentacion" @click="toggleSustentacion" :aria-pressed="sustentacion ? 'true':'false'" title="Modo presentación (Ctrl+E, ESC para salir)">
+          <Icono icono="proyector" />
+          <span>{{ sustentacion ? 'Proyectando 2,1×' : 'Proyectar' }}</span>
+        </button>
+      </div>
+    </footer>
 
     <DialogoFuentes ref="dialogoFuentes" :cita="citaLarga" />
   </div>
@@ -99,8 +86,6 @@ const app = createApp({
   components: { Ver, MapaView, Icono, DialogoFuentes },
   data() {
     return {
-      /** Cuál de los dos ocupa el escenario; el otro queda reducido. */
-      pleno: 'mapa' as 'mapa' | 'ver',
       sustentacion: false,
       offline: false,
       resultado: null as Record<string, any> | null,
@@ -152,26 +137,20 @@ const app = createApp({
     abrirFuentes() {
       ;(this.$refs.dialogoFuentes as { abrir: () => void } | undefined)?.abrir()
     },
-    intercambiar(cual: 'mapa' | 'ver') {
-      this.pleno = cual
-    },
     alSeleccionarSitioMapa(s: SitioMapa) {
-      const cambios: Partial<Params> = {
-        sitio_id: s.id,
-      }
+      const cambios: Partial<Params> = { sitio_id: s.id }
       if (s.hm0_m) cambios.hm0_m = s.hm0_m
       if (s.te_s) cambios.te_s = s.te_s
       if (s.profundidad_m) cambios.profundidad_m = s.profundidad_m
-      if (s.tipo === 'mareomotriz') {
-        cambios.dispositivo = 'turbina_corriente'
-      } else if (s.tipo === 'undimotriz') {
-        cambios.dispositivo = 'absorbedor_puntual'
-      }
+      if (s.tipo === 'mareomotriz') cambios.dispositivo = 'turbina_corriente'
+      else if (s.tipo === 'undimotriz') cambios.dispositivo = 'absorbedor_puntual'
       this.aplicarParams(cambios)
     },
+    // Con las dos columnas siempre visibles, «simular» ya no cambia de
+    // pantalla: lleva el foco a la escena para que la mirada siga a la acción.
     alIrASimulador(s: SitioMapa) {
       this.alSeleccionarSitioMapa(s)
-      this.pleno = 'ver'
+      ;(this.$refs.ver as { enfocar?: () => void } | undefined)?.enfocar?.()
     },
     async ejecutar() {
       this.cargando = true
@@ -209,8 +188,6 @@ const app = createApp({
     },
     onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        // Con un diálogo abierto, ESC es suyo: lo cierra el <dialog> nativo y
-        // aquí no se cancela nada ni se conmuta la sustentación.
         if (document.querySelector('dialog[open]')) return
         if (this.sustentacion) this.toggleSustentacion()
         cancelar()

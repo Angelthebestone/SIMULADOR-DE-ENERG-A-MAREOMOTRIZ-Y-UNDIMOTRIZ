@@ -47,3 +47,5 @@ datos/__pycache__/
 # Documentacion: mantener ignorada (es fuente, no codigo)
 # /documentacion
 .agents/
+# Estado del plugin superdesign (contexto de diseno por sesion)
+/.superdesign/

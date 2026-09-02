@@ -54,14 +54,18 @@ def test_contraste_isla_fuerte_vs_umbral() -> None:
 
 
 def test_8_9_visible_en_ver() -> None:
-    """`Ver.vue` muestra 8,9 kW/m y la fuente Ortega et al. 2013."""
-    src = _leer(_VER_VUE)
+    """La pantalla Ver muestra 8,9 kW/m y la fuente Ortega et al. 2013.
+
+    La tarjeta de contraste salio del nivel Ver: la cifra vive en la ficha del
+    emplazamiento (MapaView.vue), que es la columna izquierda de esa pantalla.
+    """
+    src = _leer(_RAIZ / "web" / "src" / "components" / "MapaView.vue")
     # 8.9 o 8,9
     assert "8.9" in src or "8,9" in src, (
-        "Ver.vue no muestra la cifra 8,9 kW/m"
+        "MapaView.vue no muestra la cifra 8,9 kW/m"
     )
     assert "Ortega" in src or "kW/m" in src, (
-        "Ver.vue no muestra la fuente/unidad de la cifra"
+        "MapaView.vue no muestra la fuente/unidad de la cifra"
     )
 
 

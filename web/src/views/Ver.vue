@@ -1,136 +1,124 @@
 <template>
-  <section class="ver" aria-label="Simulador de captura">
-    <canvas
-      ref="canvasRef"
-      class="oleaje"
-      width="1200"
-      height="600"
-      aria-label="Corte del mar con el dispositivo, el oleaje y la salida a la red"
-    ></canvas>
+  <section class="ver" aria-label="Simulador de captura" ref="raiz" tabindex="-1">
+    <!-- Escena: el corte del mar ocupa el ancho de la columna; encima sólo el
+         rótulo del emplazamiento y el control de pausa. -->
+    <div class="escena">
+      <canvas
+        ref="canvasRef"
+        class="oleaje"
+        width="1200"
+        height="600"
+        aria-label="Corte del mar con el dispositivo, el oleaje y la salida a la red"
+      ></canvas>
 
-    <!-- Cabina de mando: qué se simula y con qué números. Se oculta cuando el
-         simulador queda reducido en la esquina, donde sólo cabe la escena. -->
-    <div v-if="!reducido" class="cabina cabina--controles">
-      <header class="cabina-cabecera">
+      <header class="escena-cabecera">
         <h1 id="titulo-ver" class="titulo-nivel">Simulador de captura</h1>
-        <p class="sitio-actual">{{ nombreSitioActual }}</p>
+        <p class="sitio-actual">
+          <Icono icono="marca" tamano="sm" />
+          <span>{{ nombreSitioActual }}</span>
+        </p>
       </header>
 
-      <div class="modos" role="group" aria-label="Tipo de recurso">
-        <button
-          v-for="m in MODOS"
-          :key="m.id"
-          type="button"
-          class="btn-modo"
-          :class="{ activo: modoActivo === m.id }"
-          :aria-pressed="modoActivo === m.id ? 'true' : 'false'"
-          @click="seleccionarModo(m.id)"
-        >
-          <Icono :icono="m.id" tamano="sm" />
-          <span>{{ m.label }}</span>
+      <div class="escena-acciones">
+        <p v-if="sinSerie" class="aviso-sin-serie">
+          <Icono icono="pendiente" tamano="sm" />
+          <span>{{ sinSerie }}</span>
+        </p>
+        <button class="btn-lienzo" @click="togglePausa" :aria-pressed="pausado ? 'true' : 'false'">
+          <Icono :icono="pausado ? 'reproducir' : 'pausar'" tamano="sm" />
+          <span>{{ pausado ? "Reanudar" : "Pausar" }}</span>
         </button>
       </div>
+    </div>
 
-      <div class="dispositivos">
-        <span class="rotulo-grupo">Dispositivo</span>
-        <button
-          v-for="d in dispositivosDelModo"
-          :key="d.id"
-          type="button"
-          class="btn-dispositivo"
-          :class="{ activo: params.dispositivo === d.id }"
-          :aria-pressed="params.dispositivo === d.id ? 'true' : 'false'"
-          @click="seleccionarDispositivo(d.id)"
-        >
-          {{ d.nombre }}
-        </button>
+    <!-- Cabina: tres bloques bajo la escena. Qué se simula, con qué números y
+         qué sale. Se lee de izquierda a derecha, como la cadena. -->
+    <div class="cabina">
+      <div class="bloque bloque--recurso">
+        <div class="modos" role="group" aria-label="Tipo de recurso">
+          <button
+            v-for="m in MODOS"
+            :key="m.id"
+            type="button"
+            class="btn-modo"
+            :class="{ activo: modoActivo === m.id }"
+            :aria-pressed="modoActivo === m.id ? 'true' : 'false'"
+            @click="seleccionarModo(m.id)"
+          >
+            <Icono :icono="m.id" tamano="sm" />
+            <span>{{ m.label }}</span>
+          </button>
+        </div>
 
-        <label v-if="params.dispositivo === 'turbina_corriente'" class="campo-cimentacion">
-          <span class="rotulo-grupo">Cimentación</span>
-          <select v-model="cimentacionSeleccionada" @change="redibujar">
+        <div class="dispositivos">
+          <span class="rotulo-grupo">Dispositivo</span>
+          <div class="dispositivos-lista">
+            <button
+              v-for="d in dispositivosDelModo"
+              :key="d.id"
+              type="button"
+              class="btn-dispositivo"
+              :class="{ activo: params.dispositivo === d.id }"
+              :aria-pressed="params.dispositivo === d.id ? 'true' : 'false'"
+              @click="seleccionarDispositivo(d.id)"
+            >
+              {{ d.nombre }}
+            </button>
+          </div>
+
+          <label v-if="params.dispositivo === 'turbina_corriente'" class="campo-cimentacion">
+            <span class="rotulo-grupo">Cimentación</span>
+            <select v-model="cimentacionSeleccionada" @change="redibujar">
             <option value="pilote">Pilote clavado</option>
             <option value="gravedad">Bloque de gravedad</option>
             <option value="tripode">Trípode</option>
           </select>
         </label>
       </div>
-
-      <ControlesFisicos
-        :hm0_m="params.hm0_m"
-        :te_s="params.te_s"
-        :b_pto_ns_m="params.b_pto_ns_m"
-        :modo-energia="modoActivo"
-        :velocidad-corriente="velocidadCorriente"
-        :rango-marea="rangoMarea"
-        :profundidad_m="params.profundidad_m || 30"
-        @update:hm0_m="v => emit('update:params', { hm0_m: v })"
-        @update:te_s="v => emit('update:params', { te_s: v })"
-        @update:b_pto_ns_m="v => emit('update:params', { b_pto_ns_m: v })"
-        @update:velocidad-corriente="alCambiarVelCorriente"
-        @update:rango-marea="alCambiarRangoMarea"
-        @update:profundidad_m="v => emit('update:params', { profundidad_m: v })"
-      />
-
-      <div class="salida">
-        <article class="tarjeta" data-testid="tarjeta-viviendas" aria-live="polite">
-        <h2 class="tarjeta-titulo">
-          <Icono icono="vivienda" tamano="sm" />
-          <span>Alcanza para</span>
-        </h2>
-        <template v-if="viviendas !== null">
-          <p class="tarjeta-cifra">{{ formatearNumero(viviendas, 0) }} <small>viviendas</small></p>
-          <p class="tarjeta-subcifra">
-            <Icono icono="emision" tamano="sm" />
-            <span>{{ formatearNumero(viviendas * 1.8, 1) }} t CO₂ evitadas al año</span>
-          </p>
-        </template>
-        <p v-else-if="cargando" class="tarjeta-estado">
-          <Icono icono="calculando" tamano="sm" />
-          <span>integrando la cadena…</span>
-        </p>
-        <p v-else class="tarjeta-estado semaforo semaforo--pendiente">
-          <Icono icono="pendiente" tamano="sm" />
-          <span>pendiente — {{ error || "consumo residencial sin fuente verificada" }}</span>
-        </p>
-      </article>
-
-      <article class="tarjeta" data-testid="tesis-contraste">
-        <h2 class="tarjeta-titulo">Frente al umbral de granja comercial</h2>
-        <div class="barras">
-          <div v-for="b in barrasContraste" :key="b.id" class="barra-fila" :data-testid="'barra-' + b.id">
-            <span class="barra-rotulo">{{ b.rotulo }}</span>
-            <span class="barra-pista">
-              <span class="barra-relleno" :class="'barra-relleno--' + b.id" :style="{ inlineSize: b.ancho }"></span>
-            </span>
-            <span class="barra-cifra">{{ b.cifra }} <small>kW/m</small></span>
-            <span class="barra-fuente">{{ b.fuente }}</span>
-          </div>
-        </div>
-      </article>
-      </div>
-
-      <div class="pregunta-bloque" data-testid="pregunta-conductor">
-        <p class="pregunta-linea"><strong>{{ preguntaActiva.pregunta }}</strong></p>
-        <p class="tarea-linea">
-          <span class="tarea-rotulo">Micro-tarea</span>
-          {{ preguntaActiva.tarea }}
-        </p>
-        <p v-if="cumpleTarea" class="veredicto" data-testid="veredicto-positivo" aria-live="polite">
-          <Icono icono="verificado" tamano="sm" />
-          <span>Hm0 en el rango objetivo</span>
-        </p>
-      </div>
     </div>
 
-    <div v-if="!reducido" class="cabina cabina--acciones">
-      <button class="btn-lienzo" @click="togglePausa" :aria-pressed="pausado ? 'true' : 'false'">
-        <Icono :icono="pausado ? 'reproducir' : 'pausar'" tamano="sm" />
-        <span>{{ pausado ? "Reanudar" : "Pausar" }}</span>
-      </button>
-      <p v-if="sinSerie" class="aviso-sin-serie">
-        <Icono icono="pendiente" tamano="sm" />
-        <span>{{ sinSerie }}</span>
-      </p>
+      <div class="bloque bloque--controles">
+        <span class="rotulo-grupo">Controles</span>
+        <ControlesFisicos
+          :hm0_m="params.hm0_m"
+          :te_s="params.te_s"
+          :b_pto_ns_m="params.b_pto_ns_m"
+          :modo-energia="modoActivo"
+          :velocidad-corriente="velocidadCorriente"
+          :rango-marea="rangoMarea"
+          :profundidad_m="params.profundidad_m || 30"
+          @update:hm0_m="v => emit('update:params', { hm0_m: v })"
+          @update:te_s="v => emit('update:params', { te_s: v })"
+          @update:b_pto_ns_m="v => emit('update:params', { b_pto_ns_m: v })"
+          @update:velocidad-corriente="alCambiarVelCorriente"
+          @update:rango-marea="alCambiarRangoMarea"
+          @update:profundidad_m="v => emit('update:params', { profundidad_m: v })"
+        />
+      </div>
+
+      <div class="bloque bloque--salida">
+        <article class="tarjeta tarjeta--heroe" data-testid="tarjeta-viviendas" aria-live="polite">
+          <h2 class="tarjeta-titulo">
+            <Icono icono="vivienda" tamano="sm" />
+            <span>Alcanza para</span>
+          </h2>
+          <template v-if="viviendas !== null">
+            <p class="tarjeta-cifra">{{ formatearNumero(viviendas, 0) }} <small>viviendas</small></p>
+            <p class="tarjeta-subcifra">
+              <Icono icono="emision" tamano="sm" />
+              <span>{{ formatearNumero(viviendas * 1.8, 1) }} t CO₂ evitadas al año</span>
+            </p>
+          </template>
+          <p v-else-if="cargando" class="tarjeta-estado">
+            <Icono icono="calculando" tamano="sm" />
+            <span>integrando la cadena…</span>
+          </p>
+          <p v-else class="tarjeta-estado semaforo semaforo--pendiente">
+            <Icono icono="pendiente" tamano="sm" />
+            <span>pendiente — {{ error || "consumo residencial sin fuente verificada" }}</span>
+          </p>
+        </article>
+      </div>
     </div>
   </section>
 </template>
@@ -142,7 +130,6 @@ import ControlesFisicos from "../components/ControlesFisicos.vue";
 import Icono from "../components/Icono.vue";
 import { formatearNumero } from "../utils/formato";
 import type { Params } from "../api";
-import { preguntas, evaluar_cumplimiento } from "../contenido/pedagogia";
 
 const props = defineProps<{
   params: Params;
@@ -150,13 +137,11 @@ const props = defineProps<{
   viviendas: number | null;
   cargando?: boolean;
   error?: string;
-  /** Reducido a miniatura en la esquina: sólo se pinta la escena, sin paneles
-   *  con los que no se puede operar a ese tamaño. */
-  reducido?: boolean;
 }>();
 
 const emit = defineEmits<{ (e: "update:params", v: Partial<Params>): void }>();
 
+const raiz = ref<HTMLElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let animacion: AnimacionCanvas | null = null;
 const sinSerie = ref("");
@@ -214,35 +199,6 @@ const nombreSitioActual = computed(
   () => NOMBRES_SITIO[props.params.sitio_id || "isla_fuerte"] || "Punto marino seleccionado"
 );
 
-const preguntaActiva = computed(() => preguntas.ver);
-const cumpleTarea = computed(() =>
-  evaluar_cumplimiento("ver", props.resultado as Record<string, unknown> | null)
-);
-
-const barrasContraste = computed(() => {
-  const recursoActual = props.resultado?.eslabones?.[0]?.detalle?.j_w_m;
-  const kwm = recursoActual ? recursoActual / 1000 : 8.9;
-  const umbral = 40.0;
-  const anchoPct = Math.min(100, Math.max(3, (kwm / umbral) * 100));
-
-  return [
-    {
-      id: "sitio",
-      rotulo: nombreSitioActual.value.split(",")[0],
-      cifra: formatearNumero(kwm, 1),
-      ancho: `${anchoPct.toFixed(1)}%`,
-      fuente: "Ortega et al. 2013 — verificado",
-    },
-    {
-      id: "umbral",
-      rotulo: "Umbral de granja",
-      cifra: formatearNumero(40, 1),
-      ancho: "100%",
-      fuente: "Osorio et al. 2016 / Handbook cap. 1",
-    },
-  ];
-});
-
 function seleccionarModo(modo: "undimotriz" | "mareomotriz") {
   modoActivo.value = modo;
   if (modo === "mareomotriz") {
@@ -269,8 +225,7 @@ function alCambiarRangoMarea(v: number) {
 }
 
 /** Número de onda por Newton-Raphson sobre la relación de dispersión. Sólo se
- *  usa para dibujar la longitud de onda a escala; no interviene en el cálculo,
- *  que llega ya resuelto desde el servicio. */
+ *  usa para dibujar la longitud de onda a escala; no interviene en el cálculo. */
 function numeroOnda(omega: number, h: number): number {
   const g = 9.81;
   const arg = (omega * omega * h) / g;
@@ -328,6 +283,18 @@ function togglePausa() {
   pausado.value = animacion.pausado;
 }
 
+/** La carcasa llama aquí al pulsar «Simular este emplazamiento»: la escena
+ *  recibe el foco y un destello breve para que se vea dónde pasó la acción. */
+function enfocar() {
+  const el = raiz.value;
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  el.setAttribute("data-destello", "");
+  setTimeout(() => el.removeAttribute("data-destello"), 900);
+}
+
+defineExpose({ enfocar });
+
 onMounted(() => {
   modoActivo.value =
     props.params.dispositivo === "turbina_corriente" || props.params.dispositivo === "embalse"
@@ -336,6 +303,8 @@ onMounted(() => {
 
   if (!canvasRef.value) return;
   animacion = new AnimacionCanvas(canvasRef.value);
+  // Ya no hay tira de lectura sobre el lienzo: el corte llega hasta el borde.
+  animacion.pie = 0;
   redibujar();
 });
 
@@ -355,11 +324,30 @@ watch(
 
 <style scoped>
 .ver {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   inline-size: 100%;
   block-size: 100%;
+  min-block-size: 0;
+  overflow: auto;
+  background: var(--lienzo);
+  outline: none;
+}
+
+/* ---- Escena ---- */
+.escena {
+  position: relative;
+  flex: none;
+  aspect-ratio: 21 / 9;
+  min-block-size: 15rem;
+  max-block-size: 58%;
   overflow: hidden;
   background: var(--map-oceano);
+  transition: box-shadow var(--dur-media) var(--ease-salida);
+}
+
+.ver[data-destello] .escena {
+  box-shadow: inset 0 0 0 3px var(--rol-captado);
 }
 
 .oleaje {
@@ -370,316 +358,58 @@ watch(
   display: block;
 }
 
-/* ---- Cabina: los paneles que flotan sobre la escena ---- */
-.cabina {
+.escena-cabecera {
   position: absolute;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-}
-
-.cabina--controles {
-  inset-block-start: var(--s-2);
-  inset-inline-start: var(--s-2);
-  inline-size: min(23rem, 40vw);
-  /* La miniatura vive abajo a la izquierda, justo debajo: la cabina termina
-     antes de llegar a ella. */
-  max-block-size: calc(
-    100% - var(--lectura-alto, 0px) - var(--miniatura-alto, 0px) - var(--s-6)
-  );
-  overflow: auto;
-  padding: var(--s-3);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-caja);
-  background: var(--panel);
-  box-shadow: var(--sombra-caja);
-}
-
-/* Salida dentro de la misma cabina: así el lado derecho del corte queda
-   entero para la costa, la subestación y la red, que es donde termina la
-   cadena y hay que poder verla. */
-.salida {
-  display: grid;
-  gap: var(--s-2);
-}
-
-.cabina--acciones {
-  inset-block-end: calc(var(--lectura-alto, 0px) + var(--s-2));
-  inset-inline-end: var(--s-2);
-  align-items: end;
-}
-
-.cabina-cabecera {
+  inset-block-start: var(--s-3);
+  inset-inline-start: var(--s-3);
   display: grid;
   gap: 2px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radio-caja);
+  background: oklch(1 0 0 / 0.72);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--sombra-caja);
 }
 
 .titulo-nivel {
   font-size: var(--text-seccion);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--tinta);
   margin: 0;
-}
-
-.sitio-actual {
-  margin: 0;
-  font-size: var(--text-meta);
-  color: var(--tenue);
-}
-
-/* ---- Selección de recurso y dispositivo ---- */
-.modos {
-  display: flex;
-  gap: var(--s-1);
-}
-
-.btn-modo {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: var(--s-1) var(--s-2);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--lienzo);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-modo.activo {
-  background: var(--rol-mar-profundo);
-  border-color: var(--rol-mar-profundo);
-  color: var(--panel);
-}
-
-.dispositivos {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-1);
-}
-
-.rotulo-grupo {
-  font-size: var(--text-meta);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--tenue);
-}
-
-.btn-dispositivo {
-  padding: 2px 8px;
-  border: 1px solid var(--borde-suave);
-  border-radius: var(--radio);
-  background: var(--lienzo);
-  font-size: var(--text-meta);
-  cursor: pointer;
-}
-
-.btn-dispositivo.activo {
-  border-color: var(--rol-mar-profundo);
-  background: var(--acento-suave);
-  font-weight: 600;
-}
-
-.campo-cimentacion {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  inline-size: 100%;
-}
-
-.campo-cimentacion select {
-  flex: 1;
-  min-inline-size: 0;
-  padding: 2px 6px;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--panel);
-  font-size: var(--text-meta);
-}
-
-/* ---- Pregunta conductora ---- */
-.pregunta-bloque {
-  display: grid;
-  gap: 2px;
-  padding: var(--s-2);
-  border-radius: var(--radio);
-  background: var(--superficie);
-}
-
-.pregunta-linea {
-  margin: 0;
-  font-size: var(--text-meta);
-}
-
-.tarea-linea {
-  margin: 0;
-  font-size: 11px;
-  color: var(--tenue);
-}
-
-.tarea-rotulo {
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-inline-end: 4px;
-}
-
-.veredicto {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--conf-verificado);
-}
-
-/* ---- Tarjetas de salida ---- */
-.tarjeta > *,
-.barra-fila > * {
-  min-inline-size: 0;
-  overflow-wrap: anywhere;
-}
-
-.tarjeta {
-  display: grid;
-  align-content: start;
-  gap: var(--s-1);
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-caja);
-  background: var(--panel);
-  box-shadow: var(--sombra-caja);
-}
-
-.tarjeta-titulo {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-meta);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--tenue);
-  font-weight: 700;
-  margin: 0;
-}
-
-.tarjeta-cifra {
-  margin: 2px 0 0;
-  font-size: var(--text-cifra);
-  font-weight: 700;
-  line-height: 1.05;
-  color: var(--rol-captado);
-}
-
-.tarjeta-cifra small {
-  font-size: 0.32em;
-  font-weight: 600;
-  color: var(--tenue);
-}
-
-.tarjeta-subcifra {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: var(--tenue);
-}
-
-.tarjeta-estado {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: var(--text-meta);
-  color: var(--tenue);
-  font-style: italic;
-}
-
-.barras {
-  display: grid;
-  gap: var(--s-2);
-  margin-block-start: 2px;
-}
-
-.barra-fila {
-  display: grid;
-  grid-template-columns: minmax(5rem, 1fr) auto;
-  grid-template-areas:
-    'rotulo cifra'
-    'pista pista'
-    'fuente fuente';
-  align-items: baseline;
-  column-gap: var(--s-2);
-}
-
-.barra-rotulo {
-  grid-area: rotulo;
-  font-weight: 600;
-  font-size: var(--text-meta);
-}
-
-.barra-pista {
-  grid-area: pista;
-  display: block;
-  block-size: 0.5rem;
-  margin-block: 2px;
-  border-radius: 2px;
-  background: var(--superficie);
-  overflow: hidden;
-}
-
-.barra-relleno {
-  display: block;
-  block-size: 100%;
-  transition: inline-size var(--dur-media) var(--ease-salida);
-}
-
-.barra-relleno--sitio {
-  background: var(--rol-mar-medio);
-}
-
-.barra-relleno--umbral {
-  background: repeating-linear-gradient(135deg, var(--tenue) 0 3px, transparent 3px 7px);
-}
-
-.barra-cifra {
-  grid-area: cifra;
-  font-size: var(--text-seccion);
-  font-weight: 700;
   white-space: nowrap;
 }
 
-.barra-cifra small {
-  font-size: 0.55em;
-  font-weight: 600;
+.sitio-actual {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--text-meta);
   color: var(--tenue);
 }
 
-.barra-fuente {
-  grid-area: fuente;
-  font-size: 11px;
-  color: var(--tenue);
+.escena-acciones {
+  position: absolute;
+  inset-block-end: var(--s-3);
+  inset-inline-end: var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
 }
 
-/* ---- Acciones sobre la escena ---- */
 .btn-lienzo {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: var(--s-1) 10px;
-  border: 1px solid oklch(1 0 0 / 0.25);
+  border: 1px solid var(--marco-linea);
   border-radius: var(--radio);
-  background: oklch(0.24 0.02 238 / 0.85);
-  color: oklch(0.97 0.004 106);
+  background: oklch(0.24 0.02 238 / 0.82);
+  color: var(--marco-tinta);
   font-weight: 600;
   font-size: var(--text-meta);
   cursor: pointer;
+  backdrop-filter: blur(6px);
 }
 
 .btn-lienzo:hover {
@@ -693,14 +423,206 @@ watch(
   margin: 0;
   padding: var(--s-1) var(--s-2);
   border-radius: var(--radio);
-  background: var(--panel);
+  background: oklch(1 0 0 / 0.8);
   color: var(--tenue);
   font-size: var(--text-meta);
 }
 
-@media (width <= 56rem) {
-  .cabina--controles {
-    inline-size: min(18rem, 62vw);
+/* ---- Cabina: tres bloques ---- */
+.cabina {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--s-3);
+  padding: var(--s-3);
+  flex: 1;
+}
+
+.bloque {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-inline-size: 0;
+}
+
+.rotulo-grupo {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tenue);
+}
+
+/* ---- Selección de recurso y dispositivo ---- */
+.modos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radio-caja);
+  background: var(--superficie);
+}
+
+.btn-modo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--s-1) var(--s-2);
+  border: none;
+  border-radius: calc(var(--radio-caja) - 3px);
+  background: transparent;
+  color: var(--tenue);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--ease-salida), color var(--dur-rapida) var(--ease-salida);
+}
+
+.btn-modo.activo {
+  background: var(--panel);
+  color: var(--rol-mar-profundo);
+  box-shadow: var(--sombra-caja);
+}
+
+.dispositivos {
+  display: grid;
+  gap: var(--s-1);
+}
+
+.dispositivos-lista {
+  display: grid;
+  gap: 4px;
+}
+
+.btn-dispositivo {
+  text-align: start;
+  padding: 6px 10px;
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio);
+  background: var(--panel);
+  font-size: var(--text-meta);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--dur-rapida) var(--ease-salida), background-color var(--dur-rapida) var(--ease-salida);
+}
+
+.btn-dispositivo:hover {
+  border-color: var(--borde);
+}
+
+.btn-dispositivo.activo {
+  border-color: var(--rol-mar-profundo);
+  background: var(--acento-suave);
+  color: var(--rol-mar-profundo);
+  font-weight: 600;
+}
+
+.campo-cimentacion {
+  display: grid;
+  gap: 4px;
+  margin-block-start: var(--s-1);
+}
+
+.campo-cimentacion select {
+  min-inline-size: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--panel);
+  font-size: var(--text-meta);
+}
+
+/* ---- Tarjetas de salida ---- */
+.tarjeta > * {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.tarjeta {
+  display: grid;
+  align-content: start;
+  gap: var(--s-1);
+  padding: var(--s-3);
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  background: var(--panel);
+  box-shadow: var(--sombra-caja);
+}
+
+.tarjeta--heroe {
+  background: linear-gradient(160deg, var(--panel), var(--acento-suave));
+}
+
+.tarjeta-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tenue);
+  font-weight: 700;
+  margin: 0;
+}
+
+.tarjeta-cifra {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--text-heroe);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--rol-captado);
+}
+
+.tarjeta-cifra small {
+  font-family: var(--font-sans);
+  font-size: 0.26em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--tenue);
+}
+
+.tarjeta-subcifra {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: var(--s-1) 0 0;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+}
+
+.tarjeta-estado {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+  font-style: italic;
+}
+
+@media (width <= 90rem) {
+  .bloque--salida {
+    flex-direction: row;
+  }
+
+  .bloque--salida > * {
+    flex: 1;
+  }
+}
+
+@media (width <= 64rem) {
+  .escena {
+    max-block-size: none;
+  }
+
+  .cabina {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bloque--salida {
+    flex-direction: column;
   }
 }
 </style>
