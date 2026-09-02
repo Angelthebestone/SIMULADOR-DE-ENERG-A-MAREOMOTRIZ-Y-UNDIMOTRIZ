@@ -1,0 +1,5 @@
+# Dependencias del backend serverless (api/simular.py) en Vercel.
+# Solo el camino de cálculo de `app.servicio.simular`: numpy + scipy.
+# No incluye utide/matplotlib/pywebview (no los toca el escenario único).
+numpy==2.4.2
+scipy==1.17.1

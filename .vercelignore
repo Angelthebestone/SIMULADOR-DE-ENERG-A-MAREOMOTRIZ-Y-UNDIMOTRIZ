@@ -1,0 +1,35 @@
+# Reduce la subida a Vercel. NO excluir nada que el hook `datosPlugin` de
+# `web/vite.config.ts` copie a `web/dist/datos/` en el build, ni lo que
+# `api/simular.py` lee (`datos/sitios`, `datos/zni`).
+
+# Cruft
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.superdesign/
+salidas/
+scratchpad/
+scratchpad_*.py
+*.jsonl
+
+# Documentación y specs (no intervienen en build ni runtime)
+documentacion/
+openspec/
+analisis/figuras.py
+
+# El builder de Python de Vercel prioriza pyproject.toml y trata de resolver
+# TODO el proyecto (utide>=0.4, mhkit, playwright...) → falla en 3.12. La función
+# solo necesita numpy+scipy de requirements.txt; ocultamos el pyproject para que
+# use ese. Nada en app/ nucleo/ analisis/ lo lee en runtime.
+pyproject.toml
+
+# Datos pesados que ni el frontend ni el backend usan (25 MB de IDEAM + los
+# CSV/PDF de series que solo son entrada del cálculo en Python, nunca del navegador)
+datos/ideam/
+datos/mareas/*.csv
+datos/oleaje/*.csv
+datos/oleaje/*.pdf
+
+# El build web se rehace en Vercel
+web/dist/

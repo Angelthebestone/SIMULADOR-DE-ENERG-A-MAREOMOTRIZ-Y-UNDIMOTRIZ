@@ -49,3 +49,5 @@ datos/__pycache__/
 .agents/
 # Estado del plugin superdesign (contexto de diseno por sesion)
 /.superdesign/
+
+.vercel
