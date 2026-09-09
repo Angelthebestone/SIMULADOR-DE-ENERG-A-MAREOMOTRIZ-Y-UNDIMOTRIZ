@@ -11,10 +11,11 @@
         aria-label="Mapa navegable mundial: arrastra para desplazar, rueda para zoom, pulsa cualquier zona marina para simular"
       ></div>
 
-      <div class="escala" aria-label="Leyenda: potencia del frente de ola">
-        <div class="escala-titulo">Frente de ola</div>
+      <div class="escala" aria-label="Leyenda del recurso visible">
+        <div class="escala-titulo">{{ leyenda.titulo }}</div>
         <div class="escala-barra"></div>
-        <div class="escala-topes"><span>0</span><span>20</span><span>45</span><span>80+ kW/m</span></div>
+        <div class="escala-topes"><span v-for="t in leyenda.topes" :key="t">{{ t }}</span></div>
+        <div class="escala-fuente">Fuente: {{ leyenda.fuente }}</div>
       </div>
 
       <p v-if="consultando" class="estado-carta">
@@ -29,7 +30,61 @@
 
     <!-- Ficha del emplazamiento activo: la selección se hace en la carta, así
          que la lista y los filtros de región desaparecieron. -->
-    <div v-if="sitioActual" class="ficha-sitio">
+    <div class="barra-tecnologia" role="group" aria-label="Capa de potencial por tecnología">
+      <span class="barra-tecnologia-rotulo">Recurso</span>
+      <button
+        v-for="t in TECNOLOGIAS"
+        :key="t.id"
+        type="button"
+        class="tec-btn"
+        :class="{ activo: tecnologiaActiva === t.id }"
+        :aria-pressed="tecnologiaActiva === t.id ? 'true' : 'false'"
+        @click="cambiarTecnologia(t.id)"
+      >
+        {{ t.nombre }}
+      </button>
+    </div>
+
+    <div v-if="plantaActual" class="ficha-sitio ficha-planta" aria-label="Ficha de la planta">
+      <div class="ficha-cabecera">
+        <div>
+          <span class="ficha-tag">{{ etiquetaTecnologia(plantaActual.tecnologia) }}</span>
+          <h2 class="ficha-titulo">{{ plantaActual.nombre }}</h2>
+        </div>
+        <span class="semaforo" :class="'semaforo--' + (plantaActual.estado_operativo === 'operativo' ? 'verificado' : 'pendiente')">
+          <span class="semaforo__simbolo" :class="'semaforo__simbolo--' + (plantaActual.estado_operativo === 'operativo' ? 'verificado' : 'pendiente')" aria-hidden="true"></span>
+          <span>{{ plantaActual.estado_operativo === "operativo" ? "operativo ●" : "desmantelado ○" }}</span>
+        </span>
+      </div>
+
+      <dl class="ficha-metricas">
+        <div class="metrica">
+          <dt>Potencia instalada</dt>
+          <dd v-if="plantaActual.potencia_instalada !== null">{{ formatearPlanta(plantaActual.potencia_instalada) }} <span class="metrica-unidad">{{ plantaActual.unidad_potencia }}</span></dd>
+          <dd v-else data-pendiente>sin dato</dd>
+        </div>
+        <div class="metrica">
+          <dt>Puesta en marcha</dt>
+          <dd v-if="plantaActual.anio_puesta_en_marcha !== null">{{ plantaActual.anio_puesta_en_marcha }}</dd>
+          <dd v-else data-pendiente>sin dato</dd>
+        </div>
+        <div class="metrica">
+          <dt>Cierre</dt>
+          <dd>{{ plantaActual.anio_cierre === null ? "en servicio" : plantaActual.anio_cierre }}</dd>
+        </div>
+      </dl>
+
+      <p class="ficha-fuente">{{ plantaActual.fuente }}</p>
+      <p v-if="plantaActual.catalogo" class="ficha-enlace">Ficha del catálogo: {{ plantaActual.catalogo }}</p>
+      <p v-if="plantaActual.fracaso" class="ficha-enlace">Caso de cierre: {{ plantaActual.fracaso }}</p>
+
+      <button class="btn-simular" @click="cerrarPlanta">
+        <span>Volver al emplazamiento</span>
+        <Icono icono="eslabon" tamano="sm" />
+      </button>
+    </div>
+
+    <div v-else-if="sitioActual" class="ficha-sitio">
       <div class="ficha-cabecera">
         <div>
           <span class="ficha-tag">{{ sitioActual.pais || "Océano global" }}</span>
@@ -63,14 +118,17 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from "vue";
-import { crearMapa, flyToSitio, actualizarSitios, type SitioMapa } from "../map/mapa";
-import { consultarOleaje, consultarMarea } from "../datos/marino";
+import { crearMapa, flyToSitio, actualizarSitios, fijarTecnologiaActiva, MENSAJE_DIQUE_LEJOS, type SitioMapa } from "../map/mapa";
+import { consultarOleaje, consultarMarea, consultarRangoMareal, consultarCorriente } from "../datos/marino";
+import { cargarPlantas, type PlantaMundial, type TecnologiaActiva, type TecnologiaPlanta } from "../map/plantas";
 import { formatearNumero } from "../utils/formato";
 import Icono from "./Icono.vue";
 
 const props = defineProps<{
   /** Emplazamiento que la carcasa tiene activo, para que la carta lo refleje. */
   sitioActivo?: string;
+  /** Dispositivo que el flujo tiene activo: decide qué capa de potencial se pinta. */
+  dispositivo?: string;
 }>();
 
 const emit = defineEmits<{
@@ -84,6 +142,58 @@ const sitioActivoLocal = ref(props.sitioActivo ?? "isla_fuerte");
 const consultando = ref(false);
 const avisoTierra = ref("");
 let temporizadorAviso = 0 as unknown as ReturnType<typeof setTimeout>;
+
+/** Capa de potencial visible: una sola tecnología a la vez, nunca todas.
+ *  El flujo la conmuta con la prop `dispositivo`; el conmutador local la
+ *  cambia a mano sin tocar el cálculo. */
+const TECNOLOGIAS: { id: TecnologiaActiva; nombre: string }[] = [
+  { id: "undimotriz", nombre: "Oleaje" },
+  { id: "dique", nombre: "Dique" },
+  { id: "turbina", nombre: "Turbina" },
+];
+
+function tecnologiaDeDispositivo(d?: string): TecnologiaActiva {
+  if (d === "embalse") return "dique";
+  if (d === "turbina_corriente") return "turbina";
+  return "undimotriz";
+}
+
+const tecnologiaActiva = ref<TecnologiaActiva>(tecnologiaDeDispositivo(props.dispositivo));
+
+/** Leyenda viva: unidades + escala de color + fuente de la capa visible. */
+const leyenda = computed(() => {
+  if (tecnologiaActiva.value === "dique")
+    return { titulo: "Rango mareal", topes: ["0,4", "1", "2", "3,5+ m"], fuente: "FES2014 vía AVISO" };
+  if (tecnologiaActiva.value === "turbina")
+    return { titulo: "Corriente media", topes: ["0", "1", "2", "3+ m/s"], fuente: "GLORYS12 (pendiente de ingesta)" };
+  return { titulo: "Frente de ola", topes: ["0", "20", "45", "80+ kW/m"], fuente: "Open-Meteo Marine (ERA5-Ocean / MFWAM)" };
+});
+
+function cambiarTecnologia(t: TecnologiaActiva) {
+  tecnologiaActiva.value = t;
+  plantaActual.value = null;
+  if (map) fijarTecnologiaActiva(map, t);
+}
+
+function etiquetaTecnologia(t: TecnologiaPlanta["tecnologia"]): string {
+  return t === "dique" ? "Dique mareal" : t === "turbina" ? "Turbina de corriente" : "Undimotriz";
+}
+
+function formatearPlanta(v: number): string {
+  return formatearNumero(v, v >= 100 ? 0 : 1);
+}
+
+/** Plantas reales: el clic en un marcador abre su ficha con fuente citada. */
+const plantas = ref<PlantaMundial[]>([]);
+const plantaActual = ref<PlantaMundial | null>(null);
+
+function abrirPlanta(id: string) {
+  plantaActual.value = plantas.value.find((p) => p.id === id) ?? null;
+}
+
+function cerrarPlanta() {
+  plantaActual.value = null;
+}
 
 const sitios = ref<SitioMapa[]>([
   // Colombia
@@ -139,11 +249,24 @@ const metricasSitio = computed(() => {
 onMounted(() => {
   if (!contenedor.value) return;
   map = crearMapa(contenedor.value, sitios.value);
+  if (map) fijarTecnologiaActiva(map, tecnologiaActiva.value);
+  void cargarPlantas().then((ps) => (plantas.value = ps));
 
   map.on("sitio_seleccionado" as never, (e: { id: string }) => alSeleccionar(e.id));
+  map.on("planta_seleccionada" as never, (e: { id: string }) => {
+    plantaActual.value = null;
+    abrirPlanta(e.id);
+    const p = plantaActual.value;
+    if (p && map) flyToSitio(map, p.lon, p.lat, 6);
+  });
   map.on("coordenada_seleccionada" as never, (e: { lon: number; lat: number }) => {
     avisoTierra.value = "";
     void puntoLibre(e.lon, e.lat);
+  });
+  map.on("dique_rechazado" as never, (e: { distancia_km: number }) => {
+    avisoTierra.value = `${MENSAJE_DIQUE_LEJOS} (a ${formatearNumero(e.distancia_km, 0)} km de la costa)`;
+    clearTimeout(temporizadorAviso);
+    temporizadorAviso = setTimeout(() => (avisoTierra.value = ""), 6000);
   });
   map.on("punto_en_tierra" as never, () => {
     avisoTierra.value = "ese punto cae en tierra firme; el recurso marino sólo se evalúa sobre el mar";
@@ -159,12 +282,41 @@ watch(
   }
 );
 
-/** Punto cualquiera del océano: se consulta el recurso real en esa coordenada. */
+// El flujo conmuta la capa visible: embalse→dique, turbina→turbina, resto→oleaje.
+watch(
+  () => props.dispositivo,
+  (d) => {
+    const t = tecnologiaDeDispositivo(d);
+    if (t !== tecnologiaActiva.value) cambiarTecnologia(t);
+  }
+);
+
+/** Punto cualquiera del océano: se consulta el recurso real en esa coordenada.
+ *  Con dique activo el rango mareal manda; con turbina, la corriente. */
 async function puntoLibre(lon: number, lat: number) {
   consultando.value = true;
   try {
-    const [oleaje, marea] = await Promise.all([consultarOleaje(lon, lat), consultarMarea(lon, lat)]);
+    const [oleaje, marea, rango, corriente] = await Promise.all([
+      consultarOleaje(lon, lat),
+      consultarMarea(lon, lat),
+      consultarRangoMareal(lon, lat),
+      consultarCorriente(lon, lat),
+    ]);
     const hayOleaje = oleaje.estado !== "pendiente";
+    const tec = tecnologiaActiva.value;
+    const valor =
+      tec === "dique"
+        ? rango.estado === "verificado"
+          ? rango.rango_m
+          : null
+        : tec === "turbina"
+          ? (corriente.velocidad_ms ?? null)
+          : hayOleaje
+            ? oleaje.kw_m
+            : null;
+    const unidad = tec === "dique" ? "m" : tec === "turbina" ? "m/s" : "kW/m";
+    const estado =
+      tec === "dique" ? rango.estado : tec === "turbina" ? corriente.estado : oleaje.estado;
     const nuevo: SitioMapa = {
       id: `punto_${Date.now()}`,
       nombre: `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(2)}° ${lon >= 0 ? "E" : "O"}`,
@@ -172,23 +324,28 @@ async function puntoLibre(lon: number, lat: number) {
       region: "libre",
       lon,
       lat,
-      valor: hayOleaje ? oleaje.kw_m : null,
-      unidad: "kW/m",
-      fuente: marea
-        ? `${oleaje.fuente} · marea: ${marea.fuente} (${marea.nombre}, a ${marea.distancia_km} km)`
-        : `${oleaje.fuente} · marea sin fuente en este punto`,
-      estado: oleaje.estado,
+      valor,
+      unidad,
+      fuente:
+        tec === "dique"
+          ? rango.fuente
+          : tec === "turbina"
+            ? corriente.fuente
+            : marea
+              ? `${oleaje.fuente} · marea: ${marea.fuente} (${marea.nombre}, a ${marea.distancia_km} km)`
+              : `${oleaje.fuente} · marea sin fuente en este punto`,
+      estado,
       tipo: marea && marea.velocidad_ms >= 2 ? "mareomotriz" : "undimotriz",
       hm0_m: hayOleaje ? oleaje.hm0_m : undefined,
       te_s: hayOleaje ? oleaje.te_s : undefined,
-      rango_m: marea?.rango_m,
-      velocidad_ms: marea?.velocidad_ms,
+      rango_m: rango.estado === "verificado" ? rango.rango_m : marea?.rango_m,
+      velocidad_ms: corriente.velocidad_ms ?? marea?.velocidad_ms,
       profundidad_m: undefined,
     };
     sitios.value = [nuevo, ...sitios.value];
     sitioActivoLocal.value = nuevo.id;
     if (map) actualizarSitios(map, sitios.value);
-    if (hayOleaje) emit("seleccionar-sitio", nuevo);
+    if (valor !== null) emit("seleccionar-sitio", nuevo);
   } finally {
     consultando.value = false;
   }
@@ -271,6 +428,62 @@ function confirmarSeleccionYSimular() {
   display: flex;
   justify-content: space-between;
   font-size: 10px;
+  color: var(--tenue);
+}
+
+.escala-fuente {
+  margin-block-start: 2px;
+  font-size: 10px;
+  color: var(--tenue);
+}
+
+/* Conmutador de capa de potencial: una tecnología a la vez. */
+.barra-tecnologia {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: var(--s-2) var(--s-3) 0;
+  padding: 6px var(--s-2);
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  background: var(--panel);
+}
+
+.barra-tecnologia-rotulo {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tenue);
+}
+
+.tec-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--tinta);
+  font-size: var(--text-meta);
+  cursor: pointer;
+}
+
+.tec-btn.activo {
+  border-color: var(--rol-mar-profundo);
+  background: var(--rol-mar-profundo);
+  color: var(--panel);
+  font-weight: 600;
+}
+
+.tec-btn:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+.ficha-enlace {
+  margin: var(--s-2) 0 0;
+  font-size: 11px;
   color: var(--tenue);
 }
 

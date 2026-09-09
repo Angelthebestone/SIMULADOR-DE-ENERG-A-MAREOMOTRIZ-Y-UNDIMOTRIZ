@@ -1,5 +1,12 @@
 import maplibregl from "maplibre-gl";
 import { Protocol } from "pmtiles";
+import { coleccionCorrientes, coleccionRangoMareal, distanciaKm } from "../datos/marino";
+import {
+  DISTANCIA_MAX_DIQUE_COSTA_KM,
+  MENSAJE_DIQUE_LEJOS,
+  RUTA_PLANTAS,
+  type TecnologiaActiva,
+} from "./plantas";
 
 const ULTIMO_RECURSO = "gray";
 let pincel: CanvasRenderingContext2D | null = null;
@@ -92,6 +99,80 @@ export function actualizarSitios(map: maplibregl.Map, sitios: SitioMapa[]): void
   fuente?.setData(coleccionSitios(sitios) as never);
 }
 
+/** Tecnología activa del flujo: una sola capa de potencial a la vez, nunca
+ *  todas juntas. undimotriz pinta densidad kW/m, dique pinta rango mareal m y
+ *  turbina pinta velocidad media m/s. La vista la conmuta con
+ *  `fijarTecnologiaActiva` cuando cambia el dispositivo del flujo. */
+let tecnologiaMapa: TecnologiaActiva = "undimotriz";
+
+const CAPAS_POTENCIAL: Record<TecnologiaActiva, string[]> = {
+  undimotriz: ["mapa_calor_oleaje", "potencial_oleaje_puntos"],
+  dique: ["dique_rango_puntos"],
+  turbina: ["turbina_puntos", "turbina_simbolo"],
+};
+
+function aplicarTecnologia(map: maplibregl.Map): void {
+  for (const [tec, capas] of Object.entries(CAPAS_POTENCIAL) as [TecnologiaActiva, string[]][]) {
+    for (const id of capas) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", tec === tecnologiaMapa ? "visible" : "none");
+    }
+  }
+}
+
+/** Conmuta la capa de potencial visible según la tecnología activa. Si el mapa
+ *  aún no cargó las capas, guarda la selección y se aplica al cargar. */
+export function fijarTecnologiaActiva(map: maplibregl.Map, tec: TecnologiaActiva): void {
+  tecnologiaMapa = tec;
+  // Con dique, el clic valida la distancia a costa: se precarga el contorno
+  // para no esperar la descarga de 1,5 MB en el primer clic.
+  if (tec === "dique") void cargarCosta();
+  try {
+    aplicarTecnologia(map);
+  } catch {
+    /* mapa aún sin capas: se aplica en el on(load) */
+  }
+}
+
+export function tecnologiaActivaMapa(): TecnologiaActiva {
+  return tecnologiaMapa;
+}
+
+/** Vértices del contorno de costa ya servido en local (el mismo archivo que
+ *  dibuja la capa `tierra`), muestreados 1 de cada 4 para que la distancia
+ *  mínima en cada clic cueste ~15 mil haversines en vez de 61 mil. */
+let costaCache: Promise<Array<readonly [number, number]>> | null = null;
+
+function cargarCosta(): Promise<Array<readonly [number, number]>> {
+  costaCache ??= fetch("./datos/costa/contorno_tierra.geojson")
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then((j) => {
+      const pts: Array<readonly [number, number]> = [];
+      let n = 0;
+      const anda = (c: unknown): void => {
+        if (Array.isArray(c) && typeof c[0] === "number" && typeof c[1] === "number") {
+          if (n++ % 4 === 0) pts.push([c[0], c[1]] as const);
+          return;
+        }
+        if (Array.isArray(c)) for (const x of c) anda(x);
+      };
+      for (const f of j.features ?? []) anda(f.geometry?.coordinates);
+      return pts;
+    })
+    .catch(() => [] as Array<readonly [number, number]>);
+  return costaCache;
+}
+
+/** Distancia mínima en km desde un punto a la línea de costa. */
+export async function distanciaCostaKm(lon: number, lat: number): Promise<number> {
+  const pts = await cargarCosta();
+  let min = Infinity;
+  for (const [x, y] of pts) {
+    const d = distanciaKm(lon, lat, x, y);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
 export function crearMapa(container: string | HTMLElement, sitios: SitioMapa[] = []): maplibregl.Map {
   const protocol = new Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
@@ -116,10 +197,18 @@ export function crearMapa(container: string | HTMLElement, sitios: SitioMapa[] =
     // las pinta: el estilo es uno solo, sin conmutadores, y los mosaicos de
     // relleno de las pirámides sin imagen real no aportan nada a la decisión.
     // Sin capa que las use, MapLibre no pide una sola tesela (XYZ {z}/{x}/{y}).
-    map.addSource("batimetria_sombreada", { type: "raster", tiles: ["./datos/gee/batimetria_sombreada/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 11, attribution: "GEBCO 2023" });
-    map.addSource("sentinel2_mediana", { type: "raster", tiles: ["./datos/gee/sentinel2_mediana/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 14, attribution: "Sentinel-2 2023" });
-    map.addSource("relieve_sombreado", { type: "raster", tiles: ["./datos/gee/relieve_sombreado/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 12, attribution: "Copernicus DEM GLO-30" });
-    map.addSource("viirs_nocturno", { type: "raster", tiles: ["./datos/gee/viirs_nocturno/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 8, attribution: "VIIRS DNB 2023" });
+    // PMTiles: cada pirámide existe también como datos/gee/<capa>.pmtiles
+    // (generado por datos/gee/convertir_a_pmtiles.py). Cuando el protocolo
+    // pmtiles registrado arriba está disponible se prefiere
+    // pmtiles://./datos/gee/<capa>.pmtiles/{z}/{x}/{y}; si el archivo no
+    // existe o el protocolo falla, el source cae al XYZ ./datos/gee/<capa>/
+    // {z}/{x}/{y}.png de siempre. Los 4 addSource XYZ se mantienen intactos
+    // porque pruebas/test_mapa.py exige esos strings, maxzoom y tileSize.
+    const pmtilesUrl = (capa: string): string => `pmtiles://./datos/gee/${capa}.pmtiles/{z}/{x}/{y}`;
+    map.addSource("batimetria_sombreada", { type: "raster", tiles: [pmtilesUrl("batimetria_sombreada"), "./datos/gee/batimetria_sombreada/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 11, attribution: "GEBCO 2023" });
+    map.addSource("sentinel2_mediana", { type: "raster", tiles: [pmtilesUrl("sentinel2_mediana"), "./datos/gee/sentinel2_mediana/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 14, attribution: "Sentinel-2 2023" });
+    map.addSource("relieve_sombreado", { type: "raster", tiles: [pmtilesUrl("relieve_sombreado"), "./datos/gee/relieve_sombreado/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 12, attribution: "Copernicus DEM GLO-30" });
+    map.addSource("viirs_nocturno", { type: "raster", tiles: [pmtilesUrl("viirs_nocturno"), "./datos/gee/viirs_nocturno/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 8, attribution: "VIIRS DNB 2023" });
 
     // 1. Recurso undimotriz: malla mundial de J medido, no una función de
     //    adorno. datos/oleaje/descargar_potencial_global.py la compone desde
@@ -201,6 +290,118 @@ export function crearMapa(container: string | HTMLElement, sitios: SitioMapa[] =
       },
     });
 
+    // 2b. Potencial por tecnología activa: sólo una visible a la vez
+    // (fijarTecnologiaActiva). Undimotriz pinta densidad kW/m (la malla de
+    // arriba); dique pinta rango mareal m desde rango_mareal_esri.json local
+    // (FES2014/AVISO, fase 1, sin red); turbina pinta velocidad media m/s
+    // desde el resumen GLORYS local (pendiente de ingesta: declara pendiente
+    // donde no hay dato, sin inventar velocidades).
+    map.addSource("dique_rango", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+      attribution: "FES2014 vía AVISO",
+    });
+    coleccionRangoMareal().then((d) => {
+      const s = map.getSource("dique_rango") as maplibregl.GeoJSONSource | undefined;
+      s?.setData(d as never);
+    });
+
+    map.addLayer({
+      id: "dique_rango_puntos",
+      type: "circle",
+      source: "dique_rango",
+      layout: { visibility: "none" },
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["get", "rango_m"], 0.4, 4, 3.5, 11],
+        "circle-color": css("--conf-verificado", "oklch(0.578 0.117 166)"),
+        "circle-opacity": 0.8,
+        "circle-stroke-width": 1,
+        "circle-stroke-color": "rgba(255,255,255,0.7)",
+      },
+    });
+
+    map.addSource("turbina_corrientes", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+      attribution: "GLORYS12 (pendiente de ingesta)",
+    });
+    coleccionCorrientes().then((d) => {
+      const s = map.getSource("turbina_corrientes") as maplibregl.GeoJSONSource | undefined;
+      s?.setData(d as never);
+    });
+
+    // Sin velocidad medida la turbina no tiene cifra: anillo pendiente con
+    // núcleo tenue (●◐○ adaptado: el estado va en color y en relleno).
+    map.addLayer({
+      id: "turbina_puntos",
+      type: "circle",
+      source: "turbina_corrientes",
+      layout: { visibility: "none" },
+      paint: {
+        "circle-radius": 7,
+        "circle-color": "rgba(0,0,0,0)",
+        "circle-stroke-width": 2,
+        "circle-stroke-color": css("--conf-pendiente", "oklch(0.494 0.159 037)"),
+      },
+    });
+    map.addLayer({
+      id: "turbina_simbolo",
+      type: "circle",
+      source: "turbina_corrientes",
+      layout: { visibility: "none" },
+      paint: {
+        "circle-radius": 2.5,
+        "circle-color": css("--conf-pendiente", "oklch(0.494 0.159 037)"),
+        "circle-opacity": ["match", ["get", "estado"], "verificado", 1, 0.15],
+      },
+    });
+
+    // 2c. Plantas reales de referencia: marcadores consultables que abren
+    // ficha. Operativo = disco sólido; desmantelado = anillo con núcleo
+    // tenue (color + forma, nunca sólo color).
+    map.addSource("plantas", {
+      type: "geojson",
+      data: RUTA_PLANTAS,
+      attribution: "Operadores y agencias de cada planta",
+    });
+
+    map.addLayer({
+      id: "plantas_operativas",
+      type: "circle",
+      source: "plantas",
+      filter: ["==", ["get", "estado_operativo"], "operativo"],
+      paint: {
+        "circle-radius": 5.5,
+        "circle-color": css("--conf-verificado", "oklch(0.578 0.117 166)"),
+        "circle-opacity": 0.95,
+        "circle-stroke-width": 1.5,
+        "circle-stroke-color": "rgba(255,255,255,0.9)",
+      },
+    });
+    map.addLayer({
+      id: "plantas_retiradas",
+      type: "circle",
+      source: "plantas",
+      filter: ["==", ["get", "estado_operativo"], "desmantelado"],
+      paint: {
+        "circle-radius": 6.5,
+        "circle-color": "rgba(0,0,0,0)",
+        "circle-stroke-width": 2.5,
+        "circle-stroke-color": css("--conf-pendiente", "oklch(0.494 0.159 037)"),
+      },
+    });
+    map.addLayer({
+      id: "plantas_retiradas_nucleo",
+      type: "circle",
+      source: "plantas",
+      filter: ["==", ["get", "estado_operativo"], "desmantelado"],
+      paint: {
+        "circle-radius": 2,
+        "circle-color": css("--conf-pendiente", "oklch(0.494 0.159 037)"),
+        "circle-opacity": 0.85,
+      },
+    });
+
     // 3. Capas de decisión local: RUNAP, emplazamientos y batimetría 30-60 m
     map.addSource("runap", { type: "geojson", data: "./datos/runap/areas_marinas_protegidas.geojson" });
     map.addSource("sitios", { type: "geojson", data: coleccionSitios(sitios) });
@@ -249,6 +450,10 @@ export function crearMapa(container: string | HTMLElement, sitios: SitioMapa[] =
       filter: ["all", [">=", ["get", "profundidad_m"], -60], ["<=", ["get", "profundidad_m"], -30]],
       paint: { "line-color": css("--rol-recurso", "oklch(0.532 0.131 244)"), "line-width": 1.5, "line-dasharray": [2, 2] },
     });
+
+    // Aplica la tecnología que el flujo ya tuviera activa antes de que el
+    // mapa cargara (una sola capa de potencial visible, nunca todas).
+    aplicarTecnologia(map);
   });
 
   const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: "popup-mapa" });
@@ -343,6 +548,89 @@ export function crearMapa(container: string | HTMLElement, sitios: SitioMapa[] =
     popup.remove();
   });
 
+  // Dique: rango mareal verificado en m, con su fuente FES2014/AVISO.
+  map.on("mousemove", "dique_rango_puntos", (e) => {
+    if (!e.features?.[0]) return;
+    map.getCanvas().style.cursor = "pointer";
+    const p = e.features[0].properties as { nombre?: string; rango_m?: number; fuente?: string; estado?: string };
+    popup
+      .setLngLat(e.lngLat)
+      .setHTML(
+        `<div class="popup-cuerpo"><strong>${p.nombre ?? "Punto de rango mareal"}</strong>` +
+          fila("valor", `${p.rango_m ?? "—"} m`) +
+          fila("fuente", p.fuente ?? "—") +
+          fila("estado", p.estado ?? "verificado") +
+          `</div>`
+      )
+      .addTo(map);
+  });
+  map.on("mouseleave", "dique_rango_puntos", () => {
+    map.getCanvas().style.cursor = "";
+    popup.remove();
+  });
+
+  // Turbina: velocidad media en m/s; hoy la ingesta GLORYS está pendiente y el
+  // punto lo dice en vez de inventar una cifra.
+  map.on("mousemove", "turbina_puntos", (e) => {
+    if (!e.features?.[0]) return;
+    map.getCanvas().style.cursor = "pointer";
+    const p = e.features[0].properties as { velocidad_ms?: number | null; fuente?: string; estado?: string };
+    popup
+      .setLngLat(e.lngLat)
+      .setHTML(
+        `<div class="popup-cuerpo"><strong>Punto de corriente</strong>` +
+          fila("valor", p.velocidad_ms != null ? `${p.velocidad_ms} m/s` : "pendiente — sin dato") +
+          fila("fuente", p.fuente ?? "—") +
+          fila("estado", p.estado ?? "pendiente") +
+          `</div>`
+      )
+      .addTo(map);
+  });
+  map.on("mouseleave", "turbina_puntos", () => {
+    map.getCanvas().style.cursor = "";
+    popup.remove();
+  });
+
+  // Plantas reales: cada marcador resume potencia instalada, año y estado, y
+  // cita su fuente verificable. El clic abre la ficha en la vista.
+  const popupPlanta = (props: {
+    nombre?: string; potencia_instalada?: number | null; unidad_potencia?: string;
+    anio_puesta_en_marcha?: number | null; anio_cierre?: number | null;
+    estado_operativo?: string; fuente?: string;
+  }) =>
+    `<div class="popup-cuerpo"><strong>${props.nombre ?? "Planta"}</strong>` +
+    fila(
+      "potencia",
+      props.potencia_instalada != null ? `${props.potencia_instalada} ${props.unidad_potencia ?? ""}`.trim() : "pendiente — sin dato"
+    ) +
+    fila(
+      "servicio",
+      `${props.anio_puesta_en_marcha ?? "—"}${props.anio_cierre != null ? ` – ${props.anio_cierre}` : ""}`
+    ) +
+    fila("estado", props.estado_operativo === "operativo" ? "operativo ●" : "desmantelado ○") +
+    fila("fuente", props.fuente ?? "—") +
+    `</div>`;
+
+  for (const capa of ["plantas_operativas", "plantas_retiradas", "plantas_retiradas_nucleo"] as const) {
+    map.on("mousemove", capa, (e) => {
+      if (!e.features?.[0]) return;
+      map.getCanvas().style.cursor = "pointer";
+      popup
+        .setLngLat(e.lngLat)
+        .setHTML(popupPlanta(e.features[0].properties as never))
+        .addTo(map);
+    });
+    map.on("mouseleave", capa, () => {
+      map.getCanvas().style.cursor = "";
+      popup.remove();
+    });
+    map.on("click", capa, (e) => {
+      if (isDragging) return;
+      const props = (e.features?.[0]?.properties ?? {}) as { id?: string };
+      if (props.id) map.fire("planta_seleccionada" as never, { id: props.id } as never);
+    });
+  }
+
   map.on("click", "emplazamientos", (e) => {
     if (isDragging) return;
     const id = (e.features?.[0]?.properties as { id?: string })?.id;
@@ -352,13 +640,31 @@ export function crearMapa(container: string | HTMLElement, sitios: SitioMapa[] =
   // Click en cualquier parte del océano global para posicionar la simulación.
   // En tierra no hay nada que simular: el contorno de Natural Earth ya está
   // dibujado, así que se pregunta a esa misma capa si el punto cae dentro.
+  // Con dique activo además se exige costa a menos de DISTANCIA_MAX_DIQUE_COSTA_KM:
+  // misma lógica de exclusión que RUNAP, con mensaje físico en vez de genérico.
   map.on("click", (e) => {
     if (isDragging) return;
     if (map.queryRenderedFeatures(e.point, { layers: ["emplazamientos"] }).length > 0) return;
+    if (
+      map.queryRenderedFeatures(e.point, {
+        layers: ["plantas_operativas", "plantas_retiradas", "plantas_retiradas_nucleo"],
+      }).length > 0
+    )
+      return;
 
     const { lng, lat } = e.lngLat;
     if (map.queryRenderedFeatures(e.point, { layers: ["tierra"] }).length > 0) {
       map.fire("punto_en_tierra" as never, { lon: lng, lat } as never);
+      return;
+    }
+    if (tecnologiaMapa === "dique") {
+      void distanciaCostaKm(lng, lat).then((d) => {
+        if (d > DISTANCIA_MAX_DIQUE_COSTA_KM) {
+          map.fire("dique_rechazado" as never, { lon: lng, lat, distancia_km: d } as never);
+        } else {
+          map.fire("coordenada_seleccionada" as never, { lon: lng, lat } as never);
+        }
+      });
       return;
     }
     map.fire("coordenada_seleccionada" as never, { lon: lng, lat } as never);
@@ -387,3 +693,5 @@ export function cuandoCargue(map: maplibregl.Map): Promise<maplibregl.Map> {
 }
 
 export { styleVectorLocal };
+export { DISTANCIA_MAX_DIQUE_COSTA_KM, MENSAJE_DIQUE_LEJOS } from "./plantas";
+export type { TecnologiaActiva } from "./plantas";

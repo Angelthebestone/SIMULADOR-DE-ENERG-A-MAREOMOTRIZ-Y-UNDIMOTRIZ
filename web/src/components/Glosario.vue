@@ -28,6 +28,9 @@ const TERMINOS: Record<string, string> = {
   'η_gen': 'Eficiencia del generador eléctrico (adimensional): pérdidas en la conversión mecánica→eléctrica.',
   CRF: 'Factor de recuperación de capital (adimensional): anualiza la inversión inicial a una tasa y vida dadas.',
   rho: 'Densidad del agua de mar (kg/m³): 1.025 nominal; editable para análisis de sensibilidad.',
+  V_marea: 'Velocidad de la corriente de marea (m/s): agua que se mueve con la marea.',
+  R_marea: 'Rango de marea (m): diferencia de altura entre pleamar y bajamar.',
+  h_fondo: 'Profundidad del fondo (m): distancia del espejo al lecho en el emplazamiento.',
 }
 
 const definicion = computed(() => TERMINOS[props.term] ?? '')

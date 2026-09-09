@@ -2,12 +2,8 @@
   Comparar — cadena de pérdidas, catálogo de convertidores, fichas de cierre,
   comparador de dos tecnologías y discrepancia entre fuentes para un mismo punto.
 
-  Ninguna pantalla la monta: la interfaz se redujo al simulador y esta vista
-  salió de la navegación. El archivo se conserva porque aquí viven los criterios
-  de trazabilidad que el proyecto declara —los tres valores de Isla Fuerte sin
-  promediar, el eslabón que separa dos cadenas, la simulabilidad por ficha— y
-  las pruebas se leen sobre él. Para volver a publicarla basta con importarla
-  desde main.ts.
+  Se monta en el paso 4 del flujo (lectura «Comparar»): la simulabilidad de
+  cada ficha la declara el archivo con su marca, no la deduce la pantalla.
 -->
 <template>
   <section class="comparar" aria-labelledby="titulo-comparar">

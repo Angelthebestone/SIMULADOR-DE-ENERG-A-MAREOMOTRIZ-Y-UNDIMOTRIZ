@@ -18,12 +18,16 @@
             :max="c.max"
             :step="c.step"
             :value="c.valor"
-            :aria-describedby="c.id + '-valor'"
+            :aria-describedby="c.id + '-valor ' + c.id + '-efecto'"
             :style="{ '--p': ((c.valor - c.min) / (c.max - c.min)) * 100 + '%' }"
             @input="c.emitir(($event.target as HTMLInputElement).valueAsNumber)"
           />
           <span class="tope">{{ c.formato(c.max) }}</span>
         </div>
+        <p :id="c.id + '-efecto'" class="efecto">
+          <span>rango {{ c.formato(c.min) }}–{{ c.formato(c.max) }} {{ c.unidad }} · </span>
+          <span>{{ c.efecto }}</span>
+        </p>
       </div>
     </div>
   </div>
@@ -75,6 +79,7 @@ const controlesOndas = computed(() => [
     step: 0.1,
     valor: props.hm0_m,
     formato: (v: number) => formatearNumero(v, 1),
+    efecto: 'Si sube, llega más energía y la boya se mueve más; si baja, la cifra cae.',
     emitir: (v: number) => emit("update:hm0_m", v),
   },
   {
@@ -87,6 +92,7 @@ const controlesOndas = computed(() => [
     step: 0.1,
     valor: props.te_s,
     formato: (v: number) => formatearNumero(v, 1),
+    efecto: 'Si sube, la ola se alarga y trae más energía; si baja, la ola se acorta.',
     emitir: (v: number) => emit("update:te_s", v),
   },
   {
@@ -99,6 +105,7 @@ const controlesOndas = computed(() => [
     step: 1_000,
     valor: props.b_pto_ns_m,
     formato: (v: number) => formatearNumero(v / 1000, 0),
+    efecto: 'Si sube, frena más y la boya se mueve menos; si baja, la boya se mueve más suelta.',
     emitir: (v: number) => emit("update:b_pto_ns_m", v),
   },
 ]);
@@ -114,6 +121,7 @@ const controlesMareas = computed(() => [
     step: 0.1,
     valor: props.velocidadCorriente,
     formato: (v: number) => formatearNumero(v, 1),
+    efecto: 'Si sube, la turbina recibe más empuje; si baja, produce menos.',
     emitir: (v: number) => emit("update:velocidadCorriente", v),
   },
   {
@@ -126,6 +134,7 @@ const controlesMareas = computed(() => [
     step: 0.1,
     valor: props.rangoMarea,
     formato: (v: number) => formatearNumero(v, 1),
+    efecto: 'Si sube, hay más agua embalsada y más energía; si baja, hay menos.',
     emitir: (v: number) => emit("update:rangoMarea", v),
   },
   {
@@ -138,6 +147,7 @@ const controlesMareas = computed(() => [
     step: 1,
     valor: props.profundidad_m,
     formato: (v: number) => formatearNumero(v, 0),
+    efecto: 'Si baja mucho, la ola se acorta y se empina; si sube, la ola viaja más libre.',
     emitir: (v: number) => emit("update:profundidad_m", v),
   },
 ]);
@@ -230,6 +240,15 @@ const controlesActivos = computed(() => {
 
 .tope:last-child {
   text-align: end;
+}
+
+/* Qué pasa si sube o baja: una línea bajo la pista, en tono tenue. */
+.efecto {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+  line-height: 1.35;
 }
 
 /* Deslizador propio: pista fina con el tramo recorrido en el azul del

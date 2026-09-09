@@ -30,6 +30,7 @@ export const CAPAS = [
     rango: "2023",
     fecha: "2023",
     licencia: "CC BY 4.0",
+    pmtiles: "./datos/gee/batimetria_sombreada.pmtiles",
   },
   {
     id: "sentinel2_mediana",
@@ -40,6 +41,7 @@ export const CAPAS = [
     rango: "2023-01-01/2024-12-31",
     fecha: "2023-01-01/2024-12-31",
     licencia: "ESA Sentinel-2 CC BY-SA 3.0 IGO",
+    pmtiles: "./datos/gee/sentinel2_mediana.pmtiles",
   },
   {
     id: "relieve_sombreado",
@@ -50,6 +52,7 @@ export const CAPAS = [
     rango: "2021",
     fecha: "2021",
     licencia: "CC BY 4.0",
+    pmtiles: "./datos/gee/relieve_sombreado.pmtiles",
   },
   {
     id: "viirs_nocturno",
@@ -60,6 +63,7 @@ export const CAPAS = [
     rango: "2023",
     fecha: "2023",
     licencia: "public domain",
+    pmtiles: "./datos/gee/viirs_nocturno.pmtiles",
   },
 ] as const;
 

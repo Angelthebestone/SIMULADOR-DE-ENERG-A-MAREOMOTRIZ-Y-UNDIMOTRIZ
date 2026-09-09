@@ -1,24 +1,26 @@
 // Consulta del recurso marino en un punto cualquiera del océano.
 //
-// Dos vías, en este orden:
-//   1. Reanálisis en vivo (Open-Meteo Marine, que sirve ERA5-Ocean y MFWAM):
-//      serie horaria real de Hm0 y Te de los últimos días en ese punto.
-//   2. Malla local `datos/oleaje/potencial_oleaje_global.geojson`, compuesta
-//      por `datos/oleaje/descargar_potencial_global.py` desde el mismo
-//      reanálisis. Es la vía sin conexión.
+// Vía única: malla local `datos/oleaje/potencial_oleaje_global.geojson`,
+// compuesta por `datos/oleaje/descargar_potencial_global.py` desde el
+// reanálisis. Es la vía sin conexión: el simulador NUNCA consulta red en
+// ejecución (documentacion/aislamiento_red.md, CSP default-src 'self').
 //
-// Si ninguna responde, el punto queda `pendiente`: el simulador no inventa una
-// cifra de recurso para pintar algo.
+// Si la malla no cubre ese punto, queda `pendiente`: el simulador no inventa
+// una cifra de recurso para pintar algo.
 
-const API_OLEAJE = "https://marine-api.open-meteo.com/v1/marine";
 const MALLA_LOCAL = "./datos/oleaje/potencial_oleaje_global.geojson";
 const MAREAS_LOCAL = "./datos/mareas/hotspots_mareales.geojson";
+// Rango mareal verificado por tesela FES2014/AVISO (fase 1, local, sin red).
+const RANGO_MAREAL_LOCAL = "./datos/mareas/rango_mareal_esri.json";
+// GLORYS12 1/12° (fase 1, local, sin red). Pendiente de ingesta real.
+const CORRIENTES_GLORYS_LOCAL = "./datos/cmems/resumen_corrientes_glorys.json";
 
-const RHO = 1025;
-const G = 9.81;
-
-/** J = ρ g² Hm0² Te / (64π) — W por metro de frente de ola en aguas profundas. */
+/** J = ρ g² Hm0² Te / (64π) — W por metro de frente de ola en aguas profundas.
+ *  Constantes internas del cálculo offline que compuso la malla; se conserva
+ *  la fórmula aquí para documentar de dónde salen los kW/m de la malla. */
 export function densidadPotenciaWm(hm0: number, te: number): number {
+  const RHO = 1025;
+  const G = 9.81;
   return (RHO * G * G * hm0 * hm0 * te) / (64 * Math.PI);
 }
 
@@ -38,10 +40,33 @@ export type RecursoMarea = {
   distancia_km: number;
 };
 
+/** Rango mareal verificado de un sitio de fase 1 (FES2014/AVISO, local).
+ *  Dique pinta con estos valores; fuera de los 5 sitios no hay dato. */
+export type RecursoRangoMareal = {
+  rango_m: number;
+  nombre: string;
+  fuente: string;
+  estado: "verificado" | "pendiente";
+  distancia_km: number;
+};
+
+type PuntoRangoMareal = { id: string; lon: number; lat: number; rango_m: number; nombre: string };
+
+/** Velocidad media de corriente GLORYS12 en un sitio de fase 1.
+ *  Hoy la ingesta está pendiente (registros 0): se declara así, sin inventar. */
+export type RecursoCorriente = {
+  velocidad_ms: number | null;
+  fuente: string;
+  estado: "verificado" | "pendiente";
+  distancia_km: number;
+};
+
 type PuntoMalla = { lon: number; lat: number; kw_m: number; hm0_m: number; te_s: number };
 
 let mallaCache: Promise<PuntoMalla[]> | null = null;
 let mareasCache: Promise<RecursoMarea[]> | null = null;
+let rangoMarealCache: Promise<PuntoRangoMareal[]> | null = null;
+let corrientesCache: Promise<{ velocidad_ms: number | null; estado: "verificado" | "pendiente"; lon: number; lat: number }[]> | null = null;
 
 async function cargarMalla(): Promise<PuntoMalla[]> {
   mallaCache ??= fetch(MALLA_LOCAL)
@@ -90,57 +115,9 @@ export function distanciaKm(lon1: number, lat1: number, lon2: number, lat2: numb
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
-async function consultarEnVivo(lon: number, lat: number): Promise<RecursoOleaje | null> {
-  const consulta = new URLSearchParams({
-    latitude: lat.toFixed(3),
-    longitude: lon.toFixed(3),
-    hourly: "wave_height,wave_period",
-    past_days: "7",
-    forecast_days: "1",
-    timezone: "UTC",
-  });
-  const control = new AbortController();
-  const corte = setTimeout(() => control.abort(), 8000);
-  try {
-    const respuesta = await fetch(`${API_OLEAJE}?${consulta}`, { signal: control.signal });
-    if (!respuesta.ok) return null;
-    const cuerpo = await respuesta.json();
-    const alturas: (number | null)[] = cuerpo?.hourly?.wave_height ?? [];
-    const periodos: (number | null)[] = cuerpo?.hourly?.wave_period ?? [];
-    const js: number[] = [];
-    const hs: number[] = [];
-    const ts: number[] = [];
-    for (let i = 0; i < alturas.length; i++) {
-      const h = alturas[i];
-      const p = periodos[i];
-      if (h == null || p == null || p <= 0) continue;
-      js.push(densidadPotenciaWm(h, p));
-      hs.push(h);
-      ts.push(p);
-    }
-    // Menos de un día de horas válidas es tierra o hielo, no un punto de mar.
-    if (js.length < 24) return null;
-    const media = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
-    return {
-      hm0_m: Number(media(hs).toFixed(2)),
-      te_s: Number(media(ts).toFixed(2)),
-      kw_m: Number((media(js) / 1000).toFixed(2)),
-      fuente: "Open-Meteo Marine (ERA5-Ocean / MFWAM), media de 7 días",
-      estado: "inferido",
-    };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(corte);
-  }
-}
-
-/** Recurso undimotriz en un punto. Devuelve `estado: "pendiente"` sin cifras
- *  cuando ni el reanálisis en vivo ni la malla local cubren ese punto. */
+/** Recurso undimotriz en un punto: la malla local de reanálisis. Devuelve
+ *  `estado: "pendiente"` sin cifras cuando la malla no cubre ese punto. */
 export async function consultarOleaje(lon: number, lat: number): Promise<RecursoOleaje> {
-  const vivo = await consultarEnVivo(lon, lat);
-  if (vivo) return vivo;
-
   const malla = await cargarMalla();
   let mejor: PuntoMalla | null = null;
   let mejorKm = Infinity;
@@ -180,4 +157,143 @@ export async function consultarMarea(lon: number, lat: number): Promise<RecursoM
   }
   if (!mejor || mejorKm > 250) return null;
   return { ...mejor, distancia_km: Number(mejorKm.toFixed(0)) };
+}
+
+/** Carga local del rango mareal verificado de fase 1 (FES2014/AVISO,
+ *  2*(M2+S2+K1+O1)). Sin red: el mapa de dique nunca llama al servicio. */
+async function cargarRangoMareal(): Promise<PuntoRangoMareal[]> {
+  rangoMarealCache ??= fetch(RANGO_MAREAL_LOCAL)
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then((j) =>
+      Object.entries(j ?? {})
+        .filter(([id]) => !id.startsWith("_"))
+        .map(([id, v]: [string, any]) => ({
+          id,
+          lon: Number(v.lon),
+          lat: Number(v.lat),
+          rango_m: Number(v.rango_m),
+          nombre: String(v.nombre ?? id),
+        }))
+    )
+    .catch(() => [] as PuntoRangoMareal[]);
+  return rangoMarealCache;
+}
+
+/** Rango mareal en un punto (tecnología dique): sólo hay dato verificado en
+ *  los 5 sitios de fase 1. Fuera de ellos se declara pendiente, sin interpolar. */
+export async function consultarRangoMareal(lon: number, lat: number): Promise<RecursoRangoMareal> {
+  const puntos = await cargarRangoMareal();
+  let mejor: PuntoRangoMareal | null = null;
+  let mejorKm = Infinity;
+  for (const p of puntos) {
+    const d = distanciaKm(lon, lat, p.lon, p.lat);
+    if (d < mejorKm) {
+      mejorKm = d;
+      mejor = p;
+    }
+  }
+  if (mejor && mejorKm <= 250) {
+    return {
+      rango_m: mejor.rango_m,
+      nombre: mejor.nombre,
+      fuente: `FES2014 vía AVISO (${mejor.nombre}, a ${mejorKm.toFixed(0)} km)`,
+      estado: "verificado",
+      distancia_km: Number(mejorKm.toFixed(0)),
+    };
+  }
+  return {
+    rango_m: 0,
+    nombre: "",
+    fuente: "sin campaña de rango mareal en este punto",
+    estado: "pendiente",
+    distancia_km: Number(mejorKm.toFixed(0)),
+  };
+}
+
+/** Carga local del resumen GLORYS12 de corrientes (fase 1, sin red). */
+async function cargarCorrientes(): Promise<
+  { velocidad_ms: number | null; estado: "verificado" | "pendiente"; lon: number; lat: number }[]
+> {
+  corrientesCache ??= fetch(CORRIENTES_GLORYS_LOCAL)
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then((j) =>
+      Object.values(j ?? {}).map((v: any) => ({
+        velocidad_ms: Number(v.velocidad_media_ms) > 0 ? Number(v.velocidad_media_ms) : null,
+        estado: (v.estado === "verificado" ? "verificado" : "pendiente") as "verificado" | "pendiente",
+        lon: Number(v.lon_celda ?? v.lon_solicitada),
+        lat: Number(v.lat_celda ?? v.lat_solicitada),
+      }))
+    )
+    .catch(() => []);
+  return corrientesCache;
+}
+
+/** Corriente media en un punto (tecnología turbina): hoy la ingesta GLORYS
+ *  está pendiente (registros 0), así que se declara pendiente donde no hay
+ *  dato y NO se inventa ninguna velocidad. */
+export async function consultarCorriente(lon: number, lat: number): Promise<RecursoCorriente> {
+  const puntos = await cargarCorrientes();
+  let mejor: { velocidad_ms: number | null; estado: "verificado" | "pendiente"; lon: number; lat: number } | null = null;
+  let mejorKm = Infinity;
+  for (const p of puntos) {
+    const d = distanciaKm(lon, lat, p.lon, p.lat);
+    if (d < mejorKm) {
+      mejorKm = d;
+      mejor = p;
+    }
+  }
+  if (mejor && mejorKm <= 250 && mejor.velocidad_ms != null && mejor.estado === "verificado") {
+    return {
+      velocidad_ms: mejor.velocidad_ms,
+      fuente: `GLORYS12 1/12°, celda a ${mejorKm.toFixed(0)} km`,
+      estado: "verificado",
+      distancia_km: Number(mejorKm.toFixed(0)),
+    };
+  }
+  return {
+    velocidad_ms: null,
+    fuente: "corriente GLORYS pendiente de ingesta en este punto",
+    estado: "pendiente",
+    distancia_km: Number.isFinite(mejorKm) ? Number(mejorKm.toFixed(0)) : -1,
+  };
+}
+
+/** Puntos de rango mareal verificados para la capa de dique (local, sin red).
+ *  Dibuja sólo donde hay dato: los 5 sitios de fase 1. */
+export async function coleccionRangoMareal() {
+  const puntos = await cargarRangoMareal();
+  return {
+    type: "FeatureCollection" as const,
+    features: puntos.map((p) => ({
+      type: "Feature" as const,
+      geometry: { type: "Point" as const, coordinates: [p.lon, p.lat] },
+      properties: {
+        id: p.id,
+        nombre: p.nombre,
+        rango_m: p.rango_m,
+        fuente: "FES2014 vía AVISO, 2*(M2+S2+K1+O1)",
+        estado: "verificado",
+      },
+    })),
+  };
+}
+
+/** Puntos de corriente para la capa de turbina (local, sin red).
+ *  Hoy la ingesta GLORYS está pendiente: cada punto declara su estado y el
+ *  mapa pinta «pendiente» en vez de inventar una velocidad. */
+export async function coleccionCorrientes() {
+  const puntos = await cargarCorrientes();
+  return {
+    type: "FeatureCollection" as const,
+    features: puntos.map((p, i) => ({
+      type: "Feature" as const,
+      geometry: { type: "Point" as const, coordinates: [p.lon, p.lat] },
+      properties: {
+        id: `glorys_${i}`,
+        velocidad_ms: p.velocidad_ms,
+        fuente: "GLORYS12 1/12° (pendiente de ingesta)",
+        estado: p.estado,
+      },
+    })),
+  };
 }

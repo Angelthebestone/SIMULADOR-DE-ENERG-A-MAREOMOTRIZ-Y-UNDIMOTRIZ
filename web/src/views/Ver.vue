@@ -1,5 +1,5 @@
 <template>
-  <section class="ver" aria-label="Simulador de captura" ref="raiz" tabindex="-1">
+  <section class="ver" aria-label="Simulador de captura" ref="raiz" tabindex="-1" :data-motor="motorActivo">
     <!-- Escena: el corte del mar ocupa el ancho de la columna; encima sólo el
          rótulo del emplazamiento y el control de pausa. -->
     <div class="escena">
@@ -10,6 +10,8 @@
         height="600"
         aria-label="Corte del mar con el dispositivo, el oleaje y la salida a la red"
       ></canvas>
+
+      <div ref="contenedor3D" class="lienzo-3d" aria-label="Escena tridimensional del dispositivo"></div>
 
       <header class="escena-cabecera">
         <h1 id="titulo-ver" class="titulo-nivel">Simulador de captura</h1>
@@ -28,6 +30,15 @@
           <Icono :icono="pausado ? 'reproducir' : 'pausar'" tamano="sm" />
           <span>{{ pausado ? "Reanudar" : "Pausar" }}</span>
         </button>
+        <label class="selector-motor">
+          <span class="selector-motor-rotulo">Motor</span>
+          <select v-model="motorPedido" @change="alCambiarMotor" aria-label="Motor de la escena">
+            <option value="auto">Auto</option>
+            <option value="motor-3d">3D</option>
+            <option value="motor-2d">2D</option>
+          </select>
+        </label>
+        <p class="monitor-fps" aria-live="off"><span>{{ motorActivo }}</span><span aria-hidden="true"> · </span><span>{{ textoFps }}</span></p>
       </div>
     </div>
 
@@ -96,6 +107,25 @@
         />
       </div>
 
+      <div class="bloque bloque--anotaciones">
+        <span class="rotulo-grupo">Qué es cada cosa</span>
+        <ul class="anotaciones-lista">
+          <li><Anotacion elemento="boya" /></li>
+          <li><Anotacion elemento="ola_hm0" termino="Hm0" intuicion="J" /></li>
+          <li><Anotacion elemento="periodo_te" termino="Te" /></li>
+          <li><Anotacion elemento="freno_pto" termino="B_pto" intuicion="freno" /></li>
+          <li><Anotacion elemento="energia" termino="J" intuicion="J" /></li>
+          <li><Anotacion elemento="fondo" termino="h_fondo" /></li>
+          <li v-if="modoActivo === 'mareomotriz'"><Anotacion elemento="corriente" termino="V_marea" /></li>
+          <li v-if="modoActivo === 'mareomotriz'"><Anotacion elemento="rango_marea" termino="R_marea" /></li>
+        </ul>
+        <EstadoBloque
+          v-if="modoActivo === 'undimotriz'"
+          :estado="estadoValidez"
+          :motivo="motivoValidez"
+        />
+      </div>
+
       <div class="bloque bloque--salida">
         <article class="tarjeta tarjeta--heroe" data-testid="tarjeta-viviendas" aria-live="polite">
           <h2 class="tarjeta-titulo">
@@ -126,9 +156,13 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, watch, computed } from "vue";
 import { AnimacionCanvas, PROFUNDIDAD_M, type TipoCimentacion } from "../components/AnimacionCanvas";
+import { Animacion3D } from "../components/Animacion3D";
+import Anotacion from "../components/Anotacion.vue";
 import ControlesFisicos from "../components/ControlesFisicos.vue";
+import EstadoBloque from "../components/EstadoBloque.vue";
 import Icono from "../components/Icono.vue";
 import { formatearNumero } from "../utils/formato";
+import { evaluarValidezOleaje } from "../utils/validacion";
 import type { Params } from "../api";
 
 const props = defineProps<{
@@ -143,14 +177,174 @@ const emit = defineEmits<{ (e: "update:params", v: Partial<Params>): void }>();
 
 const raiz = ref<HTMLElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
+const contenedor3D = ref<HTMLElement | null>(null);
 let animacion: AnimacionCanvas | null = null;
+let motor3d: Animacion3D | null = null;
 const sinSerie = ref("");
 const pausado = ref(false);
+
+/** Motor pedido por el usuario (Auto = 3D con respaldo 2D) y motor activo
+ *  real: la escena 3D solo se enciende si WebGL aguanta; si no, el 2D
+ *  intacto toma el relevo sin perder la simulación. */
+const motorPedido = ref<"auto" | "motor-3d" | "motor-2d">("auto");
+const motorActivo = ref<"motor-3d" | "motor-2d">("motor-2d");
+const fpsMedio = ref(0);
+const textoFps = computed(() =>
+  motorActivo.value === "motor-3d" ? `${formatearNumero(fpsMedio.value, 0)} fps` : "respaldo 2D"
+);
+const marcasFps: number[] = [];
+let fpsBajoDesde: number | null = null;
+let calidadDegradada = false;
+
+function soportaWebGL(): boolean {
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+
+/** Auto solo sube a 3D con GPU real: un rasterizador por software
+ *  (SwiftShader, llvmpipe, Mesa) da WebGL válido pero pocos fps. */
+function aceleracionPorHardware(): boolean {
+  try {
+    const c = document.createElement("canvas");
+    const gl = (c.getContext("webgl2") || c.getContext("webgl")) as WebGLRenderingContext | null;
+    if (!gl) return false;
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    if (!info) return true;
+    const nombre = String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "").toLowerCase();
+    return !/swiftshader|llvmpipe|softpipe|software|microsoft basic/.test(nombre);
+  } catch {
+    return false;
+  }
+}
+
+function onFrame3D(marcaMs: number) {
+  marcasFps.push(marcaMs);
+  if (marcasFps.length > 90) marcasFps.shift();
+  if (marcasFps.length < 30) return;
+  const deltas: number[] = [];
+  for (let i = 1; i < marcasFps.length; i++) deltas.push(marcasFps[i] - marcasFps[i - 1]);
+  deltas.sort((a, b) => a - b);
+  const mediana = deltas[Math.floor(deltas.length / 2)] || 16;
+  fpsMedio.value = Math.min(120, Math.round(1000 / Math.max(1, mediana)));
+  const ahora = typeof performance !== "undefined" ? performance.now() : Date.now();
+  if (fpsMedio.value < 30) {
+    fpsBajoDesde ??= ahora;
+    if (!calidadDegradada && ahora - fpsBajoDesde > 700) {
+      calidadDegradada = true;
+      motor3d?.degradarCalidad();
+    }
+    if (ahora - fpsBajoDesde > 2000) cambiarMotor("motor-2d");
+  } else {
+    fpsBajoDesde = null;
+  }
+}
+
+function payloadComun() {
+  const { hm0_m, te_s, b_pto_ns_m } = props.params;
+  const profundidad = props.params.profundidad_m || PROFUNDIDAD_M;
+  const k = numeroOnda((2 * Math.PI) / te_s, profundidad);
+  const r = props.resultado;
+  const t = r?.series?.t_s ?? null;
+  const z = r?.series?.z_m ?? null;
+  const series =
+    Array.isArray(t) && Array.isArray(z) && t.length && z.length ? { t_s: t, z_m: z } : null;
+  return {
+    series,
+    k,
+    Hm0: hm0_m,
+    Te: te_s,
+    Bpto: b_pto_ns_m,
+    dispositivo: String(r?.metadatos?.dispositivo ?? props.params.dispositivo),
+    profundidad_m: profundidad,
+    modoEnergia: modoActivo.value,
+    cimentacion: cimentacionSeleccionada.value,
+    velocidadCorriente: velocidadCorriente.value,
+    rangoMarea: rangoMarea.value,
+    cantidadUnidades: Number((r as Record<string, unknown> | null | undefined)?.cantidad_unidades) > 0 ? Number((r as Record<string, unknown>).cantidad_unidades) : undefined,
+    potenciaCaptadaW: Number(r?.potencia_nominal_w) || null,
+    modo: String((r as Record<string, unknown> | null | undefined)?.recurso ? String(((r as Record<string, unknown>).recurso as Record<string, unknown>).modo ?? "") : ""),
+  };
+}
+
+/** Enciende el motor pedido sin perder la simulación: alimenta el payload
+ *  común al motor entrante, pausa el saliente y reconecta el monitor. */
+function cambiarMotor(destino: "motor-3d" | "motor-2d") {
+  if (destino === "motor-3d") {
+    if (!contenedor3D.value || !soportaWebGL()) {
+      motorActivo.value = "motor-2d";
+      return;
+    }
+    try {
+      if (!motor3d && contenedor3D.value) {
+        motor3d = new Animacion3D(contenedor3D.value);
+        motor3d.onFrame = onFrame3D;
+      }
+      if (!motor3d) {
+        motorActivo.value = "motor-2d";
+        return;
+      }
+      motor3d.cargarSimulacion(payloadComun() as never);
+      sinSerie.value = motor3d.sinSerieMsg;
+      animacion?.pausar();
+      motorActivo.value = "motor-3d";
+      motor3d.arrancar();
+      if (pausado.value) motor3d.pausar();
+      else motor3d.reanudar();
+      pausado.value = motor3d.pausado;
+      if (canvasRef.value) canvasRef.value.style.visibility = "hidden";
+      if (contenedor3D.value) contenedor3D.value.style.visibility = "visible";
+    } catch {
+      motor3d = null;
+      motorActivo.value = "motor-2d";
+    }
+    return;
+  }
+  animacion?.cargarSimulacion(payloadComun() as never);
+  if (animacion) {
+    sinSerie.value = animacion.sinSerieMsg;
+    motor3d?.pausar();
+    motorActivo.value = "motor-2d";
+    animacion.arrancar();
+    if (pausado.value) animacion.pausar();
+    else animacion.reanudar();
+    pausado.value = animacion.pausado;
+  }
+  if (canvasRef.value) canvasRef.value.style.visibility = "visible";
+  if (contenedor3D.value) contenedor3D.value.style.visibility = "hidden";
+}
+
+function alCambiarMotor() {
+  marcasFps.length = 0;
+  fpsBajoDesde = null;
+  if (motorPedido.value === "motor-2d") cambiarMotor("motor-2d");
+  else if (motorPedido.value === "motor-3d") cambiarMotor("motor-3d");
+  else if (soportaWebGL() && aceleracionPorHardware()) cambiarMotor("motor-3d");
+  else cambiarMotor("motor-2d");
+}
 
 const modoActivo = ref<"undimotriz" | "mareomotriz">("undimotriz");
 const cimentacionSeleccionada = ref<TipoCimentacion>("pilote");
 const velocidadCorriente = ref(2.2);
 const rangoMarea = ref(3.5);
+
+/* Aviso de validez del modelo lineal: se calcula sobre los valores de los
+   controles, sin tocar el resultado del servicio. Fuera de rango se avisa
+   en palabras, sin cifras con apariencia de exactas. */
+const validez = computed(() =>
+  evaluarValidezOleaje({
+    hm0: props.params.hm0_m,
+    te: props.params.te_s,
+    profundidad: props.params.profundidad_m || PROFUNDIDAD_M,
+  })
+);
+const estadoValidez = computed<'pendiente' | 'error' | 'resultado'>(() =>
+  validez.value.estado === 'fuera' ? 'error' : validez.value.estado === 'limite' ? 'pendiente' : 'resultado'
+);
+const motivoValidez = computed(() => validez.value.mensaje || 'Oleaje dentro del rango del modelo lineal.');
 
 const MODOS = [
   { id: "undimotriz" as const, label: "Oleaje" },
@@ -159,7 +353,6 @@ const MODOS = [
 
 const DISPOSITIVOS_UNDIMOTRIZ = [
   { id: "absorbedor_puntual", nombre: "Absorbedor puntual" },
-  { id: "owc", nombre: "Columna de agua oscilante" },
 ];
 
 const DISPOSITIVOS_MAREOMOTRIZ = [
@@ -205,7 +398,7 @@ function seleccionarModo(modo: "undimotriz" | "mareomotriz") {
     if (props.params.dispositivo !== "turbina_corriente" && props.params.dispositivo !== "embalse") {
       emit("update:params", { dispositivo: "turbina_corriente" });
     }
-  } else if (props.params.dispositivo !== "absorbedor_puntual" && props.params.dispositivo !== "owc") {
+  } else if (props.params.dispositivo !== "absorbedor_puntual") {
     emit("update:params", { dispositivo: "absorbedor_puntual" });
   }
 }
@@ -247,40 +440,27 @@ function numeroOnda(omega: number, h: number): number {
 
 function redibujar() {
   if (!animacion) return;
-  const { hm0_m, te_s, b_pto_ns_m } = props.params;
-  const profundidad = props.params.profundidad_m || PROFUNDIDAD_M;
-  const k = numeroOnda((2 * Math.PI) / te_s, profundidad);
-
-  const r = props.resultado;
-  const t = r?.series?.t_s ?? null;
-  const z = r?.series?.z_m ?? null;
-  const series =
-    Array.isArray(t) && Array.isArray(z) && t.length && z.length ? { t_s: t, z_m: z } : null;
-
-  animacion.cargarSimulacion({
-    series,
-    k,
-    Hm0: hm0_m,
-    Te: te_s,
-    Bpto: b_pto_ns_m,
-    dispositivo: String(r?.metadatos?.dispositivo ?? props.params.dispositivo),
-    profundidad_m: profundidad,
-    modoEnergia: modoActivo.value,
-    cimentacion: cimentacionSeleccionada.value,
-    velocidadCorriente: velocidadCorriente.value,
-    rangoMarea: rangoMarea.value,
-    potenciaCaptadaW: Number(r?.potencia_nominal_w) || null,
-  });
+  const payload = payloadComun();
+  if (motorActivo.value === "motor-3d" && motor3d) {
+    motor3d.cargarSimulacion(payload as never);
+    sinSerie.value = motor3d.sinSerieMsg;
+    motor3d.arrancar();
+    if (pausado.value) motor3d.pausar();
+    pausado.value = motor3d.pausado;
+    return;
+  }
+  animacion.cargarSimulacion(payload as never);
   sinSerie.value = animacion.sinSerieMsg;
   animacion.arrancar();
   pausado.value = animacion.pausado;
 }
 
 function togglePausa() {
-  if (!animacion) return;
-  if (animacion.pausado) animacion.reanudar();
-  else animacion.pausar();
-  pausado.value = animacion.pausado;
+  const activo = motorActivo.value === "motor-3d" && motor3d ? motor3d : animacion;
+  if (!activo) return;
+  if (activo.pausado) activo.reanudar();
+  else activo.pausar();
+  pausado.value = activo.pausado;
 }
 
 /** La carcasa llama aquí al pulsar «Simular este emplazamiento»: la escena
@@ -306,9 +486,15 @@ onMounted(() => {
   // Ya no hay tira de lectura sobre el lienzo: el corte llega hasta el borde.
   animacion.pie = 0;
   redibujar();
+  // Auto: 3D si WebGL aguanta, si no el 2D intacto sigue al mando.
+  alCambiarMotor();
 });
 
-onBeforeUnmount(() => animacion?.detener());
+onBeforeUnmount(() => {
+  animacion?.detener();
+  motor3d?.liberar();
+  motor3d = null;
+});
 
 watch(
   () => [props.params, props.resultado, modoActivo.value],
@@ -356,6 +542,60 @@ watch(
   inline-size: 100%;
   block-size: 100%;
   display: block;
+}
+
+/* Escena 3D con respaldo 2D: el lienzo 3D vive encima sólo cuando el motor
+   activo es el 3D; el 2D intacto sigue debajo y toma el relevo sin perder
+   la simulación si WebGL falla o el ritmo cae bajo 30 fps. */
+.lienzo-3d {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  visibility: hidden;
+}
+
+.ver[data-motor="motor-3d"] .lienzo-3d {
+  visibility: visible;
+}
+
+.ver[data-motor="motor-3d"] .oleaje {
+  visibility: hidden;
+}
+
+.selector-motor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--s-1) 10px;
+  border: 1px solid var(--marco-linea);
+  border-radius: var(--radio);
+  background: oklch(0.24 0.02 238 / 0.82);
+  color: var(--marco-tinta);
+  font-size: var(--text-meta);
+  backdrop-filter: blur(6px);
+}
+
+.selector-motor-rotulo {
+  font-weight: 600;
+}
+
+.selector-motor select {
+  background: transparent;
+  color: inherit;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.monitor-fps {
+  margin: 0;
+  padding: var(--s-1) 10px;
+  border-radius: var(--radio);
+  background: oklch(1 0 0 / 0.8);
+  color: var(--tenue);
+  font-size: var(--text-meta);
+  white-space: nowrap;
 }
 
 .escena-cabecera {
@@ -450,6 +690,24 @@ watch(
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--tenue);
+}
+
+/* Anotaciones clicables de la escena: qué es cada cosa, en lista. */
+.anotaciones-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Aviso de validez del modelo: reutiliza EstadoBloque con sus estados. */
+.bloque--anotaciones {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--aviso-borde);
+  border-radius: var(--radio-caja);
+  background: var(--aviso-fondo);
 }
 
 /* ---- Selección de recurso y dispositivo ---- */

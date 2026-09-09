@@ -18,6 +18,7 @@ ATRIBUCIONES: list[str] = [
     "RUNAP PNN 37 areas marinas 305.335 km2, datos/runap/areas_marinas_protegidas_atributos.json.",
     "Superservicios ZNI/SIN 3ebi-d83g demanda, 5cvc-m38t costo ZNI, td8k-vhq9 SIN - datos/zni/, documentacion/fuentes_datos_economicos.md.",
     "XM/API_XM EquipoAnaliticaXM pydataxm MIT https://github.com/EquipoAnaliticaXM/API_XM, metricas PrecBolsNaci y factorEmisionCO2e horarios 8760 filas 2023, datos/xm/resumen_xm.json.",
+    "Esri Global_Tidal_Range_meters2 Image Service 2*(M2+S2+K1+O1) sobre FES2014 via teselas LERC, datos/mareas/rango_mareal_esri.json - FES2014 was produced by Noveltis, Legos and CLS and distributed by Aviso+, with support from Cnes.",
 ]
 
 
@@ -44,4 +45,5 @@ def atribuciones_dict() -> dict[str, str]:
         "runap": ATRIBUCIONES[3],
         "superservicios": ATRIBUCIONES[4],
         "xm": ATRIBUCIONES[5],
+        "esri_fes": ATRIBUCIONES[6],
     }

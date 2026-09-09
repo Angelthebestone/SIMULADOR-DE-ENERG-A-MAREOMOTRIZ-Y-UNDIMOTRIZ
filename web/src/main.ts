@@ -3,43 +3,137 @@ import './styles/tokens.css'
 import './styles/fuentes.css'
 import './styles/semaforo.css'
 import './styles/app.css'
+import './flujo/flujo.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Ver from './views/Ver.vue'
+import Calcular from './views/Calcular.vue'
+import Comparar from './views/Comparar.vue'
+import Disenar from './views/Disenar.vue'
+import Portada from './views/Portada.vue'
+import Tecnologia from './views/Tecnologia.vue'
+import OrigenDatos from './views/OrigenDatos.vue'
 import MapaView from './components/MapaView.vue'
 import Icono from './components/Icono.vue'
 import DialogoFuentes from './components/DialogoFuentes.vue'
 import type { SitioMapa } from './map/mapa'
 import { simular, cancelar, type Params } from './api'
 import { formatearNumero } from './utils/formato'
+import {
+  PASOS,
+  PARAMS_INICIALES,
+  dispositivoPorDefecto,
+  familiaDeDispositivo,
+  type Familia,
+  type Origen,
+  type Paso,
+} from './flujo/estado'
 
 const CITA = `SIMULADOR DE ENERGÍA MARINA — RECURSO, CAPTURA Y COSTES
 Ortega et al. (2013) · 8,9 kW/m en Isla Fuerte frente a 40 kW/m de umbral de granja (Osorio et al. 2016 / Handbook cap. 1)
 ERA5-Ocean vía Open-Meteo Marine · GMRT Lamont-Doherty · RUNAP · XM
 Natural Earth para el contorno de tierra. Repositorio público con datos reproducibles.`
 
+// Decisión de arranque (lote a): la app arranca en el paso 4 con los valores
+// de siempre (isla_fuerte / absorbedor_puntual) para que la escena, la carta
+// y la barra de cifras estén montadas al cargar. La portada queda a un toque
+// en la ruta de pasos, no como bloqueo inicial.
 const PLANTILLA = `
   <div id="app" :data-sustentacion="sustentacion ? '' : null" style="--escala:1">
-    <!-- Tablero: emplazamiento a la izquierda, escena a la derecha. Los dos
-         siempre a la vista, ninguno se desmonta ni se reduce a miniatura.
-         Sin barra superior: el título vive en la pestaña y las dos acciones
-         bajan al pie, ganando una franja completa para el tablero. -->
-    <main class="tablero">
-      <section class="columna" aria-label="Emplazamiento">
-        <MapaView
-          :sitio-activo="params.sitio_id"
-          @seleccionar-sitio="alSeleccionarSitioMapa"
-          @ir-a-simulador="alIrASimulador" />
-      </section>
+    <main class="tablero flujo">
+      <header class="flujo-cabecera" aria-label="Ruta del recorrido">
+        <ol class="flujo-lista">
+          <li v-for="(p, i) in pasos" :key="p.id" class="flujo-paso-item">
+            <button
+              type="button"
+              class="flujo-paso"
+              :data-testid="'paso-' + p.id"
+              :aria-current="paso === p.id ? 'step' : undefined"
+              @click="irA(p.id)"
+            >
+              <span class="flujo-num" aria-hidden="true">{{ p.id }}</span>
+              <span>{{ p.nombre }}</span>
+            </button>
+            <span v-if="i < pasos.length - 1" class="flujo-separador" aria-hidden="true">›</span>
+          </li>
+        </ol>
+      </header>
 
-      <section class="columna" aria-label="Simulador">
-        <Ver
-          ref="ver"
-          :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
-          @update:params="aplicarParams" />
-      </section>
+      <div class="etapa">
+        <Portada v-if="paso === 1" @elegir-familia="alElegirFamilia" />
+
+        <Tecnologia
+          v-else-if="paso === 2"
+          :familia="familia"
+          :dispositivo="params.dispositivo"
+          @elegir-tecnologia="alElegirTecnologia"
+          @continuar="irA(3)"
+          @volver="irA(1)"
+        />
+
+        <OrigenDatos
+          v-else-if="paso === 3"
+          :origen="origen"
+          :params="params"
+          :sitio-id="params.sitio_id"
+          :sitio-nombre="nombreSitio"
+          :sitio-fuente="fuenteSitio"
+          @elegir-origen="alElegirOrigen"
+          @update:params="aplicarParams"
+          @seleccionar-sitio="alSeleccionarSitioMapa"
+          @ir-a-simulador="alIrASimulador"
+          @continuar="irA(4)"
+          @volver="irA(2)"
+        />
+
+        <div v-else class="panel-simulacion">
+          <Ver
+            ref="ver"
+            :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
+            @update:params="aplicarParams" />
+
+          <p v-if="origen === 'personalizado'" class="nota-hipotetico" data-testid="nota-hipotetico">
+            Resultado hipotético: estos números se escribieron a mano y no pertenecen a ningún punto del mapa.
+          </p>
+
+          <div class="bloque-mapa">
+            <h2>Emplazamiento</h2>
+            <div class="mapa-caja">
+              <MapaView
+                :sitio-activo="params.sitio_id"
+                @seleccionar-sitio="alSeleccionarSitioMapa"
+                @ir-a-simulador="alIrASimulador" />
+            </div>
+          </div>
+
+          <nav class="subvistas" aria-label="Lecturas de la simulación">
+            <button
+              v-for="s in subvistas"
+              :key="s.id"
+              type="button"
+              class="subvista-btn"
+              :data-testid="'subvista-' + s.id"
+              :aria-selected="subvista === s.id ? 'true' : 'false'"
+              @click="subvista = s.id"
+            >
+              <span>{{ s.nombre }}</span>
+            </button>
+          </nav>
+
+          <Calcular v-if="subvista === 'calcular'" :formulas="formulas" :resultado="resultado" :cargando="cargando" />
+          <Comparar v-else-if="subvista === 'comparar'" :resultado="resultado" :cargando="cargando" />
+          <Disenar
+            v-else-if="subvista === 'disenar'"
+            :figuras="figuras"
+            :resultado="resultado"
+            :panel-sitio="panelSitio"
+            :sitio-id="params.sitio_id"
+            :params="params"
+            @update:params="aplicarParams"
+          />
+        </div>
+      </div>
     </main>
 
-    <!-- Cadena de lectura: las cuatro cifras encadenadas, siempre a la vista. -->
     <footer class="lectura" role="status" aria-live="polite" data-testid="barra-kpis">
       <div class="cadena">
         <template v-for="(k, i) in kpis" :key="k.id">
@@ -83,27 +177,31 @@ const PLANTILLA = `
 
 const app = createApp({
   template: PLANTILLA,
-  components: { Ver, MapaView, Icono, DialogoFuentes },
+  components: { Ver, Calcular, Comparar, Disenar, Portada, Tecnologia, OrigenDatos, MapaView, Icono, DialogoFuentes },
   data() {
     return {
       sustentacion: false,
       offline: false,
+      paso: 4 as Paso,
+      familia: 'undimotriz' as Familia,
+      origen: 'lugar' as Origen,
+      subvista: 'calcular' as 'calcular' | 'comparar' | 'disenar',
+      pasos: PASOS,
+      subvistas: [
+        { id: 'calcular' as const, nombre: 'Calcular' },
+        { id: 'comparar' as const, nombre: 'Comparar' },
+        { id: 'disenar' as const, nombre: 'Diseñar' },
+      ],
       resultado: null as Record<string, any> | null,
+      formulas: {} as Record<string, unknown>,
+      figuras: null as Record<string, unknown> | null,
+      panelSitio: null as Record<string, unknown> | null,
       viviendas: null as number | null,
       error: '' as string,
       cargando: false,
-      params: {
-        hm0_m: 1.5,
-        te_s: 7.0,
-        b_pto_ns_m: 80_000,
-        profundidad_m: 30,
-        sitio_id: 'isla_fuerte',
-        dispositivo: 'absorbedor_puntual',
-        eta_pto: 0.65,
-        eta_gen: 0.90,
-        crf: 0.08,
-        rho: 1025,
-      } as Params,
+      nombreSitio: 'Isla Fuerte, Caribe colombiano',
+      fuenteSitio: 'Ortega et al. 2013 · periodo 2015-2024',
+      params: { ...PARAMS_INICIALES } as Params,
       citaLarga: CITA,
       temporizador: 0 as unknown as ReturnType<typeof setTimeout>,
     }
@@ -131,8 +229,24 @@ const app = createApp({
     },
   },
   methods: {
+    irA(p: Paso) {
+      this.paso = p
+    },
+    alElegirFamilia(f: Familia) {
+      this.familia = f
+      this.aplicarParams({ dispositivo: dispositivoPorDefecto(f) })
+      this.paso = 2
+    },
+    alElegirTecnologia(id: string) {
+      this.familia = familiaDeDispositivo(id)
+      this.aplicarParams({ dispositivo: id })
+    },
+    alElegirOrigen(o: Origen) {
+      this.origen = o
+    },
     aplicarParams(cambios: Partial<Params>) {
       Object.assign(this.params, cambios)
+      if (cambios.dispositivo) this.familia = familiaDeDispositivo(cambios.dispositivo)
     },
     abrirFuentes() {
       ;(this.$refs.dialogoFuentes as { abrir: () => void } | undefined)?.abrir()
@@ -144,12 +258,14 @@ const app = createApp({
       if (s.profundidad_m) cambios.profundidad_m = s.profundidad_m
       if (s.tipo === 'mareomotriz') cambios.dispositivo = 'turbina_corriente'
       else if (s.tipo === 'undimotriz') cambios.dispositivo = 'absorbedor_puntual'
+      this.origen = 'lugar'
+      this.nombreSitio = s.nombre || this.nombreSitio
+      this.fuenteSitio = s.fuente ? `${s.fuente} · periodo 2015-2024` : this.fuenteSitio
       this.aplicarParams(cambios)
     },
-    // Con las dos columnas siempre visibles, «simular» ya no cambia de
-    // pantalla: lleva el foco a la escena para que la mirada siga a la acción.
     alIrASimulador(s: SitioMapa) {
       this.alSeleccionarSitioMapa(s)
+      this.paso = 4
       ;(this.$refs.ver as { enfocar?: () => void } | undefined)?.enfocar?.()
     },
     async ejecutar() {
@@ -159,6 +275,12 @@ const app = createApp({
         const respuesta = (await simular({ ...this.params })) as Record<string, any>
         if (respuesta?.error) this.error = String(respuesta.error)
         this.resultado = respuesta?.resultado ?? null
+        const f = respuesta?.formulas
+        this.formulas = f && typeof f === 'object' ? (f as Record<string, unknown>) : {}
+        const figs = respuesta?.figuras ?? respuesta?.resultado?.figuras ?? null
+        this.figuras = figs && typeof figs === 'object' ? (figs as Record<string, unknown>) : null
+        const panel = respuesta?.extras?.panel_sitio ?? null
+        this.panelSitio = panel && typeof panel === 'object' ? (panel as Record<string, unknown>) : null
         const v = respuesta?.extras?.viviendas
         this.viviendas = typeof v === 'number' ? v : (v?.viviendas ?? null)
       } catch (e) {

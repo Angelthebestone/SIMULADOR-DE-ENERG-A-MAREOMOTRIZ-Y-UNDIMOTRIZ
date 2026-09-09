@@ -93,6 +93,16 @@
   --map-oceano: oklch(0.32 0.04 165);
   --map-tierra-fill: oklch(0.93 0.014 90);
   --map-tierra-stroke: oklch(0.52 0.035 145);
+
+  /* Anotaciones educativas y avisos de validez: vocabulario propio, sin
+     repetir valores de --conf-* ni de --rol-*. Los componentes los usan
+     con var(), nunca con literales. */
+  --anotacion-fondo: oklch(0.97 0.012 110);
+  --anotacion-borde: oklch(0.42 0.08 155);
+  --aviso-fondo: oklch(0.945 0.02 95);
+  --aviso-borde: oklch(0.55 0.1 80);
+  --aviso-error-fondo: oklch(0.94 0.03 40);
+  --aviso-error-borde: oklch(0.52 0.15 35);
 }
 
 [data-sustentacion] {
