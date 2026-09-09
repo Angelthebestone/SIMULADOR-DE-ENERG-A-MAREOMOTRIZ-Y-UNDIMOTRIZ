@@ -43,9 +43,9 @@ Hecho (ya en árbol):
 - `datos/manifiesto.json` v2: 15 entradas, cubre 100 % carpetas.
 - Diff tracked Fase 1: +146 / −7.792 líneas. `datos/` 91,6 → 91,2 MB.
 
-Pendiente (NO borrar sin “sí” uno por uno):
-1. Crudo `datos/mareas/nivel_mar_tumaco_ioc_2023-2025.csv` (32,5 MB, 0 referencias, ya derivado en 31,2 KB).
-2. Los 1.722 PNG de `datos/gee/` (10,6 MB, ya empaquetados en 258 KB `.pmtiles`).
+Borrado autorizado el 2026-09-09: crudo `datos/mareas/nivel_mar_tumaco_ioc_2023-2025.csv` (32,5 MB, 0 referencias en runtime; solo lo nombraban su descargador y `procesar_tumaco_diario.py`, que ya lo redujo a 31,2 KB). Regenerable con `descargar_mareas_tumaco.py`. `datos/` 95 → 63 MB.
+
+Pendiente (NO borrar sin “sí”): los 1.722 PNG de `datos/gee/` (10,6 MB, ya empaquetados en 258 KB `.pmtiles`; ojo al fallback XYZ de `mapa.ts`).
 
 Criterios Hecho Fase 1: pytest con 8 rojos preexistentes (no verde limpio) ❌; `datos/` 91,2 MB no <30 MB ❌ (bloqueado por lo anterior + `juanchaco`/`tesoro` que sí lee `nucleo/mareas.py` + ERA5 que sí lee `servicio.py`); 0 nulls en resúmenes propios ✅; manifiesto 100 % ✅.
 
@@ -81,6 +81,8 @@ Existe y verificado en código:
 
 ## 8. Tests — dónde estamos (corrida 2026-09-09)
 
+- Ejecución local verificada el 2026-09-09: `python -m app` abre la ventana nativa (requiere `pip install pywebview`, que NO está en `requirements.txt` porque ese archivo es solo del backend serverless). El motor real vía `app.carcasa.api_simular`: absorbedor@isla_fuerte 407 ms, turbina@tumaco 39 ms, embalse@tumaco 38 ms — muy por debajo del RNF01 de 2 s. Las 3 escenas 3D (absorbedor, granja de turbinas, dique con `h` en vivo) se comprobaron a ojo en el dev server; ojo: el dev server de Vite responde `/api/simular` con un **mock** (`vite.config.ts`), las cifras reales solo salen por la carcasa o por Vercel.
+- Instalar pywebview destapó dos pruebas que solo pasaban por su ausencia; arregladas en `app/carcasa.py` resolviendo el módulo en la llamada y no en el import: `comprobar_motor()` lee `sys.modules`, `crear_ventana()` hace `import webview` dentro. Con eso `test_deteccion_webview2_presente` pasa a verde y quedan **5** rojos preexistentes, no 6.
 - Suite Python sin e2e/build: **330 passed, 6 failed** — los mismos 6 rojos preexistentes de `documentacion/tests_rojos_pre_existentes.md`, ninguno es regresión: `test_11_4_esquema_sitios` (fixture `sin_coords.json`), `test_deteccion_webview2_presente`, 2× `s1_21` resonancia borde, `s4_03` progreso/cancelación (carrera), `test_14_1_14_2` ("Copernicus Marine" case/encoding).
 - CSP + build: **15 passed, 1 deselected**.
 - `test_build_es_reproducible_dos_corridas` (corrido solo): **1 passed en 83 s** — ya no hace falta deselectarlo.
@@ -104,9 +106,8 @@ Fuera del commit: `web/dist/` (rebuild local), `documentacion/logs/`, `__pycache
 
 Cerrados en esta sesión: enlaces `fracaso` de plantas (§7.2), fix headless↔3D (§7.3), `dos_corridas` en verde (§8). Queda:
 
-1. **Autorizaciones de borrado de Fase 1 (§4), una por una y con peso** — sin "sí" explícito no se toca nada:
-   - `datos/mareas/nivel_mar_tumaco_ioc_2023-2025.csv`, 32,5 MB, 0 referencias en código, ya derivado en `nivel_mar_tumaco_diario_2023-2025.csv` (31,2 KB).
+1. **Autorización de borrado pendiente de Fase 1 (§4)** — sin "sí" explícito no se toca:
    - Los 1.722 PNG de `datos/gee/`, 10,6 MB, ya empaquetados en 258 KB de `.pmtiles` (los `.pmtiles` se sirven con fallback XYZ a esos PNG en `mapa.ts`: si se borran, el fallback se queda sin destino y hay que quitarlo o aceptar solo `pmtiles://`).
-   Con ambos borrados `datos/` bajaría de 91,2 MB a ~48 MB; el objetivo <30 MB sigue bloqueado por `juanchaco`/`tesoro` (los lee `nucleo/mareas.py`) y ERA5 (lo lee `servicio.py`).
+   Con ese borrado `datos/` bajaría de 63 MB a ~52 MB; el objetivo <30 MB sigue bloqueado por `juanchaco`/`tesoro` (los lee `nucleo/mareas.py`) y ERA5 (lo lee `servicio.py`).
 2. Los 6 rojos preexistentes (§8) siguen abiertos y documentados; decidir si se arreglan o se aceptan como deuda declarada.
 3. Checkpoint formal de Fase 2 (§5), que quedó sin imprimir.
