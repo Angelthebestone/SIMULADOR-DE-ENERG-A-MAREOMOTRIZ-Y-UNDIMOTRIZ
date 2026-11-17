@@ -21,6 +21,8 @@ import {
   crearCielo,
   crearEntornoMarino,
   crearEtiqueta,
+  crearLechoArena,
+  crearRocasLecho,
   crearSuperficieMar,
 } from "../utilidades";
 
@@ -52,10 +54,12 @@ export const escenaAbsorbedor: Escena3D = {
 
   encuadre(): Encuadre3D {
     return {
-      posicion: { x: 7.5, y: 4.8, z: 17.5 },
-      lookAt: { x: 0.8, y: -1.6, z: 0 },
-      fondo: 0x5a9ec2,
-      niebla: { near: 24, far: 70 },
+      posicion: { x: 7.0, y: 4.4, z: 16.2 },
+      lookAt: { x: 0.9, y: -1.8, z: 0 },
+      fondo: 0xa8c8da,
+      niebla: { near: 40, far: 140 },
+      radio: 6.9,
+      margen: 1.02,
     };
   },
 
@@ -67,33 +71,23 @@ export const escenaAbsorbedor: Escena3D = {
     const m = manijasVacias();
     const mat = ctx.mat;
 
-    // ---- Lecho de arena plano (sin caja) ----
-    const lechoGeo = new THREE.PlaneGeometry(100, 60, ctx.calidadBaja ? 8 : 14, ctx.calidadBaja ? 4 : 8);
-    lechoGeo.rotateX(-Math.PI / 2);
-    const lp = lechoGeo.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < lp.count; i++) {
-      lp.setY(i, Math.sin(lp.getX(i) * 0.3) * 0.07 + Math.cos(lp.getZ(i) * 0.35) * 0.05);
-    }
-    lechoGeo.computeVertexNormals();
-    const lecho = new THREE.Mesh(
-      lechoGeo,
-      mat(COL.arena, { roughness: 0.95, metalness: 0.0 })
-    );
-    lecho.position.y = -6.2;
-    lecho.receiveShadow = true;
+    // ---- Lecho de arena con dunas y rocas (sin caja) ----
+    const lecho = crearLechoArena(220, 180, -6.2, ctx.calidadBaja, {
+      amplitud: 0.5,
+      tono: 0.95,
+    });
+    lecho.position.z = -30;
     g.add(lecho);
+    g.add(crearRocasLecho(10, 120, 90, -6.2, 23));
 
     // ---- Superficie de mar ancha, sin volumen caja ----
-    const marInfo = crearSuperficieMar(80, 40, 0.15, ctx.calidadBaja);
-    const matMar = marInfo.malla.material as THREE.MeshPhongMaterial;
-    matMar.color.setHex(0x2b86b5);
-    matMar.opacity = 0.5;
-    matMar.shininess = 170;
-    matMar.specular.setHex(0xb8e4f5);
-    matMar.side = THREE.FrontSide;
-    matMar.depthWrite = false;
-    marInfo.malla.renderOrder = 2;
-    marInfo.malla.position.z = -6;
+    // Llega más allá de la niebla: el horizonte no muestra el borde del plano.
+    const marInfo = crearSuperficieMar(220, 200, 0.15, ctx.calidadBaja, {
+      color: 0xa8c8da,
+      near: 40,
+      far: 140,
+    });
+    marInfo.malla.position.z = -40;
     g.add(marInfo.malla);
     m.mar = marInfo.malla;
     m.marBase = marInfo.base;
@@ -394,7 +388,7 @@ export const escenaAbsorbedor: Escena3D = {
     g.add(cableInterno);
 
     m.etiquetaDispositivo = crearEtiqueta("Absorbedor puntual");
-    m.etiquetaDispositivo.position.set(0, 4.4, 0);
+    m.etiquetaDispositivo.position.set(0, 3.6, 0);
     g.add(m.etiquetaDispositivo as Sprite3D);
 
     return m;

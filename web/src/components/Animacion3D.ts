@@ -8,6 +8,7 @@
 import * as THREE from "three";
 import type {
   ContextoEscena3D,
+  Encuadre3D,
   Escena3D,
   ManijasEscena3D,
   ModoEnergia3D,
@@ -16,12 +17,15 @@ import type {
 } from "./animacion3d/tipos";
 import { manijasVacias, PROFUNDIDAD_M_3D } from "./animacion3d/tipos";
 import {
+  actualizarNivelAgua,
   crearEtiqueta,
   crearLecho,
   crearMat,
   crearRedElectrica,
   crearSuperficieMar,
+  disponerEtiquetas,
   pintarEtiqueta,
+  type ZonaReservadaPx,
 } from "./animacion3d/utilidades";
 import { escenaAbsorbedor } from "./animacion3d/escenas/absorbedor";
 import { escenaDique } from "./animacion3d/escenas/dique";
@@ -75,13 +79,23 @@ export class Animacion3D {
   private raiz: THREE.Group | null = null;
   private escena: Escena3D = escenaAbsorbedor;
   private manijas: ManijasEscena3D = manijasVacias();
+  /** Encuadre autoral de la escena; el aspecto decide la distancia final. */
+  private encuadre: Encuadre3D | null = null;
+  /** Rótulos en espacio de cámara (se recolocan cada fotograma). */
+  private etiquetas: THREE.Sprite[] = [];
+  private grupoEtiquetas: THREE.Group;
+  /** Controles flotantes medidos en el DOM que los rótulos deben esquivar. */
+  private zonasRotulos: ZonaReservadaPx[] = [];
+  private zonasMedidasMs = 0;
 
   constructor(contenedor: HTMLElement) {
     this.contenedor = contenedor;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCF (no PCFSoft): mismo aspecto didáctico, más barato y sin aviso de
+    // deprecación en consola.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     const ancho = Math.max(2, contenedor.clientWidth || 800);
     const alto = Math.max(2, contenedor.clientHeight || 400);
     this.renderer.setSize(ancho, alto);
@@ -90,7 +104,7 @@ export class Animacion3D {
     this.renderer.domElement.style.height = "100%";
     // ACES + sRGB: evita el lavado de colores del tonemap lineal por defecto.
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     contenedor.appendChild(this.renderer.domElement);
 
@@ -101,16 +115,22 @@ export class Animacion3D {
     this.camera = new THREE.PerspectiveCamera(45, ancho / alto, 0.1, 300);
     this.camera.position.set(0, 9, 24);
     this.camera.lookAt(0, -1, 0);
+    // Los rótulos son hijos de la cámara: la cámara debe estar en la escena
+    // para que su subárbol se renderice.
+    this.grupoEtiquetas = new THREE.Group();
+    this.grupoEtiquetas.name = "rotulos";
+    this.camera.add(this.grupoEtiquetas);
+    this.scene.add(this.camera);
 
-    const hemi = new THREE.HemisphereLight(0xe8f4f8, 0x2a4a5a, 1.15);
+    const hemi = new THREE.HemisphereLight(0xdceef6, 0x24424f, 0.95);
     this.scene.add(hemi);
-    const sol = new THREE.DirectionalLight(0xfff4e0, 1.85);
+    const sol = new THREE.DirectionalLight(0xfff2dc, 1.65);
     sol.position.set(12, 20, 10);
     sol.castShadow = true;
     sol.shadow.mapSize.set(1024, 1024);
     this.scene.add(sol);
     // Relleno suave desde el otro lado: evita que el metal quede a manchas.
-    const relleno = new THREE.DirectionalLight(0xc5dff0, 0.55);
+    const relleno = new THREE.DirectionalLight(0xbfdcef, 0.45);
     relleno.position.set(-10, 8, -6);
     this.scene.add(relleno);
 
@@ -240,15 +260,40 @@ export class Animacion3D {
       });
       this.raiz = null;
     }
+    for (const sp of this.etiquetas) {
+      this.grupoEtiquetas.remove(sp);
+      const datos = sp.userData as Record<string, unknown>;
+      (datos.etiquetaTex as THREE.Texture | undefined)?.dispose?.();
+      (sp.material as THREE.SpriteMaterial | undefined)?.dispose?.();
+    }
+    this.etiquetas = [];
     this.manijas = manijasVacias();
+  }
+
+  /** Pasa los rótulos de la escena al grupo de cámara y guarda su ancla. */
+  private recogerEtiquetas(g: THREE.Group) {
+    const encontradas: THREE.Sprite[] = [];
+    g.updateMatrixWorld(true);
+    g.traverse((o: THREE.Object3D) => {
+      const sp = o as THREE.Sprite;
+      if (sp.isSprite && o.userData?.esEtiqueta) encontradas.push(sp);
+    });
+    for (const sp of encontradas) {
+      const ancla = sp.userData.ancla as THREE.Vector3 | undefined;
+      sp.getWorldPosition(ancla ?? new THREE.Vector3());
+      this.grupoEtiquetas.add(sp);
+      this.etiquetas.push(sp);
+    }
   }
 
   private construir() {
     this.limpiar();
     this.escena = this.elegirEscena();
-    const enc = this.escena.encuadre();
-    this.camera.position.set(enc.posicion.x, enc.posicion.y, enc.posicion.z);
-    this.camera.lookAt(enc.lookAt.x, enc.lookAt.y, enc.lookAt.z);
+    // El contexto va primero: algunas escenas adaptan su encuadre al número
+    // de unidades o al modo.
+    const ctx = this.contexto();
+    const enc = this.escena.encuadre(ctx);
+    this.encuadre = enc;
     this.scene.background = new THREE.Color(enc.fondo);
     this.scene.fog = new THREE.Fog(enc.fondo, enc.niebla.near, enc.niebla.far);
     // Limpia environment de la escena anterior; la escena nueva puede reponerlo.
@@ -266,8 +311,9 @@ export class Animacion3D {
       crearRedElectrica(g);
     }
 
-    const ctx = this.contexto();
     this.manijas = this.escena.construir(g, ctx);
+    this.recogerEtiquetas(g);
+    this.ajustar();
   }
 
   private ajustar() {
@@ -276,9 +322,44 @@ export class Animacion3D {
     this.renderer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    // La UI flotante cambia de tamaño con el lienzo: se vuelve a medir.
+    this.zonasMedidasMs = 0;
+    this.aplicarEncuadre();
   }
 
-  /** Oleaje eta(x,t) sobre la malla de mar que la escena haya dejado en manijas. */
+  /**
+   * Coloca la cámara a la distancia justa para que la esfera declarada por la
+   * escena quepa entera (con margen) en el aspecto actual. En 21:9 manda el
+   * alto; en un lienzo estrecho manda el ancho. Nunca se acerca más que el
+   * encuadre autoral.
+   */
+  private aplicarEncuadre() {
+    const enc = this.encuadre;
+    if (!enc) return;
+    const fovV = (this.camera.fov * Math.PI) / 180;
+    const aspecto = Math.max(0.2, this.camera.aspect || 1);
+    const fovH = 2 * Math.atan(Math.tan(fovV / 2) * aspecto);
+    const radio = Math.max(0.5, enc.radio ?? 8);
+    const margen = Math.max(1, enc.margen ?? 1.1);
+    const distV = radio / Math.sin(fovV / 2);
+    const distH = radio / Math.sin(fovH / 2);
+    const necesaria = Math.max(distV, distH) * margen;
+
+    const look = new THREE.Vector3(enc.lookAt.x, enc.lookAt.y, enc.lookAt.z);
+    const dir = new THREE.Vector3(
+      enc.posicion.x - look.x,
+      enc.posicion.y - look.y,
+      enc.posicion.z - look.z
+    );
+    const base = dir.length() || 1;
+    dir.normalize();
+    const dist = Math.max(base, necesaria);
+    this.camera.position.copy(look).addScaledVector(dir, dist);
+    this.camera.lookAt(look);
+    this.camera.updateMatrixWorld();
+  }
+
+  /** Oleaje sobre la malla de mar que la escena haya dejado en manijas. */
   private animarOleaje(t: number) {
     const { mar, marBase, marAncho } = this.manijas;
     if (!mar || !marBase) return;
@@ -287,13 +368,21 @@ export class Animacion3D {
     const pos = mar.geometry.attributes.position as THREE.BufferAttribute;
     const arr = pos.array as Float32Array;
     const dominio = this.lambda > 0 ? 2.2 * this.lambda : 120;
+    const ampSec = (this.Hm0 / 2) * 0.2;
     for (let i = 0; i < pos.count; i++) {
       const bx = marBase[i * 3];
+      const bz = marBase[i * 3 + 2];
       const xM = (bx / marAncho) * dominio;
-      arr[i * 3 + 1] = marBase[i * 3 + 1] + this.eta(xM, t, omega, k);
+      // Ola principal (la del modelo) + mar de fondo corto: superficie viva
+      // sin cambiar la física que mueve al dispositivo.
+      const chop =
+        ampSec *
+        Math.cos(0.62 * k * xM + 0.4 * k * bz - 1.35 * omega * t + 1.6);
+      arr[i * 3 + 1] = marBase[i * 3 + 1] + this.eta(xM, t, omega, k) + chop;
     }
     pos.needsUpdate = true;
     mar.geometry.computeVertexNormals();
+    actualizarNivelAgua(mar, mar.position.y, this.Hm0 / 2, t);
   }
 
   /** Pulso de energía a lo largo del cable de evacuación. */
@@ -308,7 +397,55 @@ export class Animacion3D {
     this.animarOleaje(t);
     this.escena.animar(t, this.contexto(), this.manijas);
     this.animarPulso(t);
+    this.disponerRotulos();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Mide los controles que flotan sobre la escena (conmutador 2D/3D, minimapa
+   * y pausa) para que ningún rótulo quede debajo. Se cachea ~400 ms: el
+   * minimapa se pliega/despliega sin cambiar el tamaño del lienzo.
+   */
+  private medirZonasRotulos(w: number, h: number) {
+    const ahora =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (this.zonasRotulos.length && ahora - this.zonasMedidasMs < 400) return;
+    this.zonasMedidasMs = ahora;
+    const caja = this.contenedor.getBoundingClientRect();
+    const raiz: ParentNode =
+      (this.contenedor.closest?.(".simulacion-escena") as HTMLElement | null) ??
+      (this.contenedor.closest?.(".escena") as HTMLElement | null) ??
+      document;
+    const medir = (sel: string): ZonaReservadaPx | null => {
+      const el = raiz.querySelector(sel) as HTMLElement | null;
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return null;
+      return { x: r.left - caja.left, y: r.top - caja.top, w: r.width, h: r.height };
+    };
+    const esMovil = typeof window !== "undefined" && window.innerWidth < 768;
+    this.zonasRotulos = [
+      medir(".escena-modo") ?? { x: 12, y: 12, w: 110, h: 40 },
+      medir(".mapa-flotante") ??
+        (esMovil
+          ? { x: w - 8 - 210, y: 8, w: 210, h: 40 }
+          : { x: w - 12 - 300, y: 12, w: 300, h: 240 }),
+      medir(".escena-acciones") ?? { x: 12, y: h - 12 - 40, w: 90, h: 40 },
+    ];
+  }
+
+  /** Rótulos: tamaño en píxeles CSS, dentro del lienzo y fuera de la UI. */
+  private disponerRotulos() {
+    if (!this.etiquetas.length) return;
+    const w = Math.max(2, this.contenedor.clientWidth || 800);
+    const h = Math.max(2, this.contenedor.clientHeight || 400);
+    this.medirZonasRotulos(w, h);
+    disponerEtiquetas(this.etiquetas, this.camera, w, h, {
+      franjaSuperiorPx: 56,
+      zonas: this.zonasRotulos,
+      separacionPx: 6,
+      ocultarSiNoCabe: true,
+    });
   }
 
   /** Degrada calidad visual sin tocar la respuesta: pixelRatio a 1, sombras
@@ -325,6 +462,7 @@ export class Animacion3D {
     if (!mar || !this.raiz) return;
     const y = mar.position.y;
     const x = mar.position.x;
+    const z = mar.position.z;
     const ancho = this.manijas.marAncho;
     const fondo =
       this.escena.marFondo?.(ancho) ?? (ancho >= 50 ? 24 : ancho >= 38 ? 16 : 14);
@@ -333,9 +471,16 @@ export class Animacion3D {
     const mat = mar.material as THREE.Material | THREE.Material[];
     if (Array.isArray(mat)) mat.forEach((m) => m.dispose?.());
     else mat?.dispose?.();
-    const nuevo = crearSuperficieMar(ancho, fondo, 0, true);
+    const nuevo = crearSuperficieMar(ancho, fondo, 0, true, {
+      color: this.encuadre?.fondo ?? 0xb4cedc,
+      near: this.encuadre?.niebla.near ?? 30,
+      far: this.encuadre?.niebla.far ?? 105,
+    });
+    // La escena puede tener uniformes propios (p. ej. la ventana del dique).
+    this.escena.configurarMar?.(nuevo.malla);
     nuevo.malla.position.y = y;
     nuevo.malla.position.x = x;
+    nuevo.malla.position.z = z;
     this.raiz.add(nuevo.malla);
     this.manijas.mar = nuevo.malla;
     this.manijas.marBase = nuevo.base;

@@ -85,6 +85,13 @@ export interface ManijasEscena3D {
   etiquetaDispositivo: Sprite3D | null;
   pulso: Malla3D | null;
   pulsoCurva: Curva3D | null;
+  /** Partículas de flujo del conducto (dique). */
+  chorros: Malla3D[];
+  /** Indicador vertical del salto h entre niveles (dique). */
+  grupoSalto: Grupo3D | null;
+  /** Espuma de la línea de flotación en cada lado (dique). */
+  espumaMar: Malla3D | null;
+  espumaEmbalse: Malla3D | null;
   ultimoTextoSalto: string;
   ultimoTextoCiclo: string;
 }
@@ -93,21 +100,31 @@ export interface ManijasEscena3D {
 export interface Encuadre3D {
   posicion: { x: number; y: number; z: number };
   lookAt: { x: number; y: number; z: number };
-  /** Color de fondo en hex (0xRRGGBB). */
+  /** Color de fondo en hex (0xRRGGBB). También es el color de la niebla. */
   fondo: number;
   /** Niebla exponencial lineal. */
   niebla: { near: number; far: number };
+  /**
+   * Radio (unidades de mundo) de la esfera que debe caber entera en el
+   * lienzo. El motor aleja la cámara lo necesario según el aspecto.
+   */
+  radio?: number;
+  /** Margen extra sobre la esfera (1 = justo al borde). Por defecto 1,1. */
+  margen?: number;
 }
 
 /** Una escena concreta: dique, absorbedor o granja. */
 export interface Escena3D {
-  encuadre(): Encuadre3D;
+  /** ctx permite adaptar el encuadre al número de unidades o al modo. */
+  encuadre(ctx?: ContextoEscena3D): Encuadre3D;
   /** Añade la geometría al grupo raíz y devuelve las manijas a animar. */
   construir(g: Grupo3D, ctx: ContextoEscena3D): ManijasEscena3D;
   /** Actualiza manijas según el tiempo. El render lo hace el motor. */
   animar(t: number, ctx: ContextoEscena3D, manijas: ManijasEscena3D): void;
   /** Profundidad (en Z) de la lámina de mar al degradar calidad. */
   marFondo?(ancho: number): number;
+  /** Ajusta la lámina de mar recién creada (p. ej. la ventana del dique). */
+  configurarMar?(malla: Malla3D): void;
   /** Si es true, el motor no añade lecho ni red eléctrica de tierra. */
   omiteEntornoTierra?: boolean;
   /** Hook previo a construir: environment map, tone mapping, luces extra. */
@@ -132,6 +149,10 @@ export function manijasVacias(): ManijasEscena3D {
     etiquetaDispositivo: null,
     pulso: null,
     pulsoCurva: null,
+    chorros: [],
+    grupoSalto: null,
+    espumaMar: null,
+    espumaEmbalse: null,
     ultimoTextoSalto: "",
     ultimoTextoCiclo: "",
   };

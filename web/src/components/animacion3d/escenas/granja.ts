@@ -29,7 +29,9 @@ import {
   crearCielo,
   crearEntornoMarino,
   crearEtiqueta,
+  crearLechoArena,
   crearMat,
+  crearRocasLecho,
   crearSuperficieMar,
 } from "../utilidades";
 
@@ -302,21 +304,15 @@ function construirCimentacion(
   }
 }
 
-/** Lecho de arena con micro-relieve y sombras. Grande hasta la niebla. */
+/** Lecho de arena con dunas, color por vértice y rocas. Grande hasta la niebla. */
 function construirLechoArena(g: Grupo3D, mats: MaterialesGranja, calidadBaja: boolean) {
-  const geo = new THREE.PlaneGeometry(160, 100, calidadBaja ? 10 : 18, calidadBaja ? 6 : 10);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    pos.setY(i, Math.sin(x * 0.28) * 0.1 + Math.cos(z * 0.33) * 0.08 + Math.sin((x + z) * 0.15) * 0.05);
-  }
-  geo.computeVertexNormals();
-  const lecho = new THREE.Mesh(geo, mats.arena);
-  lecho.position.y = COTAS_GRANJA.yLecho;
-  lecho.receiveShadow = true;
+  const lecho = crearLechoArena(280, 240, COTAS_GRANJA.yLecho, calidadBaja, {
+    amplitud: 0.5,
+    tono: 0.95,
+  });
+  lecho.position.z = -50;
   g.add(lecho);
+  g.add(crearRocasLecho(12, 150, 110, COTAS_GRANJA.yLecho, 31));
 }
 
 /** Anillo de espuma en la línea de flotación del pilar. */
@@ -440,15 +436,28 @@ export const escenaGranja: Escena3D = {
     escenaThree.background = crearCielo();
   },
 
-  encuadre(): Encuadre3D {
+  encuadre(ctx?: ContextoEscena3D): Encuadre3D {
     // Cámara alta mirando a la granja: la lámina de mar cruza la vista y el
     // azul de niebla tiñe lo lejano. Sin cajas: el horizonte lo pinta el cielo.
+    // El radio crece con el número de unidades para que ninguna quede fuera.
+    const n = Math.max(1, Math.min(24, Math.floor(ctx?.cantidadUnidades ?? 3) || 3));
+    const pos = posicionesGranja(n);
+    let maxX = 0;
+    let minZ = 0;
+    let maxZ = 0;
+    for (const p of pos) {
+      maxX = Math.max(maxX, Math.abs(p.x));
+      minZ = Math.min(minZ, p.z);
+      maxZ = Math.max(maxZ, p.z);
+    }
+    const radio = Math.max(7.2, maxX + 2.6, Math.abs(minZ) + 2.2, maxZ + 2.4);
     return {
-      posicion: { x: 8.5, y: 5.0, z: 18.0 },
-      lookAt: { x: -0.5, y: -1.0, z: -3.0 },
-      // Azul cielo-océano: la niebla tiñe el lejano (lecho lejano) de agua.
-      fondo: 0x5a9ec2,
-      niebla: { near: 22, far: 65 },
+      posicion: { x: 6.5, y: 4.6, z: 19.0 },
+      lookAt: { x: 0.0, y: -1.2, z: -2.0 },
+      fondo: 0xa8c8da,
+      niebla: { near: 45, far: 165 },
+      radio,
+      margen: 1.02,
     };
   },
 
@@ -464,19 +473,15 @@ export const escenaGranja: Escena3D = {
     // lecho bajo el agua, no como desierto.
     construirLechoArena(g, mats, ctx.calidadBaja);
 
-    // Una sola lámina de mar, muy ancha (bordes fuera del frustum) y con
+    // Una sola lámina de mar, muy ancha (bordes más allá de la niebla) y con
     // oleaje. Sin volumen caja ni plano de horizonte: esos rectángulos eran
     // lo que se veía como "muro azul".
-    const marInfo = crearSuperficieMar(140, 80, COTAS_GRANJA.ySuperficie, ctx.calidadBaja);
-    const marMat = marInfo.malla.material as THREE.MeshPhongMaterial;
-    marMat.color.setHex(0x2b86b5);
-    marMat.opacity = 0.55;
-    marMat.shininess = 180;
-    marMat.specular.setHex(0xb8e4f5);
-    marMat.side = THREE.FrontSide;
-    marMat.depthWrite = false;
-    marInfo.malla.renderOrder = 2;
-    marInfo.malla.position.z = -10;
+    const marInfo = crearSuperficieMar(280, 240, COTAS_GRANJA.ySuperficie, ctx.calidadBaja, {
+      color: 0xa8c8da,
+      near: 45,
+      far: 165,
+    });
+    marInfo.malla.position.z = -50;
     g.add(marInfo.malla);
     m.mar = marInfo.malla;
     m.marBase = marInfo.base;
@@ -507,7 +512,7 @@ export const escenaGranja: Escena3D = {
     m.etiquetaDispositivo = crearEtiqueta(
       `Granja mareomotriz · ${n} unidad${n > 1 ? "es" : ""}`
     );
-    m.etiquetaDispositivo.position.set(0, 5.2, 0);
+    m.etiquetaDispositivo.position.set(0, 5.4, 0);
     g.add(m.etiquetaDispositivo);
 
     return m;
