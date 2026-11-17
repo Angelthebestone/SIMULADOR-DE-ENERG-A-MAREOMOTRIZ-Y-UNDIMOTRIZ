@@ -82,6 +82,10 @@ class Parametros:
     eta_gen: float = 0.90
     crf: float = 0.08
     rho: float = 1_025.0
+    # Marea elegida en el mapa o en los controles. None = la del sitio, para
+    # que un punto fuera de datos/sitios/ no simule con corriente cero.
+    rango_m: float | None = None
+    velocidad_ms: float | None = None
 
 
 def _acotar(params: Parametros) -> tuple[Parametros, list[str]]:
@@ -97,7 +101,11 @@ def _acotar(params: Parametros) -> tuple[Parametros, list[str]]:
     prof, ac_p = acotar("profundidad", params.profundidad_m)
     masa, ac_m = acotar("masa_boya", params.masa_kg)
     diametro, ac_d = acotar("diametro_boya", params.diametro_m)
-    avisos = [a.motivo for a in (ac_h, ac_t, ac_b, ac_p, ac_m, ac_d) if a is not None]
+    rango, ac_r = (None, None) if params.rango_m is None else acotar("rango_mareal", params.rango_m)
+    vel, ac_v = (
+        (None, None) if params.velocidad_ms is None else acotar("velocidad_corriente", params.velocidad_ms)
+    )
+    avisos = [a.motivo for a in (ac_h, ac_t, ac_b, ac_p, ac_m, ac_d, ac_r, ac_v) if a is not None]
     acotados = replace(
         params,
         hm0_m=hm0,
@@ -106,6 +114,8 @@ def _acotar(params: Parametros) -> tuple[Parametros, list[str]]:
         profundidad_m=prof,
         masa_kg=masa,
         diametro_m=diametro,
+        rango_m=rango,
+        velocidad_ms=vel,
     )
     return acotados, avisos
 
@@ -155,6 +165,10 @@ def recurso_de(params: Parametros, sitio: dict[str, Any]) -> dict[str, Any]:
             velocidad_ms = 0.0
     else:
         velocidad_ms = 0.0
+    if params.rango_m is not None:
+        rango_m = params.rango_m
+    if params.velocidad_ms is not None:
+        velocidad_ms = params.velocidad_ms
     return {
         "hm0": params.hm0_m,
         "te": params.te_s,

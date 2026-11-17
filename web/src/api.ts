@@ -18,6 +18,9 @@ export type Params = {
   eta_gen: number
   crf: number
   rho: number
+  // Marea del punto elegido o del mando; sin ellas el motor usa la del sitio.
+  rango_m?: number
+  velocidad_ms?: number
 }
 
 type PuenteApi = {

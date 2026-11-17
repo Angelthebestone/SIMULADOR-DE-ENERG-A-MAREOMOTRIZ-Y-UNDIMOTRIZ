@@ -48,16 +48,39 @@ export const TECNOLOGIAS_POR_FAMILIA: Record<
 }
 
 export const PARAMS_INICIALES: Params = {
-  hm0_m: 1.5,
-  te_s: 7.0,
+  hm0_m: 2.3,
+  te_s: 8.8,
   b_pto_ns_m: 80_000,
   profundidad_m: 30,
-  sitio_id: 'isla_fuerte',
+  sitio_id: 'peniche',
+  rango_m: 2.8,
+  velocidad_ms: 0.5,
   dispositivo: 'absorbedor_puntual',
   eta_pto: 0.65,
   eta_gen: 0.9,
   crf: 0.08,
   rho: 1025,
+}
+
+/** Punto con el que arranca cada dispositivo: un sitio de pruebas real de esa
+ *  tecnología, para que la comparación con plantas reales tenga sentido desde
+ *  el primer cálculo. Valores de la carta mundial (MapaView). */
+export const SITIO_INICIAL: Record<string, { nombre: string; fuente: string; params: Partial<Params> }> = {
+  absorbedor_puntual: {
+    nombre: 'Peniche, Portugal',
+    fuente: 'Wavec Portugal',
+    params: { sitio_id: 'peniche', hm0_m: 2.3, te_s: 8.8, profundidad_m: 30, rango_m: 2.8, velocidad_ms: 0.5 },
+  },
+  turbina_corriente: {
+    nombre: 'Pentland Firth, Escocia',
+    fuente: 'EMEC / MeyGen',
+    params: { sitio_id: 'pentland_firth', hm0_m: 2.8, te_s: 8.2, profundidad_m: 35, rango_m: 4.5, velocidad_ms: 5.0 },
+  },
+  embalse: {
+    nombre: 'Estuario de La Rance, Francia',
+    fuente: 'EDF France (240 MW)',
+    params: { sitio_id: 'la_rance', hm0_m: 0.7, te_s: 4.5, profundidad_m: 18, rango_m: 13.5, velocidad_ms: 3.8 },
+  },
 }
 
 export function familiaDeDispositivo(dispositivo: string): Familia {

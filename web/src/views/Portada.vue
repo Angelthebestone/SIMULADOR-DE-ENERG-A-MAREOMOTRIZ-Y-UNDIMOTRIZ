@@ -9,6 +9,11 @@
 
     <div class="portada-contenido">
       <p class="marca">Simulador de energía marina</p>
+      <h1 class="titular">La energía del mar, en cualquier costa del mundo</h1>
+      <p class="promesa">
+        Elige un punto del océano con datos reales, mira el dispositivo trabajar en 2D o 3D
+        y compara lo que produce con plantas que existen o existieron.
+      </p>
 
       <div class="entradas">
         <button
@@ -19,7 +24,8 @@
         >
           <Icono icono="mareomotriz" tamano="lg" />
           <span class="entrada-nombre">Mareomotriz</span>
-          <span class="entrada-detalle">La marea que sube y baja, dos veces al día</span>
+          <span class="entrada-detalle">La marea que sube y baja dos veces al día: turbinas de corriente y diques.</span>
+          <span class="entrada-ejemplo">Como MeyGen (Escocia) o La Rance (Francia)</span>
         </button>
         <button
           type="button"
@@ -29,9 +35,17 @@
         >
           <Icono icono="undimotriz" tamano="lg" />
           <span class="entrada-nombre">Undimotriz</span>
-          <span class="entrada-detalle">La ola que cruza la superficie (m, s)</span>
+          <span class="entrada-detalle">La ola que cruza la superficie: boyas que suben y bajan con ella.</span>
+          <span class="entrada-ejemplo">Como Mutriku (España) o Pelamis (Escocia)</span>
         </button>
       </div>
+
+      <ol class="recorrido" aria-label="Cómo funciona">
+        <li><span>1</span> Recurso</li>
+        <li><span>2</span> Tecnología</li>
+        <li><span>3</span> Lugar en el mapa</li>
+        <li><span>4</span> Simulación y comparación</li>
+      </ol>
     </div>
   </section>
 </template>
@@ -120,7 +134,7 @@ onBeforeUnmount(() => {
   align-content: center;
   justify-items: center;
   inline-size: 100%;
-  padding: var(--s-8) var(--s-4) var(--s-9);
+  padding: var(--s-9) var(--s-4);
   text-align: center;
   color: oklch(0.98 0.005 106);
   text-shadow: 0 1px 12px oklch(0.1 0.02 240 / 0.55);
@@ -135,9 +149,65 @@ onBeforeUnmount(() => {
   opacity: 0.92;
 }
 
+.titular {
+  max-inline-size: 18ch;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5vw, var(--text-heroe));
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.promesa {
+  max-inline-size: 38rem;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.5;
+  color: oklch(0.95 0.008 220);
+}
+
+.recorrido {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-4) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-meta);
+  color: oklch(0.92 0.008 220);
+}
+
+.recorrido li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recorrido span {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.4rem;
+  block-size: 1.4rem;
+  border: 1px solid oklch(1 0 0 / 0.45);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.entrada-ejemplo {
+  margin-block-start: var(--s-1);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--marco-captado);
+}
+
 .entradas {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 17rem));
+  grid-template-columns: repeat(2, minmax(0, 20rem));
   gap: var(--s-4);
   margin-block-start: var(--s-3);
 }
@@ -170,12 +240,14 @@ onBeforeUnmount(() => {
 
 .entrada-nombre {
   font-family: var(--font-display);
-  font-size: var(--text-seccion);
+  font-size: var(--text-nivel);
   font-weight: 700;
 }
 
 .entrada-detalle {
+  max-inline-size: 16rem;
   font-size: var(--text-meta);
+  line-height: 1.45;
   color: oklch(0.88 0.01 220);
 }
 

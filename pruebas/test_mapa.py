@@ -35,7 +35,8 @@ def test_19_1_cartografia_base_vectorial_local():
     txt = _leer(MAPA_TS)
     esperado = "map = new maplibregl.Map({container, style: styleVectorLocal"
     assert esperado in txt
-    assert "center:[-76.18,9.39]" in txt
+    # Arranca con el mundo entero: el simulador no se centra en un país.
+    assert "const VISTA_MUNDO" in txt and "center: VISTA_MUNDO.center" in txt
     assert "pmtiles" in txt.lower(), "protocolo pmtiles registrado para capas futuras"
     assert "styleVectorLocal" in txt
     # La base sale de datos/ en local. Es GeoJSON y no vector tiles porque

@@ -56,11 +56,8 @@ const styleVectorLocal = {
   ],
 };
 
-/** Vista de arranque: el mundo entero, porque cualquier punto de mar es
- *  simulable. `VISTA_CARIBE` es el encuadre del estudio de origen y es a donde
- *  vuelve el botón de inicio de la vista de mapa. */
+/** Vista de arranque: el mundo entero, porque cualquier punto de mar es simulable. */
 const VISTA_MUNDO = { center: [-30, 18] as [number, number], zoom: 1.4 };
-export const VISTA_CARIBE = { center:[-76.18,9.39] as [number, number], zoom: 6 };
 
 export type SitioMapa = {
   id: string; nombre: string; lon: number; lat: number;

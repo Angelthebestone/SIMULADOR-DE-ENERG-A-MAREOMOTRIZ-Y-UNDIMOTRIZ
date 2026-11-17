@@ -430,7 +430,8 @@ def test_las_vistas_declaran_estado_de_carga_con_estructura():
 
 def test_la_carcasa_publica_los_cuatro_indicadores():
     """Los cuatro KPI existen, se anuncian y declaran su estado."""
-    m = _read(MAIN)
+    # Los KPI viven en el panel de resultados de la simulación.
+    m = _read(MAIN) + _read(WEB / "components" / "Resultados.vue")
     for clave in ("kpi-", "recurso", "potencia", "anual", "factor"):
         assert clave in m, f"falta el indicador {clave}"
     assert 'role="status"' in m and 'aria-live="polite"' in m, "la barra de KPI se anuncia"

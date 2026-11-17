@@ -12,9 +12,9 @@ import OrigenDatos from './views/OrigenDatos.vue'
 import MapaView from './components/MapaView.vue'
 import Icono from './components/Icono.vue'
 import DialogoFuentes from './components/DialogoFuentes.vue'
+import Resultados from './components/Resultados.vue'
 import type { SitioMapa } from './map/mapa'
 import { simular, cancelar, type Params } from './api'
-import { formatearNumero } from './utils/formato'
 import {
   PARAMS_INICIALES,
   dispositivoPorDefecto,
@@ -22,12 +22,16 @@ import {
   type Familia,
   type Origen,
   type Paso,
+  PASOS,
+  SITIO_INICIAL,
 } from './flujo/estado'
 
 const CITA = `SIMULADOR DE ENERGÍA MARINA — RECURSO, CAPTURA Y COSTES
-Ortega et al. (2013) · 8,9 kW/m en Isla Fuerte frente a 40 kW/m de umbral de granja (Osorio et al. 2016 / Handbook cap. 1)
-ERA5-Ocean vía Open-Meteo Marine · GMRT Lamont-Doherty · RUNAP · XM
-Natural Earth para el contorno de tierra. Repositorio público con datos reproducibles.`
+Recurso de oleaje: ERA5-Ocean vía Open-Meteo Marine (MFWAM) · Marea: FES2014 (Esri) y estaciones IOC
+Plantas reales: Wikipedia, EMEC, Tethys (PNNL) y K-water · Captura: Falnes (2002), Babarit et al. (2012)
+Medición revisada por pares de uno de los puntos de la carta: Ortega et al. (2013), Renewable Energy 57, 8,9 kW/m
+Batimetría: GEBCO 2023 y GMRT Lamont-Doherty · Contorno de tierra: Natural Earth
+Repositorio público con datos reproducibles.`
 
 // La portada es la puerta de entrada: mar realista a pantalla completa, sin
 // barra de pasos ni cadena de lectura. Al elegir familia se entra al flujo.
@@ -39,6 +43,45 @@ const PLANTILLA = `
     :data-sustentacion="sustentacion ? '' : null"
     style="--escala:1"
   >
+    <header v-if="paso !== 1" class="barra-flujo">
+      <ol class="pasos" aria-label="Pasos">
+        <li v-for="p in PASOS" :key="p.id">
+          <button
+            type="button"
+            class="paso"
+            :class="{ hecho: p.id < paso, actual: p.id === paso }"
+            :aria-current="p.id === paso ? 'step' : undefined"
+            :disabled="p.id > paso"
+            @click="irA(p.id)"
+          >
+            <span class="paso-num">{{ p.id }}</span>
+            <span class="paso-nombre">{{ p.nombre }}</span>
+          </button>
+        </li>
+      </ol>
+
+      <p v-if="paso === 4" class="sitio-chip" data-testid="sitio-actual">
+        <Icono icono="marca" tamano="sm" />
+        <span>{{ origen === 'personalizado' ? 'Valores libres (sin punto en el mapa)' : nombreSitio }}</span>
+      </p>
+
+      <p v-if="offline" class="aviso-red" data-testid="aviso-offline">
+        <Icono icono="offline" tamano="sm" />
+        <span>sin conexión — datos locales</span>
+      </p>
+
+      <div class="acciones-barra">
+        <button class="btn-barra" data-testid="abrir-fuentes" @click="abrirFuentes">
+          <Icono icono="fuentes" />
+          <span>Fuentes</span>
+        </button>
+        <button class="btn-barra" data-testid="sustentacion" @click="toggleSustentacion" :aria-pressed="sustentacion ? 'true':'false'" title="Modo presentación (Ctrl+E, ESC para salir)">
+          <Icono icono="proyector" />
+          <span>{{ sustentacion ? 'Proyectando 2,1×' : 'Proyectar' }}</span>
+        </button>
+      </div>
+    </header>
+
     <main class="tablero flujo">
       <div class="etapa">
         <Portada v-if="paso === 1" @elegir-familia="alElegirFamilia" />
@@ -69,79 +112,47 @@ const PLANTILLA = `
         />
 
         <div v-else class="panel-simulacion">
-          <Ver
-            ref="ver"
-            :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
-            @update:params="aplicarParams" />
+          <div class="simulacion-escena">
+            <Ver
+              ref="ver"
+              :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
+              @update:params="aplicarParams" />
 
-          <p v-if="origen === 'personalizado'" class="nota-hipotetico" data-testid="nota-hipotetico">
-            Resultado hipotético: estos números se escribieron a mano y no pertenecen a ningún punto del mapa.
-          </p>
+            <p v-if="origen === 'personalizado'" class="nota-hipotetico" data-testid="nota-hipotetico">
+              Resultado hipotético: estos números se escribieron a mano y no pertenecen a ningún punto del mapa.
+            </p>
 
-          <!-- Mapa flotante: el estudiante cambia de punto sin salir de la escena. -->
-          <aside class="mapa-flotante" :class="{ replegado: mapaReplegado }" aria-label="Emplazamiento">
-            <div class="mapa-flotante-barra">
-              <span class="mapa-flotante-titulo">Emplazamiento</span>
-              <button
-                type="button"
-                class="mapa-flotante-toggle"
-                :aria-expanded="mapaReplegado ? 'false' : 'true'"
-                data-testid="alternar-mapa-mini"
-                @click="mapaReplegado = !mapaReplegado"
-              >
-                <Icono :icono="mapaReplegado ? 'eslabon' : 'marca'" tamano="sm" />
-                <span>{{ mapaReplegado ? 'Ver mapa' : 'Ocultar' }}</span>
-              </button>
-            </div>
-            <div v-show="!mapaReplegado" class="mapa-flotante-caja">
-              <MapaView
-                compacto
-                :sitio-activo="params.sitio_id"
-                :dispositivo="params.dispositivo"
-                @seleccionar-sitio="alSeleccionarSitioMapa"
-                @ir-a-simulador="alSeleccionarSitioMapa" />
-            </div>
-          </aside>
+            <!-- Mapa flotante: el estudiante cambia de punto sin salir de la escena. -->
+            <aside class="mapa-flotante" :class="{ replegado: mapaReplegado }" aria-label="Emplazamiento">
+              <div class="mapa-flotante-barra">
+                <span class="mapa-flotante-titulo">Emplazamiento</span>
+                <button
+                  type="button"
+                  class="mapa-flotante-toggle"
+                  :aria-expanded="mapaReplegado ? 'false' : 'true'"
+                  data-testid="alternar-mapa-mini"
+                  @click="mapaReplegado = !mapaReplegado"
+                >
+                  <Icono :icono="mapaReplegado ? 'mapa' : 'cerrar'" tamano="sm" />
+                  <span>{{ mapaReplegado ? 'Ver mapa' : 'Ocultar' }}</span>
+                </button>
+              </div>
+              <div v-if="!mapaReplegado" class="mapa-flotante-caja">
+                <MapaView
+                  compacto
+                  :sitio-activo="params.sitio_id"
+                  :dispositivo="params.dispositivo"
+                  @seleccionar-sitio="alSeleccionarSitioMapa"
+                  @ir-a-simulador="alSeleccionarSitioMapa" />
+              </div>
+            </aside>
+          </div>
+
+          <Resultados
+            :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error" />
         </div>
       </div>
     </main>
-
-    <footer v-if="paso !== 1" class="lectura" role="status" aria-live="polite" data-testid="barra-kpis">
-      <div class="cadena">
-        <template v-for="(k, i) in kpis" :key="k.id">
-          <Icono v-if="i > 0" icono="eslabon" tamano="sm" class="eslabon" />
-          <div class="kpi" :data-testid="'kpi-'+k.id" :data-estado="k.pendiente ? 'pendiente' : 'ok'">
-            <span class="kpi-etiqueta">{{ k.etiqueta }}</span>
-            <span v-if="cargando" class="kpi-esqueleto" aria-hidden="true"></span>
-            <span v-else-if="k.pendiente" class="kpi-pendiente semaforo semaforo--pendiente">
-              <Icono icono="pendiente" tamano="sm" />
-              <span>pendiente</span>
-            </span>
-            <span v-else class="kpi-valor">{{ k.valor }} <small class="kpi-unidad">{{ k.unidad }}</small></span>
-          </div>
-        </template>
-      </div>
-
-      <p v-if="error" class="aviso aviso--error" data-testid="aviso-error">
-        <Icono icono="error" tamano="sm" />
-        <span>{{ error }}</span>
-      </p>
-      <p v-else-if="offline" class="aviso" data-testid="aviso-offline">
-        <Icono icono="offline" tamano="sm" />
-        <span>sin conexión — datos locales</span>
-      </p>
-
-      <div class="acciones-barra">
-        <button class="btn-barra" data-testid="abrir-fuentes" @click="abrirFuentes">
-          <Icono icono="fuentes" />
-          <span>Fuentes</span>
-        </button>
-        <button class="btn-barra" data-testid="sustentacion" @click="toggleSustentacion" :aria-pressed="sustentacion ? 'true':'false'" title="Modo presentación (Ctrl+E, ESC para salir)">
-          <Icono icono="proyector" />
-          <span>{{ sustentacion ? 'Proyectando 2,1×' : 'Proyectar' }}</span>
-        </button>
-      </div>
-    </footer>
 
     <DialogoFuentes ref="dialogoFuentes" :cita="citaLarga" />
   </div>
@@ -149,12 +160,13 @@ const PLANTILLA = `
 
 const app = createApp({
   template: PLANTILLA,
-  components: { Ver, Portada, Tecnologia, OrigenDatos, MapaView, Icono, DialogoFuentes },
+  components: { Ver, Portada, Tecnologia, OrigenDatos, MapaView, Icono, DialogoFuentes, Resultados },
   data() {
     return {
+      PASOS,
       sustentacion: false,
       offline: false,
-      mapaReplegado: false,
+      mapaReplegado: window.innerWidth < 768,
       paso: 1 as Paso,
       familia: 'undimotriz' as Familia,
       origen: 'lugar' as Origen,
@@ -162,8 +174,8 @@ const app = createApp({
       viviendas: null as number | null,
       error: '' as string,
       cargando: false,
-      nombreSitio: 'Isla Fuerte, Caribe colombiano',
-      fuenteSitio: 'Ortega et al. 2013 · periodo 2015-2024',
+      nombreSitio: SITIO_INICIAL.absorbedor_puntual.nombre,
+      fuenteSitio: SITIO_INICIAL.absorbedor_puntual.fuente,
       params: { ...PARAMS_INICIALES } as Params,
       citaLarga: CITA,
       temporizador: 0 as unknown as ReturnType<typeof setTimeout>,
@@ -176,26 +188,6 @@ const app = createApp({
       if (this.paso === 3) return 'modo-origen'
       return 'modo-simulacion'
     },
-    kpis(): Array<{ id: string; etiqueta: string; valor: string; unidad: string; pendiente: boolean }> {
-      const r = this.resultado
-      const kwm = Number(r?.eslabones?.[0]?.detalle?.j_w_m ?? NaN) / 1000
-      const w = Number(r?.potencia_nominal_w ?? NaN)
-      const mwh = Number(r?.produccion_anual_mwh ?? NaN)
-      const fp = Number(r?.factor_planta ?? NaN)
-      const celda = (id: string, etiqueta: string, v: number, unidad: string, dec: number) => ({
-        id,
-        etiqueta,
-        unidad,
-        pendiente: !Number.isFinite(v),
-        valor: Number.isFinite(v) ? formatearNumero(v, dec) : '',
-      })
-      return [
-        celda('recurso', 'Recurso', kwm, 'kW/m', 1),
-        celda('potencia', 'Potencia captada', w / 1000, 'kW', 1),
-        celda('anual', 'Producción anual', mwh, 'MWh/año', 1),
-        celda('factor', 'Factor de planta', fp * 100, '%', 1),
-      ]
-    },
   },
   methods: {
     irA(p: Paso) {
@@ -203,12 +195,17 @@ const app = createApp({
     },
     alElegirFamilia(f: Familia) {
       this.familia = f
-      this.aplicarParams({ dispositivo: dispositivoPorDefecto(f) })
+      this.alElegirTecnologia(dispositivoPorDefecto(f))
       this.paso = 2
     },
     alElegirTecnologia(id: string) {
       this.familia = familiaDeDispositivo(id)
-      this.aplicarParams({ dispositivo: id })
+      const inicio = SITIO_INICIAL[id]
+      if (inicio) {
+        this.nombreSitio = inicio.nombre
+        this.fuenteSitio = inicio.fuente
+      }
+      this.aplicarParams({ ...inicio?.params, dispositivo: id })
     },
     alElegirOrigen(o: Origen) {
       this.origen = o
@@ -225,11 +222,13 @@ const app = createApp({
       if (s.hm0_m) cambios.hm0_m = s.hm0_m
       if (s.te_s) cambios.te_s = s.te_s
       if (s.profundidad_m) cambios.profundidad_m = s.profundidad_m
+      cambios.rango_m = s.rango_m ?? undefined
+      cambios.velocidad_ms = s.velocidad_ms ?? undefined
       if (s.tipo === 'mareomotriz') cambios.dispositivo = 'turbina_corriente'
       else if (s.tipo === 'undimotriz') cambios.dispositivo = 'absorbedor_puntual'
       this.origen = 'lugar'
       this.nombreSitio = s.nombre || this.nombreSitio
-      this.fuenteSitio = s.fuente ? `${s.fuente} · periodo 2015-2024` : this.fuenteSitio
+      this.fuenteSitio = s.fuente || this.fuenteSitio
       this.aplicarParams(cambios)
     },
     alIrASimulador(s: SitioMapa) {

@@ -1,6 +1,5 @@
-/* Flujo guiado por pasos. Sin barra de pasos: cada etapa ocupa el hueco
-   disponible. La clase `tablero` se conserva en el `main` para los selectores
-   de prueba; en modo flujo es una sola columna a pantalla completa. */
+/* Flujo guiado por pasos: cada etapa ocupa el hueco bajo la barra del flujo.
+   La clase `tablero` se conserva en el `main` para los selectores de prueba. */
 
 main.tablero.flujo {
   display: flex;
@@ -17,12 +16,11 @@ main.tablero.flujo {
   block-size: 100%;
 }
 
-/* Simulación: Ver a pantalla completa + mapa flotante en la esquina superior
-   derecha para cambiar de emplazamiento sin salir de la escena. */
+/* Simulación: escena y mandos a la izquierda, resultados a la derecha; el
+   mapa flotante deja cambiar de punto sin salir de la escena. */
 .panel-simulacion {
-  position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 27rem);
   inline-size: 100%;
   block-size: 100%;
   min-block-size: 0;
@@ -30,9 +28,36 @@ main.tablero.flujo {
   background: var(--lienzo);
 }
 
-.panel-simulacion > .ver {
+.simulacion-escena {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.simulacion-escena > .ver {
   flex: 1 1 auto;
   min-block-size: 0;
+}
+
+/* Pantalla estrecha: escena, mandos y resultados en una sola columna. */
+@media (width <= 64rem) {
+  .panel-simulacion {
+    display: block;
+    overflow-y: auto;
+  }
+
+  .panel-simulacion .simulacion-escena > .ver {
+    block-size: auto;
+    overflow: visible;
+  }
+
+  .panel-simulacion .resultados {
+    overflow: visible;
+    border-inline-start: none;
+    border-block-start: 1px solid var(--borde-suave);
+  }
 }
 
 .nota-hipotetico {

@@ -25,8 +25,7 @@
           <span class="tope">{{ c.formato(c.max) }}</span>
         </div>
         <p :id="c.id + '-efecto'" class="efecto">
-          <span>rango {{ c.formato(c.min) }}–{{ c.formato(c.max) }} {{ c.unidad }} · </span>
-          <span>{{ c.efecto }}</span>
+          {{ c.efecto }}
         </p>
       </div>
     </div>
@@ -44,6 +43,7 @@ const props = withDefaults(
     te_s: number;
     b_pto_ns_m: number;
     modoEnergia?: "undimotriz" | "mareomotriz";
+    dispositivo?: string;
     velocidadCorriente?: number;
     rangoMarea?: number;
     profundidad_m?: number;
@@ -116,8 +116,8 @@ const controlesMareas = computed(() => [
     etiqueta: "Velocidad de corriente mareal",
     simbolo: "V_marea",
     unidad: "m/s",
-    min: 0.5,
-    max: 5.5,
+    min: 0,
+    max: 5,
     step: 0.1,
     valor: props.velocidadCorriente,
     formato: (v: number) => formatearNumero(v, 1),
@@ -129,8 +129,8 @@ const controlesMareas = computed(() => [
     etiqueta: "Rango mareal (pleamar - bajamar)",
     simbolo: "R_marea",
     unidad: "m",
-    min: 0.5,
-    max: 16.0,
+    min: 0,
+    max: 15,
     step: 0.1,
     valor: props.rangoMarea,
     formato: (v: number) => formatearNumero(v, 1),
@@ -153,7 +153,10 @@ const controlesMareas = computed(() => [
 ]);
 
 const controlesActivos = computed(() => {
-  if (props.modoEnergia === "mareomotriz") return controlesMareas.value;
+  // Cada obra mareomotriz responde a una sola variable de la marea: la turbina
+  // a la corriente, el dique al rango. Mostrar la otra sería un mando muerto.
+  if (props.dispositivo === "embalse") return controlesMareas.value.filter((c) => c.id !== "ctrl-vel-corriente");
+  if (props.modoEnergia === "mareomotriz") return controlesMareas.value.filter((c) => c.id !== "ctrl-rango-marea");
   return controlesOndas.value;
 });
 </script>
@@ -171,6 +174,13 @@ const controlesActivos = computed(() => {
 .controles-grid {
   display: grid;
   gap: var(--s-4);
+}
+
+@container (inline-size >= 40rem) {
+  .controles-grid {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--s-6);
+  }
 }
 
 /* Cada control: etiqueta y cifra en la misma fila, la pista debajo a todo

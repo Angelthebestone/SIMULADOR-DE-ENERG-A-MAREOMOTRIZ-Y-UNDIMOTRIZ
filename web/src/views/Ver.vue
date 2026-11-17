@@ -13,13 +13,18 @@
 
       <div ref="contenedor3D" class="lienzo-3d" aria-label="Escena tridimensional del dispositivo"></div>
 
-      <header class="escena-cabecera">
-        <h1 id="titulo-ver" class="titulo-nivel">Simulador de captura</h1>
-        <p class="sitio-actual">
-          <Icono icono="marca" tamano="sm" />
-          <span>{{ nombreSitioActual }}</span>
-        </p>
-      </header>
+      <div class="escena-modo" role="group" aria-label="Vista de la escena">
+        <button
+          v-for="m in VISTAS"
+          :key="m.id"
+          type="button"
+          class="btn-vista"
+          :class="{ activo: motorActivo === m.id }"
+          :aria-pressed="motorActivo === m.id ? 'true' : 'false'"
+          :data-testid="'vista-' + m.etiqueta"
+          @click="elegirVista(m.id)"
+        >{{ m.etiqueta }}</button>
+      </div>
 
       <div class="escena-acciones">
         <p v-if="sinSerie" class="aviso-sin-serie">
@@ -30,20 +35,11 @@
           <Icono :icono="pausado ? 'reproducir' : 'pausar'" tamano="sm" />
           <span>{{ pausado ? "Reanudar" : "Pausar" }}</span>
         </button>
-        <label class="selector-motor">
-          <span class="selector-motor-rotulo">Motor</span>
-          <select v-model="motorPedido" @change="alCambiarMotor" aria-label="Motor de la escena">
-            <option value="auto">Auto</option>
-            <option value="motor-3d">3D</option>
-            <option value="motor-2d">2D</option>
-          </select>
-        </label>
-        <p class="monitor-fps" aria-live="off"><span>{{ motorActivo }}</span><span aria-hidden="true"> · </span><span>{{ textoFps }}</span></p>
       </div>
     </div>
 
-    <!-- Cabina: tres bloques bajo la escena. Qué se simula, con qué números y
-         qué sale. Se lee de izquierda a derecha, como la cadena. -->
+    <!-- Cabina: qué se simula y con qué números. Las cifras de salida viven
+         en el panel de resultados, a la derecha. -->
     <div class="cabina">
       <div class="bloque bloque--recurso">
         <div class="modos" role="group" aria-label="Tipo de recurso">
@@ -80,21 +76,21 @@
           <label v-if="params.dispositivo === 'turbina_corriente'" class="campo-cimentacion">
             <span class="rotulo-grupo">Cimentación</span>
             <select v-model="cimentacionSeleccionada" @change="redibujar">
-            <option value="pilote">Pilote clavado</option>
-            <option value="gravedad">Bloque de gravedad</option>
-            <option value="tripode">Trípode</option>
-          </select>
-        </label>
+              <option value="pilote">Pilote clavado</option>
+              <option value="gravedad">Bloque de gravedad</option>
+              <option value="tripode">Trípode</option>
+            </select>
+          </label>
+        </div>
       </div>
-    </div>
 
       <div class="bloque bloque--controles">
-        <span class="rotulo-grupo">Controles</span>
         <ControlesFisicos
           :hm0_m="params.hm0_m"
           :te_s="params.te_s"
           :b_pto_ns_m="params.b_pto_ns_m"
           :modo-energia="modoActivo"
+          :dispositivo="params.dispositivo"
           :velocidad-corriente="velocidadCorriente"
           :rango-marea="rangoMarea"
           :profundidad_m="params.profundidad_m || 30"
@@ -110,44 +106,22 @@
       <div class="bloque bloque--anotaciones">
         <span class="rotulo-grupo">Qué es cada cosa</span>
         <ul class="anotaciones-lista">
-          <li><Anotacion elemento="boya" /></li>
-          <li><Anotacion elemento="ola_hm0" termino="Hm0" intuicion="J" /></li>
-          <li><Anotacion elemento="periodo_te" termino="Te" /></li>
-          <li><Anotacion elemento="freno_pto" termino="B_pto" intuicion="freno" /></li>
+          <template v-if="modoActivo === 'undimotriz'">
+            <li><Anotacion elemento="boya" /></li>
+            <li><Anotacion elemento="ola_hm0" termino="Hm0" intuicion="J" /></li>
+            <li><Anotacion elemento="periodo_te" termino="Te" /></li>
+            <li><Anotacion elemento="freno_pto" termino="B_pto" intuicion="freno" /></li>
+          </template>
+          <li v-else-if="params.dispositivo === 'embalse'"><Anotacion elemento="rango_marea" termino="R_marea" /></li>
+          <li v-else><Anotacion elemento="corriente" termino="V_marea" /></li>
           <li><Anotacion elemento="energia" termino="J" intuicion="J" /></li>
           <li><Anotacion elemento="fondo" termino="h_fondo" /></li>
-          <li v-if="modoActivo === 'mareomotriz'"><Anotacion elemento="corriente" termino="V_marea" /></li>
-          <li v-if="modoActivo === 'mareomotriz'"><Anotacion elemento="rango_marea" termino="R_marea" /></li>
         </ul>
         <EstadoBloque
           v-if="modoActivo === 'undimotriz'"
           :estado="estadoValidez"
           :motivo="motivoValidez"
         />
-      </div>
-
-      <div class="bloque bloque--salida">
-        <article class="tarjeta tarjeta--heroe" data-testid="tarjeta-viviendas" aria-live="polite">
-          <h2 class="tarjeta-titulo">
-            <Icono icono="vivienda" tamano="sm" />
-            <span>Alcanza para</span>
-          </h2>
-          <template v-if="viviendas !== null">
-            <p class="tarjeta-cifra">{{ formatearNumero(viviendas, 0) }} <small>viviendas</small></p>
-            <p class="tarjeta-subcifra">
-              <Icono icono="emision" tamano="sm" />
-              <span>{{ formatearNumero(viviendas * 1.8, 1) }} t CO₂ evitadas al año</span>
-            </p>
-          </template>
-          <p v-else-if="cargando" class="tarjeta-estado">
-            <Icono icono="calculando" tamano="sm" />
-            <span>integrando la cadena…</span>
-          </p>
-          <p v-else class="tarjeta-estado semaforo semaforo--pendiente">
-            <Icono icono="pendiente" tamano="sm" />
-            <span>pendiente — {{ error || "consumo residencial sin fuente verificada" }}</span>
-          </p>
-        </article>
       </div>
     </div>
   </section>
@@ -161,7 +135,6 @@ import Anotacion from "../components/Anotacion.vue";
 import ControlesFisicos from "../components/ControlesFisicos.vue";
 import EstadoBloque from "../components/EstadoBloque.vue";
 import Icono from "../components/Icono.vue";
-import { formatearNumero } from "../utils/formato";
 import { evaluarValidezOleaje } from "../utils/validacion";
 import type { Params } from "../api";
 
@@ -189,9 +162,6 @@ const pausado = ref(false);
 const motorPedido = ref<"auto" | "motor-3d" | "motor-2d">("auto");
 const motorActivo = ref<"motor-3d" | "motor-2d">("motor-2d");
 const fpsMedio = ref(0);
-const textoFps = computed(() =>
-  motorActivo.value === "motor-3d" ? `${formatearNumero(fpsMedio.value, 0)} fps` : "respaldo 2D"
-);
 const marcasFps: number[] = [];
 let fpsBajoDesde: number | null = null;
 let calidadDegradada = false;
@@ -317,6 +287,16 @@ function cambiarMotor(destino: "motor-3d" | "motor-2d") {
   if (contenedor3D.value) contenedor3D.value.style.visibility = "hidden";
 }
 
+const VISTAS = [
+  { id: "motor-2d" as const, etiqueta: "2D" },
+  { id: "motor-3d" as const, etiqueta: "3D" },
+];
+
+function elegirVista(id: "motor-2d" | "motor-3d") {
+  motorPedido.value = id;
+  alCambiarMotor();
+}
+
 function alCambiarMotor() {
   marcasFps.length = 0;
   fpsBajoDesde = null;
@@ -328,8 +308,11 @@ function alCambiarMotor() {
 
 const modoActivo = ref<"undimotriz" | "mareomotriz">("undimotriz");
 const cimentacionSeleccionada = ref<TipoCimentacion>("pilote");
-const velocidadCorriente = ref(2.2);
-const rangoMarea = ref(3.5);
+// La marea que manda es la de los params (punto del mapa o mando); si no la
+// hay, la que el motor leyó del sitio.
+const recursoMotor = computed(() => (props.resultado?.recurso ?? {}) as Record<string, number>);
+const velocidadCorriente = computed(() => props.params.velocidad_ms ?? recursoMotor.value.velocidad_ms ?? 0);
+const rangoMarea = computed(() => props.params.rango_m ?? recursoMotor.value.rango_m ?? 0);
 
 /* Aviso de validez del modelo lineal: se calcula sobre los valores de los
    controles, sin tocar el resultado del servicio. Fuera de rango se avisa
@@ -364,34 +347,6 @@ const dispositivosDelModo = computed(() =>
   modoActivo.value === "mareomotriz" ? DISPOSITIVOS_MAREOMOTRIZ : DISPOSITIVOS_UNDIMOTRIZ
 );
 
-const NOMBRES_SITIO: Record<string, string> = {
-  isla_fuerte: "Isla Fuerte, Caribe colombiano",
-  san_andres: "San Andrés, Caribe insular",
-  tumaco: "Tumaco, Pacífico colombiano",
-  bahia_malaga: "Bahía Málaga, Pacífico",
-  islas_rosario: "Islas del Rosario",
-  puerto_bolivar: "Puerto Bolívar, La Guajira",
-  bahia_fundy: "Bahía de Fundy, Canadá",
-  pentland_firth: "Pentland Firth, Escocia",
-  la_rance: "Estuario de La Rance, Francia",
-  severn_estuary: "Estuario del Severn, Reino Unido",
-  cook_strait: "Estrecho de Cook, Nueva Zelanda",
-  estrecho_magallanes: "Estrecho de Magallanes, Chile",
-  sihwa_lake: "Lago Sihwa, Corea del Sur",
-  oregon_coast: "PacWave, Oregón",
-  hawaii_oahu: "Kaneohe Bay, Oahu",
-  costa_da_morte: "Costa da Morte, Galicia",
-  peniche: "Peniche, Portugal",
-  messina_strait: "Estrecho de Messina, Italia",
-  king_island: "King Island, Tasmania",
-  cape_point: "Cape Point, Sudáfrica",
-  golfo_san_jose: "Golfo San José, Argentina",
-};
-
-const nombreSitioActual = computed(
-  () => NOMBRES_SITIO[props.params.sitio_id || "isla_fuerte"] || "Punto marino seleccionado"
-);
-
 function seleccionarModo(modo: "undimotriz" | "mareomotriz") {
   modoActivo.value = modo;
   if (modo === "mareomotriz") {
@@ -408,13 +363,11 @@ function seleccionarDispositivo(id: string) {
 }
 
 function alCambiarVelCorriente(v: number) {
-  velocidadCorriente.value = v;
-  redibujar();
+  emit("update:params", { velocidad_ms: v });
 }
 
 function alCambiarRangoMarea(v: number) {
-  rangoMarea.value = v;
-  redibujar();
+  emit("update:params", { rango_m: v });
 }
 
 /** Número de onda por Newton-Raphson sobre la relación de dispersión. Sólo se
@@ -563,71 +516,6 @@ watch(
   visibility: hidden;
 }
 
-.selector-motor {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: var(--s-1) 10px;
-  border: 1px solid var(--marco-linea);
-  border-radius: var(--radio);
-  background: oklch(0.24 0.02 238 / 0.82);
-  color: var(--marco-tinta);
-  font-size: var(--text-meta);
-  backdrop-filter: blur(6px);
-}
-
-.selector-motor-rotulo {
-  font-weight: 600;
-}
-
-.selector-motor select {
-  background: transparent;
-  color: inherit;
-  border: none;
-  font: inherit;
-  cursor: pointer;
-}
-
-.monitor-fps {
-  margin: 0;
-  padding: var(--s-1) 10px;
-  border-radius: var(--radio);
-  background: oklch(1 0 0 / 0.8);
-  color: var(--tenue);
-  font-size: var(--text-meta);
-  white-space: nowrap;
-}
-
-.escena-cabecera {
-  position: absolute;
-  inset-block-start: var(--s-3);
-  inset-inline-start: var(--s-3);
-  display: grid;
-  gap: 2px;
-  padding: var(--s-2) var(--s-3);
-  border-radius: var(--radio-caja);
-  background: oklch(1 0 0 / 0.72);
-  backdrop-filter: blur(8px);
-  box-shadow: var(--sombra-caja);
-}
-
-.titulo-nivel {
-  font-size: var(--text-seccion);
-  font-weight: 600;
-  color: var(--tinta);
-  margin: 0;
-  white-space: nowrap;
-}
-
-.sitio-actual {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  font-size: var(--text-meta);
-  color: var(--tenue);
-}
-
 .escena-acciones {
   position: absolute;
   inset-block-end: var(--s-3);
@@ -668,14 +556,58 @@ watch(
   font-size: var(--text-meta);
 }
 
-/* ---- Cabina: tres bloques ---- */
+/* Conmutador de vista 2D | 3D: arriba a la izquierda, siempre a la vista. */
+.escena-modo {
+  position: absolute;
+  inset-block-start: var(--s-3);
+  inset-inline-start: var(--s-3);
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--marco-linea);
+  border-radius: var(--radio-caja);
+  background: oklch(0.24 0.02 238 / 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.btn-vista {
+  min-inline-size: 3rem;
+  padding: 4px 12px;
+  border: none;
+  border-radius: calc(var(--radio-caja) - 3px);
+  background: transparent;
+  color: var(--marco-tenue);
+  font-weight: 700;
+  font-size: var(--text-meta);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--ease-salida), color var(--dur-rapida) var(--ease-salida);
+}
+
+.btn-vista:hover {
+  color: var(--marco-tinta);
+}
+
+.btn-vista.activo {
+  background: var(--marco-captado);
+  color: var(--marco);
+}
+
+/* ---- Cabina: dispositivo y mandos en una fila, anotaciones debajo ---- */
 .cabina {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
+  grid-template-areas:
+    "recurso controles"
+    "anotaciones anotaciones";
+  align-items: start;
   gap: var(--s-3);
   padding: var(--s-3);
-  flex: 1;
 }
+
+.bloque--recurso { grid-area: recurso; }
+.bloque--controles { grid-area: controles; }
+.bloque--anotaciones { grid-area: anotaciones; }
 
 .bloque {
   display: flex;
@@ -704,10 +636,14 @@ watch(
 
 /* Aviso de validez del modelo: reutiliza EstadoBloque con sus estados. */
 .bloque--anotaciones {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
   padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--aviso-borde);
+  border: 1px solid var(--borde-suave);
   border-radius: var(--radio-caja);
-  background: var(--aviso-fondo);
+  background: var(--panel);
 }
 
 /* ---- Selección de recurso y dispositivo ---- */
@@ -789,87 +725,6 @@ watch(
   font-size: var(--text-meta);
 }
 
-/* ---- Tarjetas de salida ---- */
-.tarjeta > * {
-  min-inline-size: 0;
-  overflow-wrap: anywhere;
-}
-
-.tarjeta {
-  display: grid;
-  align-content: start;
-  gap: var(--s-1);
-  padding: var(--s-3);
-  border: 1px solid var(--borde-suave);
-  border-radius: var(--radio-caja);
-  background: var(--panel);
-  box-shadow: var(--sombra-caja);
-}
-
-.tarjeta--heroe {
-  background: linear-gradient(160deg, var(--panel), var(--acento-suave));
-}
-
-.tarjeta-titulo {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--tenue);
-  font-weight: 700;
-  margin: 0;
-}
-
-.tarjeta-cifra {
-  margin: 2px 0 0;
-  font-family: var(--font-display);
-  font-size: var(--text-heroe);
-  font-weight: 700;
-  line-height: 0.95;
-  letter-spacing: -0.03em;
-  color: var(--rol-captado);
-}
-
-.tarjeta-cifra small {
-  font-family: var(--font-sans);
-  font-size: 0.26em;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--tenue);
-}
-
-.tarjeta-subcifra {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: var(--s-1) 0 0;
-  font-size: var(--text-meta);
-  color: var(--tenue);
-}
-
-.tarjeta-estado {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: var(--text-meta);
-  color: var(--tenue);
-  font-style: italic;
-}
-
-@media (width <= 90rem) {
-  .bloque--salida {
-    flex-direction: row;
-  }
-
-  .bloque--salida > * {
-    flex: 1;
-  }
-}
-
 @media (width <= 64rem) {
   .escena {
     max-block-size: none;
@@ -877,10 +732,7 @@ watch(
 
   .cabina {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .bloque--salida {
-    flex-direction: column;
+    grid-template-areas: "recurso" "controles" "anotaciones";
   }
 }
 </style>

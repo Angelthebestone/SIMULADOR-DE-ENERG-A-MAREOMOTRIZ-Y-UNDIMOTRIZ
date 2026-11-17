@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, computed, watch } from "vue";
 import { crearMapa, flyToSitio, actualizarSitios, fijarTecnologiaActiva, MENSAJE_DIQUE_LEJOS, type SitioMapa } from "../map/mapa";
 import { consultarOleaje, consultarMarea, consultarRangoMareal, consultarCorriente } from "../datos/marino";
 import { cargarPlantas, type PlantaMundial, type TecnologiaActiva, type TecnologiaPlanta } from "../map/plantas";
@@ -125,7 +125,7 @@ const emit = defineEmits<{
 
 const contenedor = ref<HTMLElement | null>(null);
 let map: ReturnType<typeof crearMapa> | null = null;
-const sitioActivoLocal = ref(props.sitioActivo ?? "isla_fuerte");
+const sitioActivoLocal = ref(props.sitioActivo ?? "");
 const consultando = ref(false);
 const avisoTierra = ref("");
 let temporizadorAviso = 0 as unknown as ReturnType<typeof setTimeout>;
@@ -230,6 +230,9 @@ onMounted(() => {
   if (!contenedor.value) return;
   map = crearMapa(contenedor.value, sitios.value);
   if (map) fijarTecnologiaActiva(map, tecnologiaActiva.value);
+  // El mapa compacto enseña dónde se está simulando, no el mundo entero.
+  const activo = sitios.value.find((s) => s.id === props.sitioActivo);
+  if (props.compacto && activo) map.jumpTo({ center: [activo.lon, activo.lat], zoom: 4 });
   void cargarPlantas().then((ps) => (plantas.value = ps));
 
   map.on("sitio_seleccionado" as never, (e: { id: string }) => alSeleccionar(e.id));
@@ -253,6 +256,11 @@ onMounted(() => {
     clearTimeout(temporizadorAviso);
     temporizadorAviso = setTimeout(() => (avisoTierra.value = ""), 5000);
   });
+});
+
+onBeforeUnmount(() => {
+  map?.remove();
+  map = null;
 });
 
 watch(
@@ -370,9 +378,11 @@ function confirmarSeleccionYSimular() {
   background: var(--map-oceano);
 }
 
+/* Absoluto dentro de .carta: un 100 % de alto no resuelve en un hijo flex
+   sin altura definida y el mapa compacto quedaba con 0 px de alto. */
 .mapa {
-  inline-size: 100%;
-  block-size: 100%;
+  position: absolute;
+  inset: 0;
 }
 
 .escala {

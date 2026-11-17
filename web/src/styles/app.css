@@ -1,7 +1,5 @@
-/* Carcasa de la aplicación: tablero y lectura.
-   El tablero son dos columnas fijas —emplazamiento a la izquierda, escena a la
-   derecha— sobre un marco oscuro que las enmarca y cierra por abajo la cadena
-   de lectura. Sin barra superior: el pie carga también con las acciones. */
+/* Carcasa de la aplicación: barra del flujo arriba (pasos, punto activo y
+   acciones) y la etapa a pantalla completa debajo, sobre el marco oscuro. */
 
 @layer base, componentes;
 
@@ -60,7 +58,7 @@
 @layer componentes {
   #app {
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
     block-size: 100dvh;
     background: var(--marco);
   }
@@ -69,46 +67,118 @@
     min-inline-size: 0;
   }
 
-  /* Portada y tecnología: una sola celda a pantalla completa, sin marco de rejilla. */
-  #app.modo-portada,
-  #app.modo-tecnologia {
-    grid-template-rows: minmax(0, 1fr) auto;
-    background: var(--marco);
-  }
-
   #app.modo-portada {
     grid-template-rows: minmax(0, 1fr);
   }
 
-  #app.modo-portada main.tablero.flujo,
-  #app.modo-tecnologia main.tablero.flujo,
-  #app.modo-origen main.tablero.flujo,
-  #app.modo-simulacion main.tablero.flujo {
+  #app main.tablero.flujo {
     padding: 0;
     overflow: hidden;
     background: transparent;
   }
 
-  #app.modo-portada .etapa,
-  #app.modo-tecnologia .etapa,
-  #app.modo-origen .etapa,
-  #app.modo-simulacion .etapa {
+  #app .etapa {
     block-size: 100%;
     min-block-size: 0;
   }
 
-  #app.modo-origen,
-  #app.modo-simulacion {
+  /* ---- Barra del flujo: pasos, punto activo y acciones ---- */
+  .barra-flujo {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3) var(--s-4);
+    min-block-size: 3rem;
+    padding: var(--s-1) var(--s-4);
+    color: var(--marco-tinta);
     background: var(--marco);
+    border-block-end: 1px solid var(--marco-linea);
   }
 
-  #app.modo-tecnologia .lectura {
-    background: oklch(0.16 0.03 230 / 0.72);
-    border-block-start-color: oklch(1 0 0 / 0.12);
-    backdrop-filter: blur(10px);
+  .pasos {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  /* Acciones de la aplicación, al pie junto a la cadena de lectura. */
+  .pasos li + li::before {
+    content: "";
+    display: inline-block;
+    inline-size: 1.25rem;
+    block-size: 1px;
+    margin-inline-end: var(--s-1);
+    vertical-align: middle;
+    background: var(--marco-linea);
+  }
+
+  .paso {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 4px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--marco-tenue);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .paso:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+
+  .paso:not(:disabled):hover {
+    color: var(--marco-tinta);
+    background: var(--marco-alto);
+  }
+
+  .paso-num {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 1.4rem;
+    block-size: 1.4rem;
+    border: 1px solid var(--marco-linea);
+    border-radius: 50%;
+    font-size: 11px;
+  }
+
+  .paso.hecho .paso-num {
+    border-color: var(--marco-recurso);
+    color: var(--marco-recurso);
+  }
+
+  .paso.actual {
+    color: var(--marco-tinta);
+  }
+
+  .paso.actual .paso-num {
+    border-color: var(--marco-captado);
+    background: var(--marco-captado);
+    color: var(--marco);
+  }
+
+  .sitio-chip,
+  .aviso-red {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--marco-alto);
+    font-size: var(--text-meta);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-inline-size: 0;
+  }
+
+  /* Acciones de la aplicación, a la derecha de la barra. */
   .acciones-barra {
     display: flex;
     gap: var(--s-2);
@@ -141,6 +211,24 @@
     color: var(--marco-captado);
   }
 
+  @media (width <= 48rem) {
+    .barra-flujo {
+      gap: var(--s-2);
+      padding-inline: var(--s-2);
+    }
+
+    .paso-nombre,
+    .btn-barra span,
+    .sitio-chip,
+    .pasos li + li::before {
+      display: none;
+    }
+
+    .paso.actual .paso-nombre {
+      display: inline;
+    }
+  }
+
   /* ---- Tablero: dos columnas sobre el marco ---- */
   .tablero {
     display: grid;
@@ -164,139 +252,12 @@
     box-shadow: var(--sombra-escena);
   }
 
-  /* ---- Cadena de lectura: las cuatro cifras como eslabones ---- */
-  .lectura {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-2) var(--s-4);
-    padding: var(--s-2) var(--s-4);
-    color: var(--marco-tinta);
-    background: var(--marco);
-    border-block-start: 1px solid var(--marco-linea);
-  }
-
-  .cadena {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-    gap: var(--s-1);
-    min-inline-size: 0;
-  }
-
-  .kpi {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-areas:
-      'etiqueta etiqueta'
-      'valor valor';
-    align-content: center;
-    gap: 0 6px;
-    min-inline-size: 0;
-    padding: 4px var(--s-3);
-    border-radius: var(--radio);
-  }
-
-  .kpi-etiqueta {
-    grid-area: etiqueta;
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--marco-tenue);
-    white-space: nowrap;
-  }
-
-  .kpi-valor {
-    grid-area: valor;
-    font-family: var(--font-display);
-    font-size: var(--text-kpi);
-    font-weight: 600;
-    line-height: 1.05;
-    letter-spacing: -0.02em;
-  }
-
-  .kpi-unidad {
-    font-family: var(--font-sans);
-    font-size: 0.45em;
-    font-weight: 600;
-    letter-spacing: 0;
-    color: var(--marco-tenue);
-  }
-
-  /* El recurso es lo que entra del mar; la potencia, lo que queda captado.
-     Sólo esos dos llevan color: el resto se lee en blanco. */
-  [data-testid='kpi-recurso'] .kpi-valor {
-    color: var(--marco-recurso);
-  }
-
-  [data-testid='kpi-potencia'] .kpi-valor {
-    color: var(--marco-captado);
-  }
-
-  .eslabon {
-    align-self: center;
-    color: var(--marco-tenue);
-    opacity: 0.7;
-  }
-
-  .kpi-pendiente {
-    grid-area: valor;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--text-meta);
-    font-style: italic;
-    color: var(--marco-tenue);
-  }
-
-  .kpi-esqueleto {
-    grid-area: valor;
-    display: block;
-    inline-size: 4.5rem;
-    block-size: calc(var(--text-kpi) * 1.05);
-    border-radius: var(--radio);
-    background: var(--marco-linea);
-    animation: kpi-latido 1.4s linear infinite;
-  }
-
-  @keyframes kpi-latido {
-    from {
-      opacity: 0.45;
-    }
-
-    to {
-      opacity: 0.9;
-    }
-  }
-
-  .aviso {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    margin-inline-start: auto;
-    padding: var(--s-1) var(--s-2);
-    border-radius: var(--radio);
-    background: var(--marco-linea);
-    font-size: var(--text-meta);
-  }
-
-  .aviso--error {
-    background: oklch(0.494 0.159 037 / 0.35);
-    font-weight: 600;
-  }
-
   /* Pantalla estrecha: una columna, el tablero se desplaza. */
   @media (width <= 64rem) {
     .tablero {
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: minmax(22rem, 42vh) minmax(0, 1fr);
       overflow: auto;
-    }
-
-    .lectura {
-      flex-wrap: nowrap;
-      overflow-x: auto;
     }
   }
 }

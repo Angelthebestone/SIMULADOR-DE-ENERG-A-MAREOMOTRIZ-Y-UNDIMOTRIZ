@@ -19,7 +19,7 @@ export type Pregunta = {
 export const preguntas: Record<Nivel, Pregunta> = {
   ver: {
     pregunta:
-      '¿Cuántas viviendas de Isla Fuerte podrías alimentar si subes la altura significativa de ola a 2 m?',
+      '¿Cuántas viviendas podrías alimentar si subes la altura significativa de ola a 2 m?',
     tarea:
       'Sube Hm0 hasta 2,0 m y deja Te en 7,0 s hasta ver la cifra de viviendas.',
     verificar: (r) => {

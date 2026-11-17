@@ -294,9 +294,13 @@ function alIrASimulador(s: SitioMapa) {
   position: absolute;
   z-index: 2;
   inset-block-start: var(--s-2);
-  inset-inline-start: var(--s-2);
+  inset-inline-start: 50%;
+  translate: -50% 0;
   margin: 0;
-  max-inline-size: min(28rem, calc(100% - 2rem));
+  max-inline-size: min(36rem, calc(100% - 7rem));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: var(--s-1) var(--s-2);
   border-radius: var(--radio);
   background: oklch(1 0 0 / 0.9);
