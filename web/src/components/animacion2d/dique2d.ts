@@ -19,6 +19,12 @@ export interface OptsDique2D {
   modo?: string;
   /** Escala vertical en píxeles por metro. Por defecto se deriva del calado. */
   escalaV?: number;
+  /** Nivel de la lámina del vaso. Si falta, se anima con `rangoMarea`. */
+  yEmbalse?: number;
+  /** Perfil del terreno: el vaso se recorta contra él para quedar contenido. */
+  terrenoY?: (px: number) => number;
+  /** Borde derecho del vaso (píxeles). */
+  xFinVaso?: number;
   /** Omite los chips de nombre/salto (previstas de la pantalla de tecnología). */
   sinRotulo?: boolean;
 }
@@ -36,7 +42,8 @@ const P = {
   palaOsc: "rgb(138 163 32)",
   escollera: "rgb(106 114 120)",
   acento: "rgb(199 225 74)",
-  aguaClara: "rgb(58 163 181)",
+  aguaVaso: "oklch(0.66 0.08 170)",
+  aguaVasoFondo: "oklch(0.4 0.05 188)",
   flechaLlenado: "rgb(199 225 74)",
   flechaVaciado: "rgb(127 212 227)",
   espuma: "rgba(255,255,255,0.55)",
@@ -67,7 +74,7 @@ function flecha(
 
 /**
  * Dibuja un dique mareal en corte: presa trapecio, conducto con bulbo y
- * palas, lámina de embalse con nivel oscilante y flechas de llenado/vaciado.
+ * palas, lámina de embalse contenida por el terreno y cota del salto.
  */
 export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D): void {
   const { cx, yMedio, yFondo, t, rangoMarea, sinRotulo = false } = opts;
@@ -75,37 +82,78 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
   if (!(yFondo > yMedio + 30)) return;
 
   const alto = yFondo - yMedio;
-  const coronacion = yMedio - Math.max(28, alto * 0.28);
-  // En previstas (lienzo estrecho) el semi-ancho se recorta para que la
-  // sección entera quepa sin comerse el embalse de la derecha.
-  const anchoMax = Math.min(180, Math.max(85, alto * 1.15));
-  const semiMar = Math.min(anchoMax, Math.max(70, alto * 1.05));
+  // Coronación con resguardo: el vaso nunca llega a rebasar la obra.
+  const coronacion = yMedio - Math.max(40, alto * 0.3);
+  const semiMar = Math.min(150, Math.max(80, alto * 0.85));
   const semiEmb = semiMar * 0.55;
   const semiCresta = Math.max(24, semiMar * 0.22);
 
-  const escalaV =
-    opts.escalaV ?? Math.max(2, Math.min(12, (yFondo - yMedio) / 18));
+  const escalaV = opts.escalaV ?? Math.max(2, Math.min(12, (yFondo - yMedio) / 18));
 
   const fase = Math.sin(t * 0.5);
   const saltoPx = (rangoMarea / 2) * escalaV * 0.9;
-  const yEmbalse = yMedio + fase * saltoPx;
+  const yEmbalse =
+    opts.yEmbalse ?? yMedio + Math.max(-26, Math.min(26, fase * saltoPx));
 
-  // ---- Embalse (a la derecha del dique) ------------------------------------
+  // ---- Vaso: lámina recortada contra el terreno ---------------------------
+  // El agua no es una caja: su fondo sigue el terreno y su borde derecho es la
+  // otra orilla, que la contiene. Así se lee como estuario y no como un
+  // rectángulo flotante junto al dique.
   const xEmb0 = cx + semiCresta;
-  const xEmb1 = cx + semiEmb + 90;
-  ctx.beginPath();
-  ctx.moveTo(xEmb0, yEmbalse);
-  ctx.lineTo(xEmb1, yEmbalse);
-  ctx.lineTo(xEmb1, yFondo + 4);
-  ctx.lineTo(xEmb0, yFondo + 4);
-  ctx.closePath();
-  const vaso = ctx.createLinearGradient(0, yEmbalse, 0, yFondo);
-  vaso.addColorStop(0, "oklch(0.62 0.085 165)");
-  vaso.addColorStop(1, "oklch(0.38 0.06 200)");
-  ctx.fillStyle = vaso;
-  ctx.fill();
-  ctx.fillStyle = P.espuma;
-  ctx.fillRect(xEmb0, yEmbalse - 1.5, xEmb1 - xEmb0, 3);
+  const xFinVaso = opts.xFinVaso ?? cx + semiEmb + 150;
+  const terreno = opts.terrenoY;
+  let xBorde = xFinVaso;
+  if (terreno) {
+    // El borde es la otra orilla: se busca hasta el final del lienzo, no hasta
+    // el límite del vaso, para que el agua muera en la ladera y no en una
+    // arista vertical.
+    for (let px = xEmb0; px <= xFinVaso + 140; px += 3) {
+      if (terreno(px) < yEmbalse) {
+        xBorde = px;
+        break;
+      }
+    }
+  }
+  if (xBorde > xEmb0 + 4) {
+    ctx.beginPath();
+    ctx.moveTo(xEmb0, yEmbalse);
+    ctx.lineTo(xBorde, yEmbalse);
+    if (terreno) {
+      for (let px = xBorde; px >= xEmb0; px -= 3) ctx.lineTo(px, terreno(px) + 1);
+    } else {
+      ctx.lineTo(xBorde, yFondo + 4);
+      ctx.lineTo(xEmb0, yFondo + 4);
+    }
+    ctx.closePath();
+    const vaso = ctx.createLinearGradient(0, yEmbalse, 0, yFondo + 10);
+    vaso.addColorStop(0, P.aguaVaso);
+    vaso.addColorStop(1, P.aguaVasoFondo);
+    ctx.fillStyle = vaso;
+    ctx.fill();
+
+    // Reflejo del cielo en la primera franja del vaso: da profundidad sin
+    // convertirlo en una lámina opaca.
+    const brillo = ctx.createLinearGradient(0, yEmbalse, 0, yEmbalse + 22);
+    brillo.addColorStop(0, "rgba(238,245,247,0.22)");
+    brillo.addColorStop(1, "rgba(238,245,247,0)");
+    ctx.fillStyle = brillo;
+    ctx.fillRect(xEmb0, yEmbalse, xBorde - xEmb0, 22);
+
+    // Lámina: una línea de espuma, no un borde de caja.
+    ctx.fillStyle = P.espuma;
+    ctx.fillRect(xEmb0, yEmbalse - 1.5, xBorde - xEmb0, 3);
+
+    // Reflejos tenues que siguen la superficie.
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 3; i++) {
+      const y = yEmbalse + i * 9 + Math.sin(t * 0.5 + i) * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(xEmb0 + 12, y);
+      ctx.lineTo(xBorde - 12 - i * 10, y);
+      ctx.stroke();
+    }
+  }
 
   // ---- Sección del dique ---------------------------------------------------
   const seccion = () => {
@@ -271,7 +319,7 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
       ? modo === "vaciado"
         ? false
         : true
-      : fase > 0;
+      : yEmbalse > yMedio;
 
   const colorFlecha = haciaEmbalse ? P.flechaLlenado : P.flechaVaciado;
   for (let i = 0; i < 3; i++) {
@@ -280,12 +328,14 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
   }
 
   // ---- Cota del salto h ----------------------------------------------------
-  const xCota = cx + semiEmb + 28;
+  // La cota vive a la derecha del dique, entre las dos láminas: es la variable
+  // que mueve la turbina y la que el estudiante tiene que poder leer.
+  const xCota = cx + semiEmb + 30;
   const yAlta = Math.min(yMedio, yEmbalse);
   const yBaja = Math.max(yMedio, yEmbalse);
-  if (yBaja - yAlta > 3) {
-    ctx.strokeStyle = "rgba(232,242,245,0.85)";
-    ctx.lineWidth = 1.2;
+  if (yBaja - yAlta > 2) {
+    ctx.strokeStyle = "rgba(238,245,247,0.9)";
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
     ctx.moveTo(xCota, yAlta);
     ctx.lineTo(xCota, yBaja);
@@ -296,35 +346,48 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
     ctx.lineTo(xCota, yBaja);
     ctx.lineTo(xCota + 4, yBaja - 4);
     ctx.stroke();
+    // Guías cortas en los dos niveles.
+    ctx.strokeStyle = "rgba(238,245,247,0.55)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(xCota - 16, yAlta);
+    ctx.lineTo(xCota + 8, yAlta);
+    ctx.moveTo(xCota - 16, yBaja);
+    ctx.lineTo(xCota + 8, yBaja);
+    ctx.stroke();
   }
 
-  // Etiqueta de ciclo + salto.
   if (sinRotulo) return;
-  const saltoM = rangoMarea * Math.abs(fase) * 0.5;
+
+  const saltoM = Math.abs(yEmbalse - yMedio) / Math.max(1, escalaV);
   const ciclo =
     ["llenado", "vaciado", "bidireccional", "bombeo"].includes(modo) && modo
       ? modo
       : haciaEmbalse
         ? "llenado"
         : "vaciado";
+
+  // Chip del salto junto a la cota, no en la coronación: así el número y la
+  // altura medida se leen en el mismo sitio.
   const chipSalto = `Salto ${saltoM.toFixed(1).replace(".", ",")} m · ${ciclo}`;
-  ctx.font = "11px system-ui, sans-serif";
+  ctx.font = "12px system-ui, sans-serif";
   ctx.textAlign = "center";
-  const anchoChip = (ctx.measureText?.(chipSalto)?.width ?? chipSalto.length * 6) + 12;
-  ctx.fillStyle = "rgba(15,26,36,0.7)";
+  const anchoSalto = (ctx.measureText?.(chipSalto)?.width ?? chipSalto.length * 6.5) + 14;
+  const ySalto = Math.min(Math.max((yAlta + yBaja) / 2 + 4, yAlta + 14), yBaja - 6);
+  ctx.fillStyle = "rgba(15,26,36,0.72)";
   ctx.beginPath();
-  ctx.roundRect(cx - anchoChip / 2, coronacion - 55, anchoChip, 16, 3);
+  ctx.roundRect(xCota + 12, ySalto - 13, anchoSalto, 18, 3);
   ctx.fill();
   ctx.fillStyle = "rgb(238 245 247)";
-  ctx.fillText(chipSalto, cx, coronacion - 44);
+  ctx.fillText(chipSalto, xCota + 12 + anchoSalto / 2, ySalto);
 
   const texto = "Dique mareal";
-  const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6) + 14;
-  ctx.font = "600 11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(15,26,36,0.78)";
+  ctx.font = "600 12px system-ui, sans-serif";
+  const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6.5) + 16;
+  ctx.fillStyle = "rgba(15,26,36,0.8)";
   ctx.beginPath();
-  ctx.roundRect(cx - ancho / 2, coronacion - 78, ancho, 17, 3);
+  ctx.roundRect(cx - ancho / 2, coronacion - 72, ancho, 19, 3);
   ctx.fill();
   ctx.fillStyle = "rgb(238 245 247)";
-  ctx.fillText(texto, cx, coronacion - 66);
+  ctx.fillText(texto, cx, coronacion - 59);
 }

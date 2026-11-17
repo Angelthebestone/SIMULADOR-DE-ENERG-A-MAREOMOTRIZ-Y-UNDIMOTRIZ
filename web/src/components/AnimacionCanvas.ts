@@ -48,8 +48,19 @@ const C = {
   tinta: "oklch(0.28 0.02 165)",
   acento: "oklch(0.72 0.15 120)",
   acentoClaro: "oklch(0.85 0.17 118)",
-  tierra: "oklch(0.8 0.02 100)",
-  tierraSombra: "oklch(0.68 0.02 100)",
+  // Corte del terreno: capa vegetal, suelo, arcilla y roca madre. Son los
+  // mismos materiales del corte 3D, en tonos apagados para que la obra y el
+  // agua sigan siendo lo que destaca.
+  suelo: "oklch(0.47 0.045 132)",
+  sueloClaro: "oklch(0.53 0.05 134)",
+  tierra: "oklch(0.72 0.035 82)",
+  tierraSombra: "oklch(0.6 0.03 78)",
+  arcilla: "oklch(0.59 0.025 70)",
+  rocaMadre: "oklch(0.44 0.012 100)",
+  rocaMadreClara: "oklch(0.5 0.012 100)",
+  hierba: "oklch(0.56 0.08 140)",
+  aguaVaso: "oklch(0.58 0.07 175)",
+  aguaVasoFondo: "oklch(0.33 0.045 190)",
 };
 
 export class AnimacionCanvas {
@@ -280,10 +291,28 @@ export class AnimacionCanvas {
     // que haya que leer se dibuja dentro de esa banda.
     const pie = this.pie;
     const horizonteY = h * 0.20;
-    const nivelMarMedio = h * 0.42;
+    // El mar baja un poco respecto al centro del cuadro: la franja de tierra de
+    // la derecha necesita aire sobre la lámina para que se lea como costa y no
+    // como un bloque tapado por el minimapa.
+    const nivelMarMedio = h * 0.455;
     const fondoMarY = h - pie - 26;
     const xCosta = w * 0.70;
-    const xPieTalud = xCosta * 0.62;
+    const xPieTalud = w * 0.38;
+    const xOrillaRef = w * 0.60;
+    const xMeseta = w * 0.66;
+    // Llanura baja: queda por debajo del minimapa (que ocupa la esquina
+    // superior derecha) y por encima de la lámina, con sitio para la
+    // subestación y la torre sin que el panel las tape.
+    const yMeseta = nivelMarMedio - h * 0.025;
+    const esEmbalse = this.modoEnergia === "mareomotriz" && this.dispositivo === "embalse";
+
+    // Dique: la obra cierra el corte por el centro y detrás queda el vaso, un
+    // estuario contenido por el terreno de la otra orilla.
+    const xDam = w * 0.56;
+    const yFondoDam = nivelMarMedio + h * 0.16;
+    const xFinVaso = w * 0.90;
+    const yFondoVaso = yFondoDam + 10;
+    const yMesetaEmb = nivelMarMedio - h * 0.085;
 
     const omega = (2 * Math.PI) / this.Te;
     const k = this.k > 0 ? this.k : 0.08;
@@ -291,44 +320,61 @@ export class AnimacionCanvas {
     // Píxeles por metro vertical: la columna de agua dibujada representa la
     // profundidad real, y la ola se exagera sobre esa misma escala.
     const pxPorM = ((fondoMarY - nivelMarMedio) / this.profundidad) * EXAGERACION_VERTICAL;
+    const pxPorMReal = (fondoMarY - nivelMarMedio) / this.profundidad;
     const escalaOla = Math.min(pxPorM, (nivelMarMedio - horizonteY) / HM0_TOPE_M);
 
     const superficieY = (px: number) =>
       nivelMarMedio - this.eta((px / w) * dominioM, t, omega, k) * escalaOla;
 
-    /** Perfil natural del terreno: fondo plano mar adentro, talud continuo
-     *  hasta la orilla y meseta tierra adentro. */
-    const yPlaya = nivelMarMedio + 6;
-    const yMeseta = nivelMarMedio - h * 0.15;
-    const perfilNatural = (px: number): number => {
-      if (px <= xPieTalud) return fondoMarY + Math.sin(px * 0.013) * 2.5;
-      if (px <= xCosta) {
-        const u = (px - xPieTalud) / (xCosta - xPieTalud);
-        return fondoMarY + (yPlaya - fondoMarY) * (u * u * (3 - 2 * u));
-      }
-      const u = Math.min(1, (px - xCosta) / (w * 0.06));
-      return yPlaya + (yMeseta - yPlaya) * (u * u * (3 - 2 * u));
+    const suave = (u: number) => {
+      const c = Math.max(0, Math.min(1, u));
+      return c * c * (3 - 2 * c);
     };
 
-    // Cada dispositivo se fondea donde le corresponde: la boya en agua abierta,
-    // la turbina a media profundidad y el cajón y el dique en el somero.
-    const xDispositivo =
-      this.dispositivo === "owc"
-        ? xPieTalud + (xCosta - xPieTalud) * 0.66
-        : this.dispositivo === "embalse"
-          ? xPieTalud + (xCosta - xPieTalud) * 0.6
-          : xCosta * 0.55;
+    /** Perfil del terreno. En la costa, el fondo sube por la playa hasta una
+     *  llanura baja. En el dique, el fondo sube hasta la cimentación, el vaso
+     *  queda excavado detrás y la otra orilla lo cierra por la derecha. */
+    const perfilNatural = (px: number): number => {
+      if (esEmbalse) {
+        if (px <= xPieTalud) return fondoMarY + Math.sin(px * 0.013) * 2.5;
+        if (px <= xDam - 115) {
+          const u = (px - xPieTalud) / (xDam - 115 - xPieTalud);
+          return fondoMarY + (yFondoDam - fondoMarY) * suave(u);
+        }
+        if (px <= xDam + 70) return yFondoDam;
+        if (px <= xFinVaso) {
+          const u = (px - (xDam + 70)) / (xFinVaso - (xDam + 70));
+          return yFondoVaso + Math.sin(u * Math.PI) * 5;
+        }
+        const u = (px - xFinVaso) / (w * 0.08);
+        return yFondoVaso + (yMesetaEmb - yFondoVaso) * suave(u);
+      }
+      if (px <= xPieTalud) return fondoMarY + Math.sin(px * 0.013) * 2.5;
+      if (px <= xOrillaRef) {
+        const u = (px - xPieTalud) / (xOrillaRef - xPieTalud);
+        return fondoMarY + (nivelMarMedio + 2 - fondoMarY) * suave(u);
+      }
+      const u = (px - xOrillaRef) / (xMeseta - xOrillaRef);
+      return nivelMarMedio + 2 + (yMeseta - (nivelMarMedio + 2)) * suave(u);
+    };
 
-    /** Banqueta de cimentación. Un cajón o un dique no se apoyan en la
-     *  pendiente: primero se draga y se rellena una plataforma horizontal. Sin
-     *  ella la obra queda colgando por el lado hondo y hundida por el somero. */
-    const conBanqueta = this.dispositivo === "owc" || this.dispositivo === "embalse";
+    // Cada dispositivo se fondea donde le corresponde: la boya y la turbina en
+    // agua abierta, el cajón en el somero y el dique cerrando el vaso.
+    const xDispositivo = esEmbalse
+      ? xDam
+      : this.dispositivo === "owc"
+        ? xPieTalud + (xOrillaRef - xPieTalud) * 0.78
+        : this.dispositivo.includes("turbina") || this.dispositivo.includes("corriente")
+          ? w * 0.35
+          : w * 0.375;
+
+    /** Banqueta de cimentación del cajón OWC: no se apoya en la pendiente. */
+    const conBanqueta = this.dispositivo === "owc";
     const yBanqueta = perfilNatural(xDispositivo);
-    const bx0 = xDispositivo - 200;
-    // La banqueta no llega a comerse la playa: la orilla la dibuja el perfil.
-    const bx1 = Math.min(xDispositivo + 150, xCosta - 55);
+    const bx0 = xDispositivo - 190;
+    const bx1 = Math.min(xDispositivo + 130, xOrillaRef - 40);
     // Transición larga: es un dragado con talud, no un escalón vertical.
-    const transicion = 165;
+    const transicion = 150;
     const terrenoY = (px: number): number => {
       const natural = perfilNatural(px);
       if (!conBanqueta || px < bx0 - transicion || px > bx1 + transicion) return natural;
@@ -339,13 +385,16 @@ export class AnimacionCanvas {
       return natural + (yBanqueta - natural) * u;
     };
 
-    // Orilla: donde el perfil corta la línea de mar. Separa la arena del suelo
-    // seco y es el ancla de la espuma y de todo lo que se apoya en la playa.
-    let xOrilla = xCosta;
-    for (let px = xPieTalud; px <= w; px += 3) {
-      if (terrenoY(px) <= nivelMarMedio) {
-        xOrilla = px;
-        break;
+    // Orilla: donde el perfil corta la línea de mar. En el dique no hay playa:
+    // el agua llega hasta el pie de aguas arriba de la obra.
+    const xBordeAgua = esEmbalse ? xDam - 60 : undefined;
+    let xOrilla = xBordeAgua ?? xCosta;
+    if (xBordeAgua === undefined) {
+      for (let px = xPieTalud; px <= w; px += 3) {
+        if (terrenoY(px) <= nivelMarMedio) {
+          xOrilla = px;
+          break;
+        }
       }
     }
 
@@ -358,30 +407,79 @@ export class AnimacionCanvas {
     };
 
     this.dibujarCielo(ctx, w, horizonteY, nivelMarMedio);
-    this.dibujarAgua(ctx, w, h, nivelMarMedio, fondoMarY, xCosta, t, superficieY, terrenoY);
-    this.dibujarTerreno(ctx, w, h, nivelMarMedio, xOrilla, terrenoY);
-    this.dibujarEspumaCosta(ctx, superficieY, terrenoY, xCosta, nivelMarMedio, t);
+    this.dibujarAgua(ctx, w, h, nivelMarMedio, fondoMarY, xBordeAgua ?? w, t, superficieY, terrenoY);
+    this.dibujarTerreno(
+      ctx,
+      w,
+      h,
+      nivelMarMedio,
+      xOrilla,
+      terrenoY,
+      // El corte geológico arranca en la orilla (o en el pie del dique) y la
+      // hierba en la llanura: así la playa conserva su arena y el subsuelo
+      // muestra las capas en todo el ancho, no sólo en la franja de la derecha.
+      esEmbalse ? xDam - 140 : xOrilla - 6,
+      esEmbalse ? w + 10 : xMeseta + 6,
+      !esEmbalse
+    );
+    if (!esEmbalse) {
+      this.dibujarEspumaCosta(ctx, superficieY, terrenoY, xOrilla + 6, nivelMarMedio, t);
+    }
 
     const yApoyo = terrenoY(xDispositivo);
+    const xSub = w * 0.64;
+    const xTorre = w * 0.69;
 
-    // La subestación vive en la meseta, ya pasada la rampa de la playa; el
-    // cable submarino remata en su base para que la conexión se lea.
-    const xSub = xCosta + (w - xCosta) * 0.18;
-    this.dibujarCableSubmarino(ctx, xDispositivo, yApoyo - 6, xSub + 6, terrenoY(xSub) - 2, t);
+    if (esEmbalse) {
+      // Escollera de cimentación: el fondo dragado bajo el dique. Sin ella la
+      // obra se posaba sobre un montón de arena liso.
+      ctx.beginPath();
+      ctx.moveTo(xDam - 124, terrenoY(xDam - 124));
+      for (let px = xDam - 124; px <= xDam + 84; px += 4) ctx.lineTo(px, terrenoY(px));
+      for (let px = xDam + 84; px >= xDam - 124; px -= 4) {
+        ctx.lineTo(px, terrenoY(px) + 7);
+      }
+      ctx.closePath();
+      ctx.fillStyle = "oklch(0.55 0.012 92)";
+      ctx.fill();
+      ctx.fillStyle = "oklch(0.63 0.01 96)";
+      for (let i = 0; i < 24; i++) {
+        const rx = xDam - 120 + i * 9;
+        const ry = terrenoY(rx) + 3 + ((i * 7) % 4);
+        ctx.beginPath();
+        ctx.ellipse(rx, ry, 3.4, 1.9, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-    if (this.modoEnergia === "mareomotriz") {
-      if (this.dispositivo === "embalse") {
-        // Dique 2D: presa trapecio + bulbo + flechas de ciclo (capa animacion2d).
-        dibujarDique2D(ctx, {
-          cx: xDispositivo,
-          yMedio: nivelMarMedio,
-          yFondo: yApoyo,
-          t,
-          rangoMarea: this.rangoMarea,
-          escalaV: escalaOla,
-          sinRotulo: this.modoPrevia,
-        });
-      } else {
+      // Lámina del vaso: sube y baja con la marea, contenida por el terreno de
+      // la otra orilla. El nivel del mar es la referencia del salto.
+      const yEmbalse = nivelMarMedio + 4 + 26 * Math.sin(t * 0.4);
+      const haciaEmbalse = yEmbalse > nivelMarMedio + 2;
+      dibujarDique2D(ctx, {
+        cx: xDam,
+        yMedio: nivelMarMedio,
+        yFondo: yApoyo,
+        t,
+        rangoMarea: this.rangoMarea,
+        escalaV: pxPorMReal,
+        yEmbalse,
+        terrenoY,
+        xFinVaso,
+        modo: haciaEmbalse ? "llenado" : "vaciado",
+        sinRotulo: this.modoPrevia,
+      });
+    } else {
+      // El cable submarino remata en la subestación de la costa.
+      this.dibujarCableSubmarino(
+        ctx,
+        xDispositivo,
+        yApoyo - 6,
+        xSub + 16,
+        terrenoY(xSub + 20) - 2,
+        t
+      );
+
+      if (this.modoEnergia === "mareomotriz") {
         // Granja / turbina de corriente: rotor tripala rojo-naranja (capa animacion2d).
         dibujarGranja2D(ctx, {
           x: xDispositivo,
@@ -394,39 +492,41 @@ export class AnimacionCanvas {
           sinRotulo: this.modoPrevia,
         });
         if (!this.modoPrevia) {
-          this.rotulo(
+          const yRotor = nivelMarMedio + (yApoyo - nivelMarMedio) * 0.52;
+          this.chip(
             ctx,
             `Corriente ${this.velocidadCorriente.toFixed(1).replace(".", ",")} m/s`,
-            xDispositivo + 66,
-            nivelMarMedio + (yApoyo - nivelMarMedio) * 0.52 + 4,
-            "left",
-            C.espuma,
-            10
+            xDispositivo + 104,
+            yRotor - 40
           );
         }
+      } else if (this.dispositivo === "owc") {
+        this.dibujarOWC(ctx, xDispositivo, nivelMarMedio, yApoyo, t, omega, escalaOla, apoyoHuella, terrenoY);
+      } else {
+        const boyaZ =
+          this.muestrearSerie(t) ?? this.eta((xDispositivo / w) * dominioM, t, omega, k) * 0.6;
+        // PowerBuoy 2D: flotador amarillo + spar + placa de reactancia + pod.
+        dibujarAbsorbedor2D(ctx, {
+          x: xDispositivo,
+          ySuperficie: nivelMarMedio,
+          yFondo: yApoyo,
+          t,
+          zRelativo: boyaZ * escalaOla,
+          Hm0: this.Hm0,
+          sinRotulo: this.modoPrevia,
+          // La escena dibuja el cable completo hasta la subestación: el del
+          // módulo acabaría en mitad de la playa.
+          sinCable: !this.modoPrevia,
+        });
       }
-    } else if (this.dispositivo === "owc") {
-      this.dibujarOWC(ctx, xDispositivo, nivelMarMedio, yApoyo, t, omega, escalaOla, apoyoHuella, terrenoY);
-    } else {
-      const boyaZ = this.muestrearSerie(t) ?? this.eta((xDispositivo / w) * dominioM, t, omega, k) * 0.6;
-      // PowerBuoy 2D: flotador amarillo + spar + placa de reactancia + pod.
-      dibujarAbsorbedor2D(ctx, {
-        x: xDispositivo,
-        ySuperficie: nivelMarMedio,
-        yFondo: yApoyo,
-        t,
-        zRelativo: boyaZ * escalaOla,
-        Hm0: this.Hm0,
-        sinRotulo: this.modoPrevia,
-      });
+
+      this.dibujarRedElectrica(ctx, w, terrenoY, xSub, xTorre);
     }
 
-    this.dibujarRedElectrica(ctx, w, xCosta, terrenoY, t);
-    void yMeseta;
     // En miniatura las anotaciones se pisan unas a otras y no se leen: a ese
     // tamaño el lienzo enseña la escena y nada más.
     if (w >= 460) {
-      this.dibujarHUD(ctx, w, h, nivelMarMedio, fondoMarY, dominioM, escalaOla, xPieTalud, pie);
+      this.dibujarHUD(ctx, w, h, nivelMarMedio, fondoMarY, dominioM, escalaOla, pie);
     }
   }
 
@@ -496,13 +596,20 @@ export class AnimacionCanvas {
     const yFondo = fondoMarY + 2;
 
     if (this.modoEnergia === "mareomotriz" && this.dispositivo === "embalse") {
+      // En la miniatura el vaso sigue el lecho plano y se sale del encuadre por
+      // la derecha: se lee como estuario, no como una caja de agua.
+      const yEmbalsePrev = nivelMarMedio + 3 + Math.min(14, h * 0.03) * Math.sin(t * 0.4);
       dibujarDique2D(ctx, {
         cx: xCentro,
         yMedio: nivelMarMedio,
         yFondo,
         t,
         rangoMarea: this.rangoMarea,
-        escalaV: escalaOla,
+        escalaV: (fondoMarY - nivelMarMedio) / this.profundidad,
+        yEmbalse: yEmbalsePrev,
+        terrenoY: () => yFondo,
+        xFinVaso: w,
+        modo: yEmbalsePrev > nivelMarMedio ? "llenado" : "vaciado",
         sinRotulo: true,
       });
       return;
@@ -554,15 +661,19 @@ export class AnimacionCanvas {
 
   /** Una sola masa de terreno con el mismo perfil dentro y fuera del agua. El
    *  cambio de material va en la orilla, no en la línea de mar: a un lado
-   *  arena, al otro suelo seco, con una franja de arena mojada entre los dos.
-   *  Partirlo por la horizontal dejaba una banda plana cruzando toda la tierra. */
+   *  arena, al otro un corte geológico —capa vegetal, suelo, arcilla y roca
+   *  madre—. Sin esas capas la tierra era un bloque plano que parecía una obra
+   *  sin terminar. */
   private dibujarTerreno(
     ctx: CanvasRenderingContext2D,
     w: number,
     h: number,
     nivelMar: number,
     xOrilla: number,
-    terrenoY: (px: number) => number
+    terrenoY: (px: number) => number,
+    xEstratos: number,
+    xHierba: number,
+    conPlaya: boolean
   ) {
     const perfil = () => {
       ctx.beginPath();
@@ -583,29 +694,154 @@ export class AnimacionCanvas {
     ctx.save();
     perfil();
     ctx.clip();
+    // Borde de corte: el corte geológico arranca en la cresta de la duna y
+    // deja una cuña de arena bajo ella, en vez de una costura vertical.
+    const corteIzq = 40;
+    ctx.beginPath();
+    ctx.moveTo(xEstratos, 0);
+    ctx.lineTo(w, 0);
+    ctx.lineTo(w, h);
+    ctx.lineTo(xEstratos + corteIzq, h);
+    ctx.closePath();
+    ctx.clip();
 
-    const suelo = ctx.createLinearGradient(0, nivelMar - h * 0.2, 0, h);
-    suelo.addColorStop(0, C.tierra);
-    suelo.addColorStop(1, C.tierraSombra);
-    ctx.fillStyle = suelo;
-    ctx.fillRect(xOrilla + 40, 0, w, h);
+    const capas = [
+      // La primera capa es arena: la playa no cambia de material en la orilla,
+      // y el corte empieza justo debajo de ella.
+      { y0: 0, y1: 6, a: "oklch(0.7 0.045 84)", b: "oklch(0.63 0.04 82)" },
+      { y0: 6, y1: 30, a: "oklch(0.6 0.035 78)", b: "oklch(0.54 0.03 76)" },
+      { y0: 30, y1: 66, a: "oklch(0.74 0.03 88)", b: "oklch(0.66 0.03 84)" },
+      { y0: 66, y1: 110, a: C.arcilla, b: "oklch(0.52 0.022 68)" },
+      { y0: 110, y1: 440, a: C.rocaMadreClara, b: C.rocaMadre },
+    ];
+    const xIniCapa = xEstratos - 4;
+    for (const capa of capas) {
+      ctx.beginPath();
+      let primero = true;
+      for (let px = xIniCapa; px <= w + 4; px += 4) {
+        const y = terrenoY(px) + capa.y0;
+        if (primero) {
+          ctx.moveTo(px, y);
+          primero = false;
+        } else ctx.lineTo(px, y);
+      }
+      for (let px = w + 4; px >= xIniCapa; px -= 4) {
+        ctx.lineTo(px, terrenoY(px) + capa.y1);
+      }
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, nivelMar, 0, h);
+      g.addColorStop(0, capa.a);
+      g.addColorStop(1, capa.b);
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
 
-    // Arena mojada: la transición no es un corte, es una franja.
-    const franja = ctx.createLinearGradient(xOrilla - 8, 0, xOrilla + 40, 0);
-    franja.addColorStop(0, "rgba(201,195,180,0)");
-    franja.addColorStop(1, C.tierra);
-    ctx.fillStyle = franja;
-    ctx.fillRect(xOrilla - 8, 0, 48, h);
+    // Contactos entre capas: una línea ondulada, no un borde de regla.
+    ctx.strokeStyle = "rgba(48,42,32,0.16)";
+    ctx.lineWidth = 1;
+    for (const yOff of [6, 30, 66, 110]) {
+      ctx.beginPath();
+      for (let px = xIniCapa; px <= w + 4; px += 4) {
+        const y = terrenoY(px) + yOff + Math.sin(px * 0.045 + yOff * 0.7) * 1.6;
+        if (px === xIniCapa) ctx.moveTo(px, y);
+        else ctx.lineTo(px, y);
+      }
+      ctx.stroke();
+    }
+
+    // Cantos en el suelo y la arcilla: tamaño y separación irregulares.
+    ctx.fillStyle = C.roca;
+    ctx.globalAlpha = 0.26;
+    for (let i = 0; i < 26; i++) {
+      const rx = xEstratos + (((i * 137) % 1000) / 1000) * (w - xEstratos);
+      const ry = terrenoY(rx) + 34 + ((i * 61) % 60);
+      const rr = 1.6 + ((i * 29) % 5) * 0.7;
+      ctx.beginPath();
+      ctx.ellipse(rx, ry, rr, rr * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Roca madre: estratos horizontales tenues y trazos inclinados. Sin esta
+    // textura la capa profunda volvía a ser un bloque plano, ahora en gris.
+    ctx.strokeStyle = "rgba(28,30,28,0.1)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) {
+      const yOff = 128 + i * 30;
+      ctx.beginPath();
+      for (let px = xIniCapa; px <= w + 4; px += 6) {
+        const y = terrenoY(px) + yOff + Math.sin(px * 0.02 + i) * 3;
+        if (px === xIniCapa) ctx.moveTo(px, y);
+        else ctx.lineTo(px, y);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(30,32,30,0.12)";
+    for (let i = 0; i < 26; i++) {
+      const rx = xEstratos + (((i * 173) % 1000) / 1000) * (w - xEstratos);
+      const ry = terrenoY(rx) + 124 + ((i * 47) % 84);
+      ctx.beginPath();
+      ctx.moveTo(rx - 6, ry + 8);
+      ctx.lineTo(rx + 8, ry - 8);
+      ctx.stroke();
+    }
     ctx.restore();
 
+    // Arena mojada: la transición no es un corte, es una franja. Sólo en la
+    // playa; en el vaso del dique el agua llega a la obra.
+    if (conPlaya) {
+      const franja = ctx.createLinearGradient(xOrilla - 10, 0, xOrilla + 34, 0);
+      franja.addColorStop(0, "rgba(201,195,180,0)");
+      franja.addColorStop(1, C.tierra);
+      ctx.save();
+      perfil();
+      ctx.clip();
+      ctx.fillStyle = franja;
+      ctx.fillRect(xOrilla - 10, 0, 44, h);
+      ctx.restore();
+    }
+
+    // Hierba sobre la llanura: sólo donde la pendiente deja de ser un talud y
+    // el terreno está por encima de la lámina.
+    ctx.strokeStyle = C.hierba;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let tramo = false;
+    for (let px = xHierba; px <= w; px += 4) {
+      const pendiente = Math.abs(terrenoY(px + 8) - terrenoY(px - 8));
+      if (pendiente > 9 || terrenoY(px) > nivelMar - 4) {
+        tramo = false;
+        continue;
+      }
+      const y = terrenoY(px) - 0.5;
+      if (!tramo) {
+        ctx.moveTo(px, y);
+        tramo = true;
+      } else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let px = xHierba + 4; px <= w; px += 13) {
+      const pendiente = Math.abs(terrenoY(px + 8) - terrenoY(px - 8));
+      if (pendiente > 9 || terrenoY(px) > nivelMar - 4) continue;
+      const y = terrenoY(px) - 1;
+      ctx.moveTo(px, y);
+      ctx.lineTo(px - 1.5, y - 3.2);
+      ctx.moveTo(px, y);
+      ctx.lineTo(px + 1.4, y - 2.4);
+    }
+    ctx.stroke();
+
+    // Filo del terreno: cierra la masa y separa el suelo del cielo.
     ctx.beginPath();
     ctx.moveTo(0, terrenoY(0));
     for (let px = 4; px <= w; px += 4) ctx.lineTo(px, terrenoY(px));
-    ctx.strokeStyle = "rgba(60,55,45,0.35)";
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(60,55,45,0.42)";
+    ctx.lineWidth = 1.3;
     ctx.stroke();
 
-    // Cantos sobre el fondo, con tamaños y separaciones desiguales.
+    // Cantos sobre el fondo marino, con tamaños y separaciones desiguales.
     ctx.fillStyle = C.roca;
     ctx.globalAlpha = 0.5;
     for (let i = 0; i < 18; i++) {
@@ -737,70 +973,89 @@ export class AnimacionCanvas {
   // ---- Red eléctrica -------------------------------------------------------
 
   /** Todo lo que hay en tierra se apoya en la cota del terreno **en su propia
-   *  abscisa**. La subestación va sobre la meseta —más allá de la rampa— para
-   *  que no vuelva a quedar flotando sobre la pendiente de la playa. */
+   *  abscisa**. La subestación y la torre van sobre la llanura, no sobre la
+   *  pendiente de la playa, y la línea sale del cuadro por la derecha: la
+   *  ciudad que antes asomaba bajo el minimapa era una carga sin sitio. */
   private dibujarRedElectrica(
     ctx: CanvasRenderingContext2D,
     w: number,
-    xCosta: number,
     terrenoY: (px: number) => number,
-    t: number
+    xSub: number,
+    xTorre: number
   ) {
-    // Subestación: transformador con radiadores, aisladores pasantes y valla.
-    const xSub = xCosta + (w - xCosta) * 0.18;
-    const sueloSub = terrenoY(xSub + 20);
-    const ySub = sueloSub - 34;
-
-    // Explanada bajo el transformador: una obra no se posa sobre la pendiente.
+    // Explanada de la subestación: una obra no se posa sobre la pendiente.
+    const sueloSub = terrenoY(xSub + 16);
+    const medioPatio = 38;
     ctx.fillStyle = C.tierraSombra;
     ctx.beginPath();
-    ctx.moveTo(xSub - 10, sueloSub + 8);
-    ctx.lineTo(xSub - 6, sueloSub);
-    ctx.lineTo(xSub + 46, sueloSub);
-    ctx.lineTo(xSub + 50, sueloSub + 8);
+    ctx.moveTo(xSub - medioPatio, sueloSub + 3);
+    ctx.lineTo(xSub - medioPatio + 4, sueloSub - 1);
+    ctx.lineTo(xSub + medioPatio - 4, sueloSub - 1);
+    ctx.lineTo(xSub + medioPatio, sueloSub + 3);
     ctx.closePath();
     ctx.fill();
+
+    // Transformador: cuerpo con radiadores, tapa y tres pasatapas.
+    const yTrafo = sueloSub - 19;
     ctx.fillStyle = C.obraOscura;
-    ctx.fillRect(xSub, ySub + 10, 40, 24);
-    ctx.fillStyle = C.obra;
-    ctx.fillRect(xSub + 4, ySub + 4, 32, 10);
+    ctx.fillRect(xSub - 13, yTrafo, 26, 18);
     ctx.strokeStyle = C.obraSombra;
     ctx.lineWidth = 1;
-    ctx.strokeRect(xSub, ySub + 10, 40, 24);
-
+    ctx.strokeRect(xSub - 13, yTrafo, 26, 18);
+    ctx.fillStyle = C.obra;
+    ctx.fillRect(xSub - 15, yTrafo - 3, 30, 4);
     ctx.strokeStyle = C.obraSombra;
-    ctx.lineWidth = 1.2;
-    for (let i = 0; i < 6; i++) {
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
       ctx.beginPath();
-      ctx.moveTo(xSub + 3 + i * 6.5, ySub + 12);
-      ctx.lineTo(xSub + 3 + i * 6.5, ySub + 32);
+      ctx.moveTo(xSub - 11 + i * 6, yTrafo + 2);
+      ctx.lineTo(xSub - 11 + i * 6, yTrafo + 16);
       ctx.stroke();
     }
+    for (const dx of [-8, 0, 8]) {
+      ctx.strokeStyle = C.tinta;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(xSub + dx, yTrafo - 3);
+      ctx.lineTo(xSub + dx, yTrafo - 11);
+      ctx.stroke();
+      ctx.fillStyle = C.espuma;
+      for (let k = 0; k < 3; k++) {
+        ctx.beginPath();
+        ctx.arc(xSub + dx, yTrafo - 5 - k * 2.2, 1.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Armario de control junto al transformador.
+    ctx.fillStyle = C.obra;
+    ctx.fillRect(xSub + 18, sueloSub - 13, 7, 12);
+    ctx.strokeStyle = C.obraSombra;
+    ctx.strokeRect(xSub + 18, sueloSub - 13, 7, 12);
+
+    // Valla del patio.
+    ctx.strokeStyle = "rgba(60,70,72,0.5)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 6; i++) {
+      const vx = xSub - medioPatio + 2 + (i * (medioPatio * 2 - 4)) / 6;
+      ctx.moveTo(vx, sueloSub - 1);
+      ctx.lineTo(vx, sueloSub - 9);
+    }
+    ctx.moveTo(xSub - medioPatio + 2, sueloSub - 8);
+    ctx.lineTo(xSub + medioPatio - 2, sueloSub - 8);
+    ctx.stroke();
+
+    // Torre de celosía: montantes que convergen, tramos arriostrados y dos
+    // crucetas con aisladores.
+    const yBase = terrenoY(xTorre);
+    const yTop = yBase - 96;
+    const anchoBase = 9;
+    const anchoTop = 3;
+    const montante = (s: number, y: number) =>
+      xTorre + s * (anchoTop + (anchoBase - anchoTop) * ((y - yTop) / (yBase - yTop)));
 
     ctx.strokeStyle = C.tinta;
     ctx.lineWidth = 1.6;
-    for (const dx of [10, 20, 30]) {
-      ctx.beginPath();
-      ctx.moveTo(xSub + dx, ySub + 4);
-      ctx.lineTo(xSub + dx, ySub - 8);
-      ctx.stroke();
-      ctx.fillStyle = C.espuma;
-      ctx.beginPath();
-      ctx.arc(xSub + dx, ySub - 10, 2.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Torre de celosía: montantes que convergen, tres tramos de arriostrado
-    // y dos crucetas con aisladores.
-    const xT = xCosta + (w - xCosta) * 0.42;
-    const yBase = terrenoY(xT);
-    const yTop = yBase - 108;
-    const anchoBase = 17;
-    const anchoTop = 5;
-    const montante = (s: number, y: number) => xT + s * (anchoTop + (anchoBase - anchoTop) * ((y - yTop) / (yBase - yTop)));
-
-    ctx.strokeStyle = C.tinta;
-    ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(montante(-1, yBase), yBase);
     ctx.lineTo(montante(-1, yTop), yTop);
@@ -808,7 +1063,7 @@ export class AnimacionCanvas {
     ctx.lineTo(montante(1, yTop), yTop);
     ctx.stroke();
 
-    ctx.lineWidth = 0.9;
+    ctx.lineWidth = 0.8;
     ctx.beginPath();
     const tramos = 7;
     for (let i = 0; i < tramos; i++) {
@@ -823,63 +1078,53 @@ export class AnimacionCanvas {
     }
     ctx.stroke();
 
-    const crucetas = [yTop + 14, yTop + 40];
-    ctx.lineWidth = 1.8;
-    for (const yc of crucetas) {
-      const brazo = yc === crucetas[0] ? 26 : 20;
+    const crucetas = [yTop + 12, yTop + 34];
+    const brazos = [20, 16];
+    for (let i = 0; i < crucetas.length; i++) {
+      const yc = crucetas[i];
+      const brazo = brazos[i];
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(xT - brazo, yc);
-      ctx.lineTo(xT + brazo, yc);
+      ctx.moveTo(xTorre - brazo, yc);
+      ctx.lineTo(xTorre + brazo, yc);
       ctx.stroke();
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 0.9;
       for (const s of [-1, 1]) {
         ctx.beginPath();
-        ctx.moveTo(xT + s * brazo, yc);
-        ctx.lineTo(xT + s * brazo, yc + 6);
+        ctx.moveTo(xTorre + s * brazo, yc);
+        ctx.lineTo(xTorre + s * brazo, yc + 5);
         ctx.stroke();
+        ctx.fillStyle = C.espuma;
+        ctx.beginPath();
+        ctx.arc(xTorre + s * brazo, yc + 6, 1.6, 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.lineWidth = 1.8;
     }
 
-    // Línea aérea con catenaria, del pórtico de la subestación a la torre y
-    // de la torre al borde del cuadro.
+    // Línea aérea con catenaria: de la subestación a la torre y de la torre al
+    // borde del cuadro, donde la red sigue fuera de plano.
     const conductor = (x0: number, y0: number, x1: number, y1: number) => {
       ctx.beginPath();
       ctx.moveTo(x0, y0);
-      ctx.quadraticCurveTo((x0 + x1) / 2, Math.max(y0, y1) + 16, x1, y1);
+      ctx.quadraticCurveTo((x0 + x1) / 2, Math.max(y0, y1) + 14, x1, y1);
       ctx.stroke();
     };
     ctx.strokeStyle = C.tinta;
-    ctx.lineWidth = 1.1;
-    conductor(xSub + 20, ySub - 10, xT - 26, crucetas[0] + 6);
-    conductor(xT + 26, crucetas[0] + 6, w, crucetas[0] + 10);
-    conductor(xT + 20, crucetas[1] + 6, w, crucetas[1] + 12);
+    ctx.lineWidth = 1;
+    conductor(xSub + 8, yTrafo - 11, xTorre - 20, crucetas[0] + 6);
+    conductor(xSub - 8, yTrafo - 11, xTorre - 16, crucetas[1] + 6);
+    conductor(xTorre + 20, crucetas[0] + 6, w, crucetas[0] + 14);
+    conductor(xTorre + 16, crucetas[1] + 6, w, crucetas[1] + 18);
 
-    // Núcleo urbano: alturas y anchos desiguales, ventanas que se encienden
-    // despacio. Es la carga al final de la cadena, no decoración.
-    const xCiudad = xCosta + (w - xCosta) * 0.62;
-    const anchos = [26, 18, 34, 22];
-    const alturas = [58, 84, 44, 70];
-    let ex = xCiudad;
-    for (let i = 0; i < anchos.length && ex < w; i++) {
-      const ancho = anchos[i];
-      const alto = alturas[i];
-      const sueloEdificio = terrenoY(ex + ancho / 2);
-      const ey = sueloEdificio - alto;
-      ctx.fillStyle = i % 2 === 0 ? C.obraOscura : C.obraSombra;
-      ctx.fillRect(ex, ey, ancho, alto);
-      ctx.fillStyle = "rgba(255,255,255,0.12)";
-      ctx.fillRect(ex, ey, ancho, 3);
-
-      for (let wy = ey + 8; wy < sueloEdificio - 8; wy += 12) {
-        for (let wx = ex + 5; wx < ex + ancho - 6; wx += 9) {
-          const fase = Math.sin(wx * 0.7 + wy * 0.3 + t * 0.6);
-          ctx.fillStyle = fase > 0.25 ? C.acentoClaro : "rgba(255,255,255,0.10)";
-          ctx.fillRect(wx, wy, 4, 6);
-        }
-      }
-      ex += ancho + 6;
-    }
+    // Patas de la torre sobre el terreno.
+    ctx.strokeStyle = C.tinta;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(montante(-1, yBase), yBase);
+    ctx.lineTo(montante(-1, yBase) - 2, yBase + 3);
+    ctx.moveTo(montante(1, yBase), yBase);
+    ctx.lineTo(montante(1, yBase) + 2, yBase + 3);
+    ctx.stroke();
   }
 
   private dibujarCableSubmarino(
@@ -1557,7 +1802,7 @@ export class AnimacionCanvas {
     y: number,
     alineacion: CanvasTextAlign,
     color: string,
-    tam = 10
+    tam = 12
   ) {
     ctx.fillStyle = color;
     ctx.font = `${tam}px ${this.token("--font-sans", "system-ui, sans-serif")}`;
@@ -1568,24 +1813,26 @@ export class AnimacionCanvas {
   /** Rótulo de anotación sobre fondo propio. Sin la pastilla, el texto claro
    *  se pierde en cuanto cae sobre la cresta de una ola. */
   private chip(ctx: CanvasRenderingContext2D, texto: string, x: number, y: number) {
-    ctx.font = `11px ${this.token("--font-sans", "system-ui, sans-serif")}`;
+    // 12 px es el mínimo legible del corte: por debajo, la anotación se pierde
+    // en cuanto el lienzo se reduce a la columna de la vista de simulación.
+    ctx.font = `12px ${this.token("--font-sans", "system-ui, sans-serif")}`;
     ctx.textAlign = "center";
-    const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6) + 12;
-    ctx.fillStyle = "rgba(15,26,36,0.7)";
+    const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6.5) + 14;
+    ctx.fillStyle = "rgba(15,26,36,0.72)";
     ctx.beginPath();
-    ctx.roundRect(x - ancho / 2, y - 11, ancho, 16, 3);
+    ctx.roundRect(x - ancho / 2, y - 13, ancho, 18, 3);
     ctx.fill();
     ctx.fillStyle = C.espuma;
     ctx.fillText(texto, x, y);
   }
 
   private rotuloDispositivo(ctx: CanvasRenderingContext2D, x: number, y: number, texto: string) {
-    ctx.font = `600 11px ${this.token("--font-sans", "system-ui, sans-serif")}`;
+    ctx.font = `600 12px ${this.token("--font-sans", "system-ui, sans-serif")}`;
     ctx.textAlign = "center";
-    const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6) + 14;
-    ctx.fillStyle = "rgba(15,26,36,0.78)";
+    const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6.5) + 16;
+    ctx.fillStyle = "rgba(15,26,36,0.8)";
     ctx.beginPath();
-    ctx.roundRect(x - ancho / 2, y - 12, ancho, 17, 3);
+    ctx.roundRect(x - ancho / 2, y - 14, ancho, 19, 3);
     ctx.fill();
     ctx.fillStyle = C.espuma;
     ctx.fillText(texto, x, y);
@@ -1599,7 +1846,6 @@ export class AnimacionCanvas {
     fondoY: number,
     dominioM: number,
     escalaOla: number,
-    xPieTalud: number,
     pie: number
   ) {
     // Dos tintas: sobre el cielo la anotación va oscura, dentro del agua va
@@ -1641,7 +1887,9 @@ export class AnimacionCanvas {
     const x0 = xFlecha + m0;
     const x1 = xFlecha + m1;
     if (this.lambda > 0 && x1 > x0) {
-      const yRegla = nivelMedio - HM0_TOPE_M * escalaOla * 0.5 - 26;
+      // La regla sube hasta el cielo libre: a la altura de la cresta se cruzaba
+      // con el chip del dispositivo.
+      const yRegla = nivelMedio - HM0_TOPE_M * escalaOla * 0.5 - 68;
       ctx.strokeStyle = sobreCielo;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
@@ -1660,8 +1908,9 @@ export class AnimacionCanvas {
       );
     }
 
-    // Cota de profundidad sobre el fondo plano, antes de que empiece el talud.
-    const xCota = xPieTalud - 12;
+    // Cota de profundidad en agua abierta, lejos del dispositivo y de la cota
+    // de Hm0: antes caía sobre el fuste y se comía el rótulo de la corriente.
+    const xCota = w * 0.20;
     ctx.strokeStyle = tenue;
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
@@ -1670,7 +1919,7 @@ export class AnimacionCanvas {
     ctx.lineTo(xCota, fondoY);
     ctx.stroke();
     ctx.setLineDash([]);
-    this.chip(ctx, `${this.profundidad} m de calado`, xCota + 56, (nivelMedio + fondoY) / 2);
+    this.chip(ctx, `${this.profundidad} m de calado`, xCota + 72, (nivelMedio + fondoY) / 2);
 
     // Pie de escala: sin esto el dibujo aparentaría una proporción que no tiene.
     this.rotulo(
@@ -1680,7 +1929,7 @@ export class AnimacionCanvas {
       h - pie - 6,
       "left",
       tenue,
-      10
+      12
     );
 
     // Lectura instantánea, arriba a la derecha. Con potencia calculada se
@@ -1707,7 +1956,6 @@ export class AnimacionCanvas {
     ctx.font = `600 12px ${this.token("--font-mono", "ui-monospace, monospace")}`;
     ctx.textAlign = "right";
     ctx.fillText(linea, w - 21, 28);
-    void fondoY;
   }
 
   arrancar() {

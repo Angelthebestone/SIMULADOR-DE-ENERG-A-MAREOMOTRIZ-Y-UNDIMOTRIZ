@@ -471,13 +471,14 @@ export function dibujarGranja2D(ctx: CanvasRenderingContext2D, opts: OptsGranja2
   if (sinRotulo) return;
   const texto =
     n > 1 ? `Granja mareomotriz · ${n} unidades` : "Turbina de corriente mareal";
-  ctx.font = "600 11px system-ui, sans-serif";
+  ctx.font = "600 12px system-ui, sans-serif";
   ctx.textAlign = "center";
-  const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6) + 14;
-  const yEt = yCorona - 78;
-  ctx.fillStyle = "rgba(15,26,36,0.78)";
+  const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6.5) + 16;
+  // Justo encima de la baliza, con aire suficiente respecto a la regla de Te.
+  const yEt = yCorona - 66;
+  ctx.fillStyle = "rgba(15,26,36,0.8)";
   ctx.beginPath();
-  ctx.roundRect(x - ancho / 2, yEt - 12, ancho, 17, 3);
+  ctx.roundRect(x - ancho / 2, yEt - 14, ancho, 19, 3);
   ctx.fill();
   ctx.fillStyle = "rgb(238 245 247)";
   ctx.fillText(texto, x, yEt);

@@ -19,6 +19,8 @@ export interface OptsAbsorbedor2D {
   Hm0?: number;
   /** Omite el chip del nombre (previstas de la pantalla de tecnología). */
   sinRotulo?: boolean;
+  /** Omite el cable a costa: la escena ya dibuja el suyo hasta la subestación. */
+  sinCable?: boolean;
 }
 
 /** Paleta PowerBuoy alineada con la escena 3D. */
@@ -46,7 +48,7 @@ const P = {
  * pod submarino y cable de evacuación.
  */
 export function dibujarAbsorbedor2D(ctx: CanvasRenderingContext2D, opts: OptsAbsorbedor2D): void {
-  const { x, ySuperficie, yFondo, t, sinRotulo = false } = opts;
+  const { x, ySuperficie, yFondo, t, sinRotulo = false, sinCable = false } = opts;
   const z = opts.zRelativo ?? 0;
   const hm0 = opts.Hm0 ?? 1.5;
   if (!(yFondo > ySuperficie + 30)) return;
@@ -57,27 +59,29 @@ export function dibujarAbsorbedor2D(ctx: CanvasRenderingContext2D, opts: OptsAbs
   const yPod = yFondo - 8;
 
   // ---- Cable a costa + pulso de energía ------------------------------------
-  const xCosta = x + 220;
-  const yCosta = ySuperficie + (yFondo - ySuperficie) * 0.15;
-  ctx.strokeStyle = P.cable;
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.moveTo(x + 18, yPod + 4);
-  ctx.quadraticCurveTo(x + 100, yPod + 10, xCosta, yCosta);
-  ctx.stroke();
-  const frac = (t * 0.2) % 1;
-  const cpX = x + 100;
-  const cpY = yPod + 10;
-  const x0c = x + 18;
-  const y0c = yPod + 4;
-  const px = (1 - frac) * (1 - frac) * x0c + 2 * (1 - frac) * frac * cpX + frac * frac * xCosta;
-  const py = (1 - frac) * (1 - frac) * y0c + 2 * (1 - frac) * frac * cpY + frac * frac * yCosta;
-  ctx.fillStyle = P.acento;
-  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(frac * Math.PI);
-  ctx.beginPath();
-  ctx.arc(px, py, 2.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
+  if (!sinCable) {
+    const xCosta = x + 220;
+    const yCosta = ySuperficie + (yFondo - ySuperficie) * 0.15;
+    ctx.strokeStyle = P.cable;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(x + 18, yPod + 4);
+    ctx.quadraticCurveTo(x + 100, yPod + 10, xCosta, yCosta);
+    ctx.stroke();
+    const frac = (t * 0.2) % 1;
+    const cpX = x + 100;
+    const cpY = yPod + 10;
+    const x0c = x + 18;
+    const y0c = yPod + 4;
+    const px = (1 - frac) * (1 - frac) * x0c + 2 * (1 - frac) * frac * cpX + frac * frac * xCosta;
+    const py = (1 - frac) * (1 - frac) * y0c + 2 * (1 - frac) * frac * cpY + frac * frac * yCosta;
+    ctx.fillStyle = P.acento;
+    ctx.globalAlpha = 0.55 + 0.45 * Math.sin(frac * Math.PI);
+    ctx.beginPath();
+    ctx.arc(px, py, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 
   // ---- Pod / subestación submarina (USP) -----------------------------------
   ctx.fillStyle = "rgba(15,25,32,0.3)";
@@ -335,13 +339,15 @@ export function dibujarAbsorbedor2D(ctx: CanvasRenderingContext2D, opts: OptsAbs
   // Rótulo.
   if (sinRotulo) return;
   const texto = "Absorbedor puntual";
-  ctx.font = "600 11px system-ui, sans-serif";
+  ctx.font = "600 12px system-ui, sans-serif";
   ctx.textAlign = "center";
-  const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6) + 14;
-  const yEt = yCima - 40;
-  ctx.fillStyle = "rgba(15,26,36,0.78)";
+  const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6.5) + 16;
+  // El chip no sube con el heave: si sigue al flotador acaba pisando la regla
+  // de Te cuando la boya está en la cresta.
+  const yEt = ySuperficie - 96;
+  ctx.fillStyle = "rgba(15,26,36,0.8)";
   ctx.beginPath();
-  ctx.roundRect(x - ancho / 2, yEt - 12, ancho, 17, 3);
+  ctx.roundRect(x - ancho / 2, yEt - 14, ancho, 19, 3);
   ctx.fill();
   ctx.fillStyle = "rgb(238 245 247)";
   ctx.fillText(texto, x, yEt);
