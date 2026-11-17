@@ -16,9 +16,9 @@ export interface EstadoFlujo {
 }
 
 export const PASOS: Array<{ id: Paso; nombre: string }> = [
-  { id: 1, nombre: 'Inicio' },
+  { id: 1, nombre: 'Recurso' },
   { id: 2, nombre: 'Tecnología' },
-  { id: 3, nombre: 'Origen de datos' },
+  { id: 3, nombre: 'Lugar' },
   { id: 4, nombre: 'Simulación' },
 ]
 
@@ -68,18 +68,18 @@ export const PARAMS_INICIALES: Params = {
 export const SITIO_INICIAL: Record<string, { nombre: string; fuente: string; params: Partial<Params> }> = {
   absorbedor_puntual: {
     nombre: 'Peniche, Portugal',
-    fuente: 'Wavec Portugal',
+    fuente: 'estado de mar típico de la costa atlántica (orientativo)',
     params: { sitio_id: 'peniche', hm0_m: 2.3, te_s: 8.8, profundidad_m: 30, rango_m: 2.8, velocidad_ms: 0.5 },
   },
   turbina_corriente: {
     nombre: 'Pentland Firth, Escocia',
-    fuente: 'EMEC / MeyGen',
+    fuente: 'EMEC / MeyGen: pico de 5 m/s en mareas vivas',
     params: { sitio_id: 'pentland_firth', hm0_m: 2.8, te_s: 8.2, profundidad_m: 35, rango_m: 4.5, velocidad_ms: 5.0 },
   },
   embalse: {
     nombre: 'Estuario de La Rance, Francia',
-    fuente: 'EDF France (240 MW)',
-    params: { sitio_id: 'la_rance', hm0_m: 0.7, te_s: 4.5, profundidad_m: 18, rango_m: 13.5, velocidad_ms: 3.8 },
+    fuente: 'EDF: rango medio 8 m (13,5 m en vivas)',
+    params: { sitio_id: 'la_rance', hm0_m: 0.7, te_s: 4.5, profundidad_m: 18, rango_m: 8.0, velocidad_ms: 3.8 },
   },
 }
 

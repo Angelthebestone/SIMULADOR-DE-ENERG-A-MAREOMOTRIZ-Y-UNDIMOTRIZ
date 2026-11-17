@@ -676,7 +676,7 @@ export const escenaDique: Escena3D = {
     m.etiquetaCiclo.userData.prioridad = 2;
     g.add(m.etiquetaCiclo);
 
-    m.etiquetaDispositivo = crearEtiqueta("Dique mareal");
+    m.etiquetaDispositivo = crearEtiqueta("Dique de marea");
     m.etiquetaDispositivo.position.set(-7.5, 5.3, -2.3);
     m.etiquetaDispositivo.userData.prioridad = 3;
     g.add(m.etiquetaDispositivo);

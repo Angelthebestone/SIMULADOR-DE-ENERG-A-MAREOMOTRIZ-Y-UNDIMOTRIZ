@@ -22,7 +22,7 @@ const TERMINOS: Record<string, string> = {
   'B_pto': 'Amortiguamiento del PTO (N·s/m): resistencia viscosa del convertidor mecánico a la velocidad de la boya.',
   J: 'Densidad de potencia del oleaje (W/m): energía que cruza un metro de frente de ola por segundo.',
   AEP: 'Producción anual de energía (MWh/año): energía que el dispositivo entrega en un año medio.',
-  LCOE: 'Coste nivelado de la energía (COP/MWh): coste total descontado sobre la energía total producida en la vida útil.',
+  LCOE: 'Coste nivelado de la energía (moneda por MWh): coste total descontado sobre la energía total producida en la vida útil.',
   PTO: 'Power Take-Off: convertidor electromecánico que transforma el movimiento de la boya en electricidad.',
   'η_PTO': 'Rendimiento del PTO (adimensional): pérdidas mecánicas e hidráulicas en la conversión.',
   'η_gen': 'Eficiencia del generador eléctrico (adimensional): pérdidas en la conversión mecánica→eléctrica.',

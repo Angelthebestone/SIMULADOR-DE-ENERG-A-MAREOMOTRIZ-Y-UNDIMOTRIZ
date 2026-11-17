@@ -47,9 +47,9 @@ export const preguntas: Record<Nivel, Pregunta> = {
   },
   disenar: {
     pregunta:
-      '¿Cuánto cuesta cada MWh del dispositivo frente al diésel ZNI y a la red SIN?',
+      '¿Cuánto cuesta cada MWh del dispositivo frente al diésel de una isla y a la red interconectada?',
     tarea:
-      'Edita CAPEX y OPEX hasta que el coste por MWh quede por debajo del diésel y, si es posible, por debajo del SIN.',
+      'Edita CAPEX y OPEX hasta que el coste por MWh quede por debajo del diésel y, si es posible, por debajo de la red.',
     verificar: (r) => {
       const lcoe = Number((r?.extras as Record<string, unknown> | undefined)?.lcoe ?? NaN)
       const lcoeSin = Number((r?.extras as Record<string, unknown> | undefined)?.lcoe_sin ?? NaN)

@@ -9,6 +9,10 @@
 
     <template v-else>
       <p v-if="frase" class="frase">{{ frase }}</p>
+      <p v-if="dispositivo === 'absorbedor_puntual'" class="nota">
+        Ninguna planta de olas en servicio usa todavía una boya como la tuya: abajo hay columnas de agua,
+        aletas y serpientes, otras formas de captar la misma ola.
+      </p>
 
       <ul class="lista" role="list">
         <li class="fila fila--tuya">
@@ -29,7 +33,9 @@
           </div>
           <div class="meta">
             <span class="estado" :data-estado="f.estado">{{ f.estadoTexto }}</span>
-            <span v-if="f.gwh !== null">{{ formatearNumero(f.gwh, 0) }} GWh/año</span>
+            <span v-if="f.gwh !== null">
+              {{ formatearNumero(f.gwh, f.gwh < 10 ? 2 : 0) }} GWh/año<template v-if="f.nota"> · {{ f.nota }}</template>
+            </span>
             <span v-else class="sin-dato">producción anual sin dato publicado</span>
           </div>
           <div v-if="f.fp !== null" class="barra barra--real">
@@ -45,7 +51,8 @@
 
       <p class="nota">
         FP = factor de planta: energía del año ÷ (potencia instalada × 8 760 h). Es la cifra que sí se
-        compara entre escalas distintas.
+        compara entre escalas distintas. La simulación no cuenta averías, mantenimiento ni paradas: por
+        eso las plantas reales suelen quedar por debajo.
       </p>
     </template>
   </section>
@@ -73,6 +80,7 @@ const TECNOLOGIA: Record<string, TecnologiaPlanta> = {
 type PlantaConDatos = PlantaMundial & {
   produccion_anual_gwh?: number;
   produccion_url?: string;
+  produccion_nota?: string;
 };
 
 const plantas = ref<PlantaConDatos[]>([]);
@@ -97,6 +105,7 @@ const filas = computed(() =>
         url: p.produccion_url || p.fuente_url,
         potenciaW: pw,
         gwh,
+        nota: p.produccion_nota ?? "",
         fp: gwh !== null && pw > 0 ? (gwh * 1e9) / (pw * 8760) : null,
         estado: p.estado_operativo,
         estadoTexto:
@@ -131,13 +140,20 @@ watch(
 
 const propia = computed(() => ({ potenciaW: props.potenciaW, fp: props.factorPlanta }));
 
-/** Una frase de escala: cuántos dispositivos como el simulado harían falta
- *  para producir lo que produce la planta real más grande con dato anual. */
+/** Una frase de escala contra la planta real de potencia más parecida a la
+ *  simulada: cuántos dispositivos harían falta, o qué parte produce el tuyo. */
 const frase = computed(() => {
-  const ref_ = filas.value.find((f) => f.gwh !== null);
-  if (!ref_ || !(props.aepMwh > 0)) return "";
-  const n = Math.ceil((ref_.gwh as number) * 1000 / props.aepMwh);
-  return `Para producir lo que produce ${ref_.nombre} en un año harían falta ${formatearNumero(n, 0)} ${n === 1 ? "dispositivo" : "dispositivos"} como el tuyo en este punto.`;
+  const conDato = filas.value.filter((f) => f.gwh !== null && f.potenciaW > 0);
+  if (!conDato.length || !(props.aepMwh > 0)) return "";
+  const distancia = (f: { potenciaW: number }) => Math.abs(Math.log(f.potenciaW / props.potenciaW));
+  const ref_ = conDato.reduce((a, b) => (distancia(b) < distancia(a) ? b : a));
+  const cociente = ((ref_.gwh as number) * 1000) / props.aepMwh;
+  if (cociente <= 1.05) {
+    return `Tu simulación produce ${formatearNumero(1 / cociente, 1)} veces lo que produce ${ref_.nombre} en un año.`;
+  }
+  const n = Math.ceil(cociente);
+  const plural = { absorbedor_puntual: "boyas", turbina_corriente: "turbinas", embalse: "diques" }[props.dispositivo] ?? "dispositivos";
+  return `Para producir lo que produce ${ref_.nombre} en un año harían falta ${formatearNumero(n, 0)} ${plural} como el tuyo en este punto.`;
 });
 
 function textoFp(fp: number | null): string {
@@ -161,7 +177,7 @@ function anchoFp(fp: number | null): string {
   gap: 6px;
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--text-meta);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -178,7 +194,7 @@ function anchoFp(fp: number | null): string {
 .vacio,
 .nota {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--tenue);
 }
 
@@ -218,6 +234,11 @@ function anchoFp(fp: number | null): string {
   text-decoration: none;
 }
 
+a.nombre {
+  padding-block: 0.6rem;
+  margin-block: -0.6rem;
+}
+
 a.nombre:hover {
   text-decoration: underline;
 }
@@ -233,7 +254,7 @@ a.nombre:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 4px var(--s-2);
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--tenue);
 }
 
@@ -269,7 +290,7 @@ a.nombre:hover {
 .barra-texto {
   position: relative;
   padding-inline: 6px;
-  font-size: 11px;
+  font-size: var(--text-meta);
   font-weight: 700;
   line-height: 18px;
   color: var(--tinta);
@@ -277,7 +298,8 @@ a.nombre:hover {
 }
 
 .causa summary {
-  font-size: 11px;
+  padding-block: 0.6rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--aviso-borde);
   cursor: pointer;
@@ -285,7 +307,7 @@ a.nombre:hover {
 
 .causa p {
   margin: 4px 0 0;
-  font-size: 11px;
+  font-size: var(--text-meta);
   line-height: 1.45;
   color: var(--tinta);
 }

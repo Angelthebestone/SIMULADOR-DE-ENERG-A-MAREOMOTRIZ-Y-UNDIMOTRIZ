@@ -17,6 +17,7 @@
     "estado": "verificado"
   },
   "ejemplos": "Flumill",
+  "ejemplo_corto": "Flumill, sin despliegue comercial",
   "desenlace_comercial": "Sin despliegue comercial relevante",
   "fuente_taxonomia": "EMEC Archimedes screw"
 }

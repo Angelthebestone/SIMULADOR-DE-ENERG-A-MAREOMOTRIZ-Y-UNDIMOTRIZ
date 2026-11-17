@@ -297,3 +297,57 @@ export async function coleccionCorrientes() {
     })),
   };
 }
+
+/** Recurso global del punto libre: ola, rango de marea y pico de corriente de la
+ *  celda de mar más próxima (datos/marino/descargar_recurso_global.py). */
+export type RecursoGlobal = {
+  hm0_m: number | null;
+  te_s: number | null;
+  rango_m: number | null;
+  pico_ms: number | null;
+  distancia_km: number;
+  fuente: string;
+};
+
+type MallaGlobal = { fuente: string; periodo: string; puntos: (number | null)[][] };
+
+const RECURSO_GLOBAL = "./datos/marino/recurso_global.json";
+// La ola cambia poco en cientos de km de mar abierto; la marea y la corriente
+// cambian de una ensenada a la siguiente, así que solo valen muy cerca.
+const MAX_KM_OLEAJE = 400;
+const MAX_KM_MAREA = 100;
+
+let globalCache: Promise<MallaGlobal | null> | null = null;
+
+function cargarGlobal(): Promise<MallaGlobal | null> {
+  globalCache ??= fetch(RECURSO_GLOBAL)
+    .then((r) => (r.ok ? (r.json() as Promise<MallaGlobal>) : null))
+    .catch(() => null);
+  return globalCache;
+}
+
+export async function consultarRecursoGlobal(lon: number, lat: number): Promise<RecursoGlobal | null> {
+  const malla = await cargarGlobal();
+  if (!malla) return null;
+  let mejor: (number | null)[] | null = null;
+  let mejorKm = Infinity;
+  for (const p of malla.puntos) {
+    const d = distanciaKm(lon, lat, p[0] as number, p[1] as number);
+    if (d < mejorKm) {
+      mejorKm = d;
+      mejor = p;
+    }
+  }
+  if (!mejor) return null;
+  const [, , hm0, te, , rango, pico] = mejor;
+  const olaCerca = mejorKm <= MAX_KM_OLEAJE;
+  const mareaCerca = mejorKm <= MAX_KM_MAREA;
+  return {
+    hm0_m: olaCerca ? hm0 : null,
+    te_s: olaCerca ? te : null,
+    rango_m: mareaCerca ? rango : null,
+    pico_ms: mareaCerca ? pico : null,
+    distancia_km: Math.round(mejorKm),
+    fuente: `${malla.fuente}, ${malla.periodo}; celda a ${Math.round(mejorKm)} km`,
+  };
+}

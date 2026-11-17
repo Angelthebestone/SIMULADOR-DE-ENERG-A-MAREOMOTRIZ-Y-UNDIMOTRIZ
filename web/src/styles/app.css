@@ -217,15 +217,27 @@
       padding-inline: var(--s-2);
     }
 
-    .paso-nombre,
-    .btn-barra span,
     .sitio-chip,
     .pasos li + li::before {
       display: none;
     }
 
-    .paso.actual .paso-nombre {
-      display: inline;
+    /* Sin texto visible, pero con nombre para el lector de pantalla. */
+    .paso:not(.actual) .paso-nombre,
+    .btn-barra span {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .paso,
+    .btn-barra {
+      min-inline-size: 2.75rem;
+      min-block-size: 2.75rem;
+      justify-content: center;
     }
   }
 

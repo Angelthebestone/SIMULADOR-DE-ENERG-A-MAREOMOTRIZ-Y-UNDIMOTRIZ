@@ -49,22 +49,28 @@
       </ol>
     </section>
 
-    <ul v-if="avisos.length" class="avisos" aria-label="Avisos del modelo">
-      <li v-for="(a, i) in avisos" :key="i">
-        <Icono icono="error" tamano="sm" />
-        <span>{{ a }}</span>
-      </li>
-    </ul>
+    <section v-if="avisos.llanos.length || avisos.tecnicos.length" class="avisos" aria-label="Notas del modelo">
+      <ul v-if="avisos.llanos.length">
+        <li v-for="a in avisos.llanos" :key="a">
+          <Icono icono="error" tamano="sm" />
+          <span>{{ a }}</span>
+        </li>
+      </ul>
+      <details v-if="avisos.tecnicos.length" class="avisos-tecnicos">
+        <summary>Detalle técnico del modelo</summary>
+        <ul>
+          <li v-for="a in avisos.tecnicos" :key="a">{{ a }}</li>
+        </ul>
+      </details>
+    </section>
 
     <article class="viviendas" data-testid="tarjeta-viviendas" aria-live="polite">
       <Icono icono="vivienda" tamano="sm" />
-      <template v-if="viviendas !== null">
-        <span>Alcanza para <strong>{{ formatearNumero(viviendas, 0) }} viviendas</strong></span>
-        <span class="viviendas-co2">· {{ formatearNumero(viviendas * 1.8, 1) }} t CO₂ evitadas al año</span>
-      </template>
+      <span v-if="viviendas !== null">Alcanza para <strong>{{ formatearNumero(viviendas, 0) }} viviendas</strong></span>
       <span v-else-if="cargando">integrando la cadena…</span>
-      <span v-else class="semaforo semaforo--pendiente">
-        viviendas: pendiente — {{ error || "consumo residencial sin fuente verificada" }}
+      <span v-else-if="kwhDia !== null">
+        Produce <strong>{{ textoDia }} al día</strong> de media. Cuántos hogares son depende del consumo de
+        cada país.
       </span>
     </article>
 
@@ -103,7 +109,7 @@ function num(v: unknown): number {
 const recurso = computed(() => {
   const r = props.resultado;
   const d = props.params.dispositivo;
-  if (d === "turbina_corriente") return { valor: num(r?.recurso?.velocidad_ms), unidad: "m/s", dec: 2, etiqueta: "Corriente" };
+  if (d === "turbina_corriente") return { valor: num(r?.recurso?.velocidad_ms), unidad: "m/s", dec: 1, etiqueta: "Corriente de pico" };
   if (d === "embalse") return { valor: num(r?.recurso?.rango_m), unidad: "m", dec: 1, etiqueta: "Rango de marea" };
   return { valor: num(r?.eslabones?.[0]?.detalle?.j_w_m) / 1000, unidad: "kW/m", dec: 1, etiqueta: "Recurso" };
 });
@@ -161,9 +167,40 @@ const cadena = computed(() => {
   }));
 });
 
+/** Los avisos del motor están escritos para quien lo programa. Cada regla los
+ *  traduce a una frase para el estudiante; el texto original queda en el detalle. */
+const TRADUCCION: [RegExp, string][] = [
+  [/^Coeficientes de literatura/, "La boya usa coeficientes publicados para un cilindro de 10 m: con otros tamaños el resultado es aproximado."],
+  [/^serie marea: sintetica/, "La marea es una curva ideal con mareas vivas y muertas, no una medición del lugar."],
+  [/^cota teorica/, "El embalse no aprovecha toda la energía teórica de la marea: la turbina solo trabaja con salto suficiente."],
+  [/ancho captura .*acotado/, "La boya no puede captar más ola que el ancho que le corresponde por física: se ha limitado a ese máximo."],
+  [/supera cota Falnes|> incidente/, "La captura se ha limitado al máximo físico posible."],
+  [/> Betz/, "El rendimiento de la turbina supera el límite de Betz (59 %): solo es posible en canales muy estrechos."],
+  [/^Por encima de/, ""],
+];
+
 const avisos = computed(() => {
   const a = props.resultado?.avisos;
-  return Array.isArray(a) ? a.map(String).filter((s) => s.length > 0) : [];
+  const crudos = Array.isArray(a) ? a.map(String).filter((s) => s.length > 0) : [];
+  const llanos = new Set<string>();
+  const tecnicos: string[] = [];
+  for (const c of crudos) {
+    const regla = TRADUCCION.find(([re]) => re.test(c));
+    if (regla) llanos.add(regla[1] || c);
+    else tecnicos.push(c);
+  }
+  return { llanos: [...llanos], tecnicos };
+});
+
+const kwhDia = computed(() => {
+  const mwh = num(props.resultado?.produccion_anual_mwh);
+  return mwh > 0 ? (mwh * 1000) / 365 : null;
+});
+
+const textoDia = computed(() => {
+  const k = kwhDia.value ?? 0;
+  if (k >= 10_000) return `${formatearNumero(k / 1000, 0)} MWh`;
+  return `${formatearNumero(k, k < 100 ? 1 : 0)} kWh`;
 });
 </script>
 
@@ -224,7 +261,7 @@ const avisos = computed(() => {
 }
 
 .kpi-etiqueta {
-  font-size: 11px;
+  font-size: var(--text-meta);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -301,7 +338,7 @@ const avisos = computed(() => {
 .rotulo {
   margin: 0 0 var(--s-2);
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--text-meta);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -368,8 +405,26 @@ const avisos = computed(() => {
   border-radius: var(--radio);
   background: var(--aviso-fondo);
   list-style: none;
-  font-size: 11px;
+  font-size: var(--text-meta);
   line-height: 1.45;
+}
+
+.avisos ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.avisos-tecnicos summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.avisos-tecnicos ul {
+  margin-block-start: 4px;
+  color: var(--tenue);
 }
 
 .avisos li {
@@ -388,7 +443,4 @@ const avisos = computed(() => {
   color: var(--tinta);
 }
 
-.viviendas-co2 {
-  color: var(--tenue);
-}
 </style>

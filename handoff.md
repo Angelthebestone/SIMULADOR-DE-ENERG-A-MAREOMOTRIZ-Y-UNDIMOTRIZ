@@ -111,3 +111,22 @@ Cerrados en esta sesión: enlaces `fracaso` de plantas (§7.2), fix headless↔3
    Con ese borrado `datos/` bajaría de 63 MB a ~52 MB; el objetivo <30 MB sigue bloqueado por `juanchaco`/`tesoro` (los lee `nucleo/mareas.py`) y ERA5 (lo lee `servicio.py`).
 2. Los 6 rojos preexistentes (§8) siguen abiertos y documentados; decidir si se arreglan o se aceptan como deuda declarada.
 3. Checkpoint formal de Fase 2 (§5), que quedó sin imprimir.
+
+## 11. Sesión 2026-11-16 — simulador global y revisión estricta
+
+Objetivo: UX/UI de altísima calidad para estudiantes, simulación 2D/3D en cualquier punto del mundo y comparación con plantas reales; sin foco en Colombia.
+
+Hecho (commits de `7b3aa13` en adelante, ver `git log`):
+- Flujo de 4 pasos (Recurso → Tecnología → Lugar → Simulación) con barra de pasos, panel `Resultados.vue` (KPI, potencia media, cadena de pérdidas, avisos traducidos, `ComparaPlantas.vue`) y catálogo de consulta en el paso 2 (`ReferenciasCatalogo.vue`, campo `ejemplo_corto` en `datos/catalogo/*.json`).
+- Sitios de arranque globales por tecnología (`estado.ts::SITIO_INICIAL`: Peniche, Pentland Firth, La Rance). Los sitios curados de `MapaView.vue` son `inferido` salvo Isla Fuerte (Ortega 2013, lo exigen las pruebas); la ficha calcula J = 0,49·Hm0²·Te con los mismos valores que simula el motor y muestra solo las magnitudes de la tecnología activa.
+- Motor (`app/servicio.py`, sin tocar `nucleo/`): `rango_m` y `velocidad_ms` como parámetros; la turbina se resuelve con una serie M2 + vivas-muertas (`serie_corriente_mareal`) recortada a la velocidad nominal, así el FP deja de salir ~95 %. El mando de la turbina es «corriente de pico en vivas»; el del dique, «rango de marea medio».
+- Punto libre global SIN red en ejecución: `datos/marino/descargar_recurso_global.py` (ingesta Open-Meteo, 15 días de marzo de 2024, costa cada 150 km + mar abierto 6°) genera `datos/marino/recurso_global.json`, que lee `web/src/datos/marino.ts::consultarRecursoGlobal` (ola ≤ 400 km, marea y corriente ≤ 100 km). Reanudable con `recurso_global.parcial.json`.
+- Plantas: producción anual con cita para La Rance (500), Sihwa (552,7), Annapolis (30), MeyGen (8,5, media 2017-19), SeaGen (1,05, media de vida), Mutriku (0,24, media 2011-23), con `produccion_nota`.
+- Escenas 2D/3D rehechas (costa, embalse, dique 3D en corte, rótulos que esquivan los controles).
+
+Abierto:
+- La boya tiene 750 kW nominales fijos en `nucleo/dispositivos/absorbedor.py` → FP ~1,7 % en Peniche. Decidir si se cambia (requiere permiso para tocar `nucleo/`).
+- El modo proyección no escala el panel de resultados: los tokens `--text-*` están en px y `test_estilo_tokens.py` lo exige.
+- RUNAP y el transecto GMRT de Isla Fuerte siguen cargándose en `mapa.ts`, y `Disenar/Comparar/Calcular.vue` y `FichaDispositivo.vue` siguen en el repo sin importarse: varias pruebas los leen por ruta (`test_mapa.py`, `test_niveles.py`, `test_tesis_accesible.py`, `test_animacion_ver.py`). Quitarlos exige reescribir esas pruebas con permiso.
+- El modelo de dique da 291 GWh en La Rance con rango medio 8 m frente a 500 reales (no modela bombeo ni doble efecto).
+- Aviso WebGL `bindTexture … multiple targets`: según el agente sale de `MarRealista.ts` (portada), no de las escenas 3D; sin verificar.

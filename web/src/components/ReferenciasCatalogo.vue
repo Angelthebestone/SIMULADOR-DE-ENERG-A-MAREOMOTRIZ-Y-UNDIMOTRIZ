@@ -6,7 +6,7 @@
         <details class="ficha">
           <summary>
             <span class="nombre">{{ f.nombre }}</span>
-            <span class="ejemplos">{{ f.ejemplos }}</span>
+            <span class="ejemplos">{{ f.ejemplo_corto || f.ejemplos }}</span>
           </summary>
           <p class="principio">{{ f.principio }}</p>
           <p v-if="f.desenlace" class="desenlace">{{ f.desenlace }}</p>
@@ -29,7 +29,7 @@ const IDS: Record<Familia, string[]> = {
   mareomotriz: ["tidal_cometa", "tidal_eje_vertical", "tidal_hidroala", "tidal_venturi", "tidal_tornillo"],
 };
 
-type Ficha = { id: string; nombre: string; principio: string; ejemplos: string; desenlace: string };
+type Ficha = { id: string; nombre: string; principio: string; ejemplos: string; ejemplo_corto: string; desenlace: string };
 const fichas = ref<Ficha[]>([]);
 
 watch(
@@ -49,6 +49,7 @@ watch(
         nombre: String(d.nombre),
         principio: String(d.principio ?? ""),
         ejemplos: String(d.ejemplos ?? ""),
+        ejemplo_corto: String(d.ejemplo_corto ?? ""),
         desenlace: String(d.desenlace_comercial ?? ""),
       }));
   },
@@ -115,11 +116,12 @@ summary::-webkit-details-marker {
 }
 
 .ejemplos {
+  display: -webkit-box;
   overflow: hidden;
   font-size: 11px;
   color: var(--marco-captado);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .principio,

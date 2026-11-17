@@ -64,6 +64,7 @@ export type SitioMapa = {
   valor: number | null; unidad: string; fuente: string; estado: string;
   pais?: string; region?: string; tipo?: "undimotriz" | "mareomotriz" | "mixto";
   hm0_m?: number; te_s?: number; rango_m?: number; velocidad_ms?: number; profundidad_m?: number;
+  publicado?: number | null;
 };
 
 function coleccionSitios(sitios: SitioMapa[]) {

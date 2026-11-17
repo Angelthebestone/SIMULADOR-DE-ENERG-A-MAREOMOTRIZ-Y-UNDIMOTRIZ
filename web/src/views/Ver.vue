@@ -41,37 +41,19 @@
     <!-- Cabina: qué se simula y con qué números. Las cifras de salida viven
          en el panel de resultados, a la derecha. -->
     <div class="cabina">
+      <!-- En móvil el panel de resultados queda muy abajo: esta línea deja ver
+           el efecto de cada mando sin desplazarse. -->
+      <p v-if="resumenMovil" class="resumen-movil" aria-hidden="true">
+        <span><strong>{{ resumenMovil.anual }}</strong> al año</span>
+        <span>FP <strong>{{ resumenMovil.fp }}</strong></span>
+      </p>
       <div class="bloque bloque--recurso">
-        <div class="modos" role="group" aria-label="Tipo de recurso">
-          <button
-            v-for="m in MODOS"
-            :key="m.id"
-            type="button"
-            class="btn-modo"
-            :class="{ activo: modoActivo === m.id }"
-            :aria-pressed="modoActivo === m.id ? 'true' : 'false'"
-            @click="seleccionarModo(m.id)"
-          >
-            <Icono :icono="m.id" tamano="sm" />
-            <span>{{ m.label }}</span>
-          </button>
-        </div>
-
         <div class="dispositivos">
           <span class="rotulo-grupo">Dispositivo</span>
-          <div class="dispositivos-lista">
-            <button
-              v-for="d in dispositivosDelModo"
-              :key="d.id"
-              type="button"
-              class="btn-dispositivo"
-              :class="{ activo: params.dispositivo === d.id }"
-              :aria-pressed="params.dispositivo === d.id ? 'true' : 'false'"
-              @click="seleccionarDispositivo(d.id)"
-            >
-              {{ d.nombre }}
-            </button>
-          </div>
+          <p class="dispositivo-actual">
+            <strong>{{ NOMBRE_DISPOSITIVO[params.dispositivo] ?? params.dispositivo }}</strong>
+            <button type="button" class="btn-cambiar" @click="emit('cambiar-tecnologia')">Cambiar</button>
+          </p>
 
           <label v-if="params.dispositivo === 'turbina_corriente'" class="campo-cimentacion">
             <span class="rotulo-grupo">Cimentación</span>
@@ -111,10 +93,10 @@
             <li><Anotacion elemento="ola_hm0" termino="Hm0" intuicion="J" /></li>
             <li><Anotacion elemento="periodo_te" termino="Te" /></li>
             <li><Anotacion elemento="freno_pto" termino="B_pto" intuicion="freno" /></li>
+            <li><Anotacion elemento="energia" termino="J" intuicion="J" /></li>
           </template>
           <li v-else-if="params.dispositivo === 'embalse'"><Anotacion elemento="rango_marea" termino="R_marea" /></li>
           <li v-else><Anotacion elemento="corriente" termino="V_marea" /></li>
-          <li><Anotacion elemento="energia" termino="J" intuicion="J" /></li>
           <li><Anotacion elemento="fondo" termino="h_fondo" /></li>
         </ul>
         <EstadoBloque
@@ -136,6 +118,7 @@ import ControlesFisicos from "../components/ControlesFisicos.vue";
 import EstadoBloque from "../components/EstadoBloque.vue";
 import Icono from "../components/Icono.vue";
 import { evaluarValidezOleaje } from "../utils/validacion";
+import { formatearNumero, partesEnergiaAnual } from "../utils/formato";
 import type { Params } from "../api";
 
 const props = defineProps<{
@@ -146,7 +129,7 @@ const props = defineProps<{
   error?: string;
 }>();
 
-const emit = defineEmits<{ (e: "update:params", v: Partial<Params>): void }>();
+const emit = defineEmits<{ (e: "update:params", v: Partial<Params>): void; (e: "cambiar-tecnologia"): void }>();
 
 const raiz = ref<HTMLElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
@@ -306,7 +289,9 @@ function alCambiarMotor() {
   else cambiarMotor("motor-2d");
 }
 
-const modoActivo = ref<"undimotriz" | "mareomotriz">("undimotriz");
+const modoActivo = computed<"undimotriz" | "mareomotriz">(() =>
+  props.params.dispositivo === "turbina_corriente" || props.params.dispositivo === "embalse" ? "mareomotriz" : "undimotriz"
+);
 const cimentacionSeleccionada = ref<TipoCimentacion>("pilote");
 // La marea que manda es la de los params (punto del mapa o mando); si no la
 // hay, la que el motor leyó del sitio.
@@ -329,38 +314,18 @@ const estadoValidez = computed<'pendiente' | 'error' | 'resultado'>(() =>
 );
 const motivoValidez = computed(() => validez.value.mensaje || 'Oleaje dentro del rango del modelo lineal.');
 
-const MODOS = [
-  { id: "undimotriz" as const, label: "Oleaje" },
-  { id: "mareomotriz" as const, label: "Marea" },
-];
+const resumenMovil = computed(() => {
+  const r = props.resultado as { produccion_anual_mwh?: number; factor_planta?: number } | null | undefined;
+  if (!r || !Number.isFinite(r.produccion_anual_mwh) || !Number.isFinite(r.factor_planta)) return null;
+  const e = partesEnergiaAnual(r.produccion_anual_mwh as number);
+  return { anual: `${e.valor} ${e.unidad.replace("/año", "")}`, fp: `${formatearNumero((r.factor_planta as number) * 100, 1)} %` };
+});
 
-const DISPOSITIVOS_UNDIMOTRIZ = [
-  { id: "absorbedor_puntual", nombre: "Absorbedor puntual" },
-];
-
-const DISPOSITIVOS_MAREOMOTRIZ = [
-  { id: "turbina_corriente", nombre: "Turbina de corriente" },
-  { id: "embalse", nombre: "Dique mareal" },
-];
-
-const dispositivosDelModo = computed(() =>
-  modoActivo.value === "mareomotriz" ? DISPOSITIVOS_MAREOMOTRIZ : DISPOSITIVOS_UNDIMOTRIZ
-);
-
-function seleccionarModo(modo: "undimotriz" | "mareomotriz") {
-  modoActivo.value = modo;
-  if (modo === "mareomotriz") {
-    if (props.params.dispositivo !== "turbina_corriente" && props.params.dispositivo !== "embalse") {
-      emit("update:params", { dispositivo: "turbina_corriente" });
-    }
-  } else if (props.params.dispositivo !== "absorbedor_puntual") {
-    emit("update:params", { dispositivo: "absorbedor_puntual" });
-  }
-}
-
-function seleccionarDispositivo(id: string) {
-  emit("update:params", { dispositivo: id });
-}
+const NOMBRE_DISPOSITIVO: Record<string, string> = {
+  absorbedor_puntual: "Absorbedor puntual",
+  turbina_corriente: "Turbina de corriente",
+  embalse: "Dique de marea",
+};
 
 function alCambiarVelCorriente(v: number) {
   emit("update:params", { velocidad_ms: v });
@@ -429,11 +394,6 @@ function enfocar() {
 defineExpose({ enfocar });
 
 onMounted(() => {
-  modoActivo.value =
-    props.params.dispositivo === "turbina_corriente" || props.params.dispositivo === "embalse"
-      ? "mareomotriz"
-      : "undimotriz";
-
   if (!canvasRef.value) return;
   animacion = new AnimacionCanvas(canvasRef.value);
   // Ya no hay tira de lectura sobre el lienzo: el corte llega hasta el borde.
@@ -451,12 +411,7 @@ onBeforeUnmount(() => {
 
 watch(
   () => [props.params, props.resultado, modoActivo.value],
-  () => {
-    if (props.params.dispositivo === "turbina_corriente" || props.params.dispositivo === "embalse") {
-      modoActivo.value = "mareomotriz";
-    }
-    redibujar();
-  },
+  () => redibujar(),
   { deep: true }
 );
 </script>
@@ -608,6 +563,10 @@ watch(
 }
 
 .bloque--recurso { grid-area: recurso; }
+
+.resumen-movil {
+  display: none;
+}
 .bloque--controles { grid-area: controles; }
 .bloque--anotaciones { grid-area: anotaciones; }
 
@@ -648,68 +607,33 @@ watch(
   background: var(--panel);
 }
 
-/* ---- Selección de recurso y dispositivo ---- */
-.modos {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  padding: 3px;
-  border-radius: var(--radio-caja);
-  background: var(--superficie);
-}
-
-.btn-modo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: var(--s-1) var(--s-2);
-  border: none;
-  border-radius: calc(var(--radio-caja) - 3px);
-  background: transparent;
-  color: var(--tenue);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color var(--dur-rapida) var(--ease-salida), color var(--dur-rapida) var(--ease-salida);
-}
-
-.btn-modo.activo {
-  background: var(--panel);
-  color: var(--rol-mar-profundo);
-  box-shadow: var(--sombra-caja);
-}
-
+/* ---- Dispositivo en uso; se cambia en el paso 2 ---- */
 .dispositivos {
   display: grid;
   gap: var(--s-1);
 }
 
-.dispositivos-lista {
-  display: grid;
-  gap: 4px;
+.dispositivo-actual {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin: 0;
 }
 
-.btn-dispositivo {
-  text-align: start;
-  padding: 6px 10px;
+.btn-cambiar {
+  min-block-size: 2.75rem;
+  padding: 0 var(--s-3);
   border: 1px solid var(--borde-suave);
   border-radius: var(--radio);
   background: var(--panel);
-  font-size: var(--text-meta);
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color var(--dur-rapida) var(--ease-salida), background-color var(--dur-rapida) var(--ease-salida);
-}
-
-.btn-dispositivo:hover {
-  border-color: var(--borde);
-}
-
-.btn-dispositivo.activo {
-  border-color: var(--rol-mar-profundo);
-  background: var(--acento-suave);
-  color: var(--rol-mar-profundo);
   font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-cambiar:hover {
+  border-color: var(--borde);
 }
 
 .campo-cimentacion {
@@ -736,7 +660,29 @@ watch(
 
   .cabina {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "recurso" "controles" "anotaciones";
+    grid-template-areas: "resumen" "recurso" "controles" "anotaciones";
+  }
+
+  .resumen-movil {
+    grid-area: resumen;
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin: 0;
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--radio);
+    background: var(--marco);
+    color: var(--marco-tinta);
+    font-size: var(--text-meta);
+  }
+
+  .resumen-movil strong {
+    font-family: var(--font-display);
+    font-size: var(--text-seccion);
+    color: var(--marco-captado);
   }
 }
 </style>

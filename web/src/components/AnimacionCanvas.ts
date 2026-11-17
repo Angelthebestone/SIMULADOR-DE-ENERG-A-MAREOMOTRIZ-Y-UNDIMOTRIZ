@@ -1853,59 +1853,66 @@ export class AnimacionCanvas {
     const sobreCielo = "rgba(30,41,59,0.6)";
     const tenue = "rgba(232,242,245,0.8)";
 
-    // Cota de Hm0. Las cabinas de mando ocupan los laterales del lienzo, así
-    // que las anotaciones viven en la franja central, que siempre está libre.
-    const altHm0 = this.alturaFlechaHm0(escalaOla);
-    this.cotaHm0Px = altHm0;
-    const xFlecha = w * 0.24;
-    const yTop = nivelMedio - altHm0 / 2;
-    const yBot = nivelMedio + altHm0 / 2;
+    // El dique de marea no se lee con Hm0 ni con Te: su escala es el rango y
+    // el salto, que rotula la escena del dique.
+    const esDique = this.modoEnergia === "mareomotriz" && this.dispositivo === "embalse";
+    if (esDique) {
+      this.cotaHm0Px = 0;
+    } else {
+      // Cota de Hm0. Las cabinas de mando ocupan los laterales del lienzo, así
+      // que las anotaciones viven en la franja central, que siempre está libre.
+      const altHm0 = this.alturaFlechaHm0(escalaOla);
+      this.cotaHm0Px = altHm0;
+      const xFlecha = w * 0.24;
+      const yTop = nivelMedio - altHm0 / 2;
+      const yBot = nivelMedio + altHm0 / 2;
 
-    ctx.strokeStyle = sobreCielo;
-    ctx.lineWidth = 1.4;
-    // Tronco de la cota en su propio trazo: es el segmento cuya altura vale
-    // Hm0 y el que mide la prueba unitaria.
-    ctx.beginPath();
-    ctx.moveTo(xFlecha, yTop);
-    ctx.lineTo(xFlecha, yBot);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(xFlecha - 4, yTop + 4);
-    ctx.lineTo(xFlecha, yTop);
-    ctx.lineTo(xFlecha + 4, yTop + 4);
-    ctx.moveTo(xFlecha - 4, yBot - 4);
-    ctx.lineTo(xFlecha, yBot);
-    ctx.lineTo(xFlecha + 4, yBot - 4);
-    ctx.stroke();
-    this.chip(ctx, `Hm0 ${this.Hm0.toFixed(1).replace(".", ",")} m`, xFlecha + 46, nivelMedio + 4);
-
-    // Regla de longitud de onda sobre la superficie media.
-    // La regla va en el cielo, por encima de la cresta más alta posible: es
-    // donde no compite con nada del corte.
-    const anchoRegla = Math.max(80, w * 0.30);
-    const [m0, m1] = this.marcasIntervaloTe(anchoRegla, dominioM);
-    const x0 = xFlecha + m0;
-    const x1 = xFlecha + m1;
-    if (this.lambda > 0 && x1 > x0) {
-      // La regla sube hasta el cielo libre: a la altura de la cresta se cruzaba
-      // con el chip del dispositivo.
-      const yRegla = nivelMedio - HM0_TOPE_M * escalaOla * 0.5 - 68;
       ctx.strokeStyle = sobreCielo;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.4;
+      // Tronco de la cota en su propio trazo: es el segmento cuya altura vale
+      // Hm0 y el que mide la prueba unitaria.
       ctx.beginPath();
-      ctx.moveTo(x0, yRegla - 5);
-      ctx.lineTo(x0, yRegla + 5);
-      ctx.moveTo(x1, yRegla - 5);
-      ctx.lineTo(x1, yRegla + 5);
-      ctx.moveTo(x0, yRegla);
-      ctx.lineTo(x1, yRegla);
+      ctx.moveTo(xFlecha, yTop);
+      ctx.lineTo(xFlecha, yBot);
       ctx.stroke();
-      this.chip(
-        ctx,
-        `Te ${this.Te.toFixed(1).replace(".", ",")} s · longitud de onda ${this.lambda.toFixed(0)} m`,
-        (x0 + x1) / 2,
-        yRegla - 9
-      );
+      ctx.beginPath();
+      ctx.moveTo(xFlecha - 4, yTop + 4);
+      ctx.lineTo(xFlecha, yTop);
+      ctx.lineTo(xFlecha + 4, yTop + 4);
+      ctx.moveTo(xFlecha - 4, yBot - 4);
+      ctx.lineTo(xFlecha, yBot);
+      ctx.lineTo(xFlecha + 4, yBot - 4);
+      ctx.stroke();
+      this.chip(ctx, `Hm0 ${this.Hm0.toFixed(1).replace(".", ",")} m`, xFlecha + 46, nivelMedio + 4);
+
+      // Regla de longitud de onda sobre la superficie media.
+      // La regla va en el cielo, por encima de la cresta más alta posible: es
+      // donde no compite con nada del corte.
+      const anchoRegla = Math.max(80, w * 0.30);
+      const [m0, m1] = this.marcasIntervaloTe(anchoRegla, dominioM);
+      const x0 = xFlecha + m0;
+      const x1 = xFlecha + m1;
+      if (this.lambda > 0 && x1 > x0) {
+        // La regla sube hasta el cielo libre: a la altura de la cresta se cruzaba
+        // con el chip del dispositivo.
+        const yRegla = nivelMedio - HM0_TOPE_M * escalaOla * 0.5 - 68;
+        ctx.strokeStyle = sobreCielo;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x0, yRegla - 5);
+        ctx.lineTo(x0, yRegla + 5);
+        ctx.moveTo(x1, yRegla - 5);
+        ctx.lineTo(x1, yRegla + 5);
+        ctx.moveTo(x0, yRegla);
+        ctx.lineTo(x1, yRegla);
+        ctx.stroke();
+        this.chip(
+          ctx,
+          `Te ${this.Te.toFixed(1).replace(".", ",")} s · longitud de onda ${this.lambda.toFixed(0)} m`,
+          (x0 + x1) / 2,
+          yRegla - 9
+        );
+      }
     }
 
     // Cota de profundidad en agua abierta, lejos del dispositivo y de la cota

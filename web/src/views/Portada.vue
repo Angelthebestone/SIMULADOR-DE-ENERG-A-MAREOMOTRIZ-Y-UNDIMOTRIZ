@@ -36,14 +36,14 @@
           <Icono icono="undimotriz" tamano="lg" />
           <span class="entrada-nombre">Undimotriz</span>
           <span class="entrada-detalle">La ola que cruza la superficie: boyas que suben y bajan con ella.</span>
-          <span class="entrada-ejemplo">Como Mutriku (España) o Pelamis (Escocia)</span>
+          <span class="entrada-ejemplo">Como la boya de CorPower (Portugal) o Wavestar (Dinamarca)</span>
         </button>
       </div>
 
       <ol class="recorrido" aria-label="Cómo funciona">
         <li><span>1</span> Recurso</li>
         <li><span>2</span> Tecnología</li>
-        <li><span>3</span> Lugar en el mapa</li>
+        <li><span>3</span> Lugar en el mapa o valores propios</li>
         <li><span>4</span> Simulación y comparación</li>
       </ol>
     </div>

@@ -130,6 +130,48 @@ def crear_dispositivo(params: Parametros) -> DispositivoBase:
     return AbsorbedorPuntual(_config_absorbedor(params))
 
 
+# Periodos de la marea semidiurna lunar (M2) y del ciclo vivas-muertas (M2-S2).
+_T_M2_S = 12.42 * 3600.0
+_T_VIVAS_MUERTAS_S = 14.77 * 86400.0
+# En muertas la corriente de pico cae a la mitad que en vivas (S2/M2 ~ 1/3).
+_FRACCION_MUERTAS = 0.5
+
+
+def serie_corriente_mareal(pico_vivas_ms: float, v_nominal_ms: float) -> tuple[np.ndarray, np.ndarray]:
+    """Velocidad a lo largo de un ciclo vivas-muertas a partir del pico en vivas.
+
+    La turbina real no ve un pico constante: la corriente pasa por cero cuatro
+    veces al dia y el pico cambia con la luna. Por encima de la velocidad
+    nominal la turbina limita su potencia (paso de pala o perdida), asi que la
+    serie se recorta ahi; sin eso el generador recortaria la media y el factor
+    de planta saldria cercano al 100 %.
+    """
+    t = np.arange(0.0, _T_VIVAS_MUERTAS_S, 600.0)
+    medio = (1.0 + _FRACCION_MUERTAS) / 2.0
+    amplitud = pico_vivas_ms * (medio + (1.0 - medio) * np.cos(2.0 * np.pi * t / _T_VIVAS_MUERTAS_S))
+    v = np.abs(amplitud * np.sin(2.0 * np.pi * t / _T_M2_S))
+    return np.minimum(v, v_nominal_ms), t
+
+
+def resolver(params: Parametros, recurso: dict[str, Any], contexto: ContextoRecurso) -> Resultado:
+    dispositivo = crear_dispositivo(params)
+    if not isinstance(dispositivo, TurbinaCorriente):
+        return dispositivo.resolver(recurso, contexto)
+    cfg = dispositivo.config
+    area = math.pi * cfg.diametro_m**2 / 4.0
+    # Velocidad a la que la potencia captada llega a la nominal tras PTO (95 %) y generador (95 %).
+    v_nominal = (cfg.potencia_nominal_w / (0.95 * 0.95) / (0.5 * contexto.rho * area * cfg.cp)) ** (1.0 / 3.0)
+    pico = float(recurso.get("velocidad_ms", 0.0))
+    v, t = serie_corriente_mareal(pico, v_nominal)
+    resultado = dispositivo.resolver({**recurso, "velocidad_ms": v, "tiempo_s": t}, contexto)
+    resultado.recurso = dict(recurso)
+    if pico > v_nominal:
+        resultado.avisos.append(
+            f"Por encima de {v_nominal:.1f} m/s la turbina limita su potencia a la nominal, como las turbinas reales."
+        )
+    return resultado
+
+
 def _config_absorbedor(params: Parametros) -> ConfigAbsorbedor:
     return ConfigAbsorbedor(
         diametro_m=params.diametro_m,
@@ -379,7 +421,7 @@ def simular(
         return _abandonado(params, avisos)
     sitio = cargar_sitio(params.sitio_id)
     contexto = ContextoRecurso(profundidad_m=params.profundidad_m, rho=params.rho)
-    resultado = crear_dispositivo(params).resolver(recurso_de(params, sitio), contexto)
+    resultado = resolver(params, recurso_de(params, sitio), contexto)
     resultado = _aplicar_rendimientos(resultado, params.eta_pto, params.eta_gen)
     # La animacion necesita un eje de tiempo. Si el dispositivo ya integro su
     # propia posicion, solo se le pone el eje: sobreescribir z_m con una senoide
@@ -437,7 +479,7 @@ def comparar_dos(params: Parametros, clave_a: str, clave_b: str) -> dict[str, An
     contexto = ContextoRecurso(profundidad_m=params.profundidad_m, rho=params.rho)
     recurso = recurso_de(params, sitio)
     salidas = [
-        crear_dispositivo(replace(params, dispositivo=clave)).resolver(dict(recurso), contexto)
+        resolver(replace(params, dispositivo=clave), dict(recurso), contexto)
         for clave in (clave_a, clave_b)
     ]
     return {

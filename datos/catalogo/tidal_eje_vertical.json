@@ -17,6 +17,7 @@
     "estado": "verificado"
   },
   "ejemplos": "Desarrollos de eje vertical diversos, ventaja omnidireccional no yaw",
+  "ejemplo_corto": "Sin prototipo comercial: solo desarrollos de eje vertical",
   "desenlace_comercial": "Rendimiento < horizontal, fatiga elevada, nicho",
   "fuente_taxonomia": "EMEC vertical axis"
 }

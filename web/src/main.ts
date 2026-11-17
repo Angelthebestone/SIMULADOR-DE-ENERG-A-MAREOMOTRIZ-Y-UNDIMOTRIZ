@@ -116,7 +116,7 @@ const PLANTILLA = `
             <Ver
               ref="ver"
               :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
-              @update:params="aplicarParams" />
+              @update:params="aplicarParams" @cambiar-tecnologia="irA(2)" />
 
             <!-- Mapa flotante: el estudiante cambia de punto sin salir de la escena. -->
             <aside class="mapa-flotante" :class="{ replegado: mapaReplegado }" aria-label="Emplazamiento">
@@ -181,6 +181,7 @@ const app = createApp({
       params: { ...PARAMS_INICIALES } as Params,
       citaLarga: CITA,
       temporizador: 0 as unknown as ReturnType<typeof setTimeout>,
+      peticion: 0,
     }
   },
   computed: {
@@ -227,8 +228,6 @@ const app = createApp({
       if (s.profundidad_m) cambios.profundidad_m = s.profundidad_m
       cambios.rango_m = s.rango_m ?? undefined
       cambios.velocidad_ms = s.velocidad_ms ?? undefined
-      if (s.tipo === 'mareomotriz') cambios.dispositivo = 'turbina_corriente'
-      else if (s.tipo === 'undimotriz') cambios.dispositivo = 'absorbedor_puntual'
       this.origen = 'lugar'
       this.centroSitio = Number.isFinite(s.lon) && Number.isFinite(s.lat) ? [s.lon, s.lat] : null
       this.nombreSitio = s.nombre || this.nombreSitio
@@ -241,18 +240,21 @@ const app = createApp({
       ;(this.$refs.ver as { enfocar?: () => void } | undefined)?.enfocar?.()
     },
     async ejecutar() {
+      // La boya tarda más que la turbina: una respuesta vieja no debe pisar a la nueva.
+      const peticion = ++this.peticion
       this.cargando = true
       this.error = ''
       try {
         const respuesta = (await simular({ ...this.params })) as Record<string, any>
+        if (peticion !== this.peticion) return
         if (respuesta?.error) this.error = String(respuesta.error)
         this.resultado = respuesta?.resultado ?? null
         const v = respuesta?.extras?.viviendas
         this.viviendas = typeof v === 'number' ? v : (v?.viviendas ?? null)
       } catch (e) {
-        this.error = e instanceof Error ? e.message : 'no se pudo calcular'
+        if (peticion === this.peticion) this.error = e instanceof Error ? e.message : 'no se pudo calcular'
       } finally {
-        this.cargando = false
+        if (peticion === this.peticion) this.cargando = false
       }
     },
     programar() {

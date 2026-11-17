@@ -113,7 +113,7 @@ const controlesOndas = computed(() => [
 const controlesMareas = computed(() => [
   {
     id: "ctrl-vel-corriente",
-    etiqueta: "Velocidad de corriente mareal",
+    etiqueta: "Corriente de pico en mareas vivas",
     simbolo: "V_marea",
     unidad: "m/s",
     min: 0,
@@ -121,12 +121,12 @@ const controlesMareas = computed(() => [
     step: 0.1,
     valor: props.velocidadCorriente,
     formato: (v: number) => formatearNumero(v, 1),
-    efecto: 'Si sube, la turbina recibe más empuje; si baja, produce menos.',
+    efecto: 'La corriente sube y baja con cada marea; la turbina produce con el cubo de la velocidad.',
     emitir: (v: number) => emit("update:velocidadCorriente", v),
   },
   {
     id: "ctrl-rango-marea",
-    etiqueta: "Rango mareal (pleamar - bajamar)",
+    etiqueta: "Rango de marea medio (pleamar − bajamar)",
     simbolo: "R_marea",
     unidad: "m",
     min: 0,
@@ -154,9 +154,10 @@ const controlesMareas = computed(() => [
 
 const controlesActivos = computed(() => {
   // Cada obra mareomotriz responde a una sola variable de la marea: la turbina
-  // a la corriente, el dique al rango. Mostrar la otra sería un mando muerto.
-  if (props.dispositivo === "embalse") return controlesMareas.value.filter((c) => c.id !== "ctrl-vel-corriente");
-  if (props.modoEnergia === "mareomotriz") return controlesMareas.value.filter((c) => c.id !== "ctrl-rango-marea");
+  // a la corriente, el dique al rango. La profundidad no entra en ninguno de los
+  // dos cálculos. Mostrar las demás serían mandos muertos.
+  if (props.dispositivo === "embalse") return controlesMareas.value.filter((c) => c.id === "ctrl-rango-marea");
+  if (props.modoEnergia === "mareomotriz") return controlesMareas.value.filter((c) => c.id === "ctrl-vel-corriente");
   return controlesOndas.value;
 });
 </script>

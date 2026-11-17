@@ -47,10 +47,10 @@
     <div v-if="origen === 'lugar'" class="panel-lugar">
       <p class="fuente-linea" data-testid="origen-fuente">
         <template v-if="sitioNombre">
-          Punto: {{ sitioNombre }} · Fuente: {{ sitioFuente || 'ver ficha del mapa' }} · Periodo 2015-2024
+          Punto: {{ sitioNombre }} · Fuente: {{ sitioFuente || 'ver ficha del mapa' }}
         </template>
         <template v-else>
-          Elige un punto en el mapa; la ficha muestra la fuente y el periodo.
+          Elige un punto en el mapa; la ficha muestra de dónde sale cada cifra.
         </template>
       </p>
       <div class="mapa-caja">
