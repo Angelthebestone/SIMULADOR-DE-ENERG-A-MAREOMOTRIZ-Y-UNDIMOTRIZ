@@ -61,11 +61,6 @@ main.tablero.flujo {
 }
 
 .nota-hipotetico {
-  position: absolute;
-  z-index: 3;
-  inset-block-end: var(--s-3);
-  inset-inline-start: var(--s-3);
-  max-inline-size: min(28rem, calc(100% - 2rem));
   margin: 0;
   padding: var(--s-2) var(--s-3);
   border-radius: var(--radio);

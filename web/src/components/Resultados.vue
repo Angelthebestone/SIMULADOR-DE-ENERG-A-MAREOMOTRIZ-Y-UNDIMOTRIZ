@@ -8,6 +8,8 @@
       </span>
     </header>
 
+    <slot />
+
     <div class="lectura" role="status" aria-live="polite" data-testid="barra-kpis">
       <div
         v-for="k in kpis"

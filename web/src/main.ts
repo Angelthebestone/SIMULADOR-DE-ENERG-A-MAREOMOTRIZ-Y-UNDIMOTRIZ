@@ -118,10 +118,6 @@ const PLANTILLA = `
               :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
               @update:params="aplicarParams" />
 
-            <p v-if="origen === 'personalizado'" class="nota-hipotetico" data-testid="nota-hipotetico">
-              Resultado hipotético: estos números se escribieron a mano y no pertenecen a ningún punto del mapa.
-            </p>
-
             <!-- Mapa flotante: el estudiante cambia de punto sin salir de la escena. -->
             <aside class="mapa-flotante" :class="{ replegado: mapaReplegado }" aria-label="Emplazamiento">
               <div class="mapa-flotante-barra">
@@ -149,7 +145,11 @@ const PLANTILLA = `
           </div>
 
           <Resultados
-            :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error" />
+            :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error">
+            <p v-if="origen === 'personalizado'" class="nota-hipotetico" data-testid="nota-hipotetico">
+              Resultado hipotético: estos números se escribieron a mano y no pertenecen a ningún punto del mapa.
+            </p>
+          </Resultados>
         </div>
       </div>
     </main>
