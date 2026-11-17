@@ -1,136 +1,110 @@
 <template>
-  <section class="ver" aria-label="Simulador de captura">
-    <canvas
-      ref="canvasRef"
-      class="oleaje"
-      width="1200"
-      height="600"
-      aria-label="Corte del mar con el dispositivo, el oleaje y la salida a la red"
-    ></canvas>
+  <section class="ver" aria-label="Simulador de captura" ref="raiz" tabindex="-1" :data-motor="motorActivo">
+    <!-- Escena: el corte del mar ocupa el ancho de la columna; encima sólo el
+         rótulo del emplazamiento y el control de pausa. -->
+    <div class="escena">
+      <canvas
+        ref="canvasRef"
+        class="oleaje"
+        width="1200"
+        height="600"
+        aria-label="Corte del mar con el dispositivo, el oleaje y la salida a la red"
+      ></canvas>
 
-    <!-- Cabina de mando: qué se simula y con qué números. Se oculta cuando el
-         simulador queda reducido en la esquina, donde sólo cabe la escena. -->
-    <div v-if="!reducido" class="cabina cabina--controles">
-      <header class="cabina-cabecera">
-        <h1 id="titulo-ver" class="titulo-nivel">Simulador de captura</h1>
-        <p class="sitio-actual">{{ nombreSitioActual }}</p>
-      </header>
+      <div ref="contenedor3D" class="lienzo-3d" aria-label="Escena tridimensional del dispositivo"></div>
 
-      <div class="modos" role="group" aria-label="Tipo de recurso">
+      <div class="escena-modo" role="group" aria-label="Vista de la escena">
         <button
-          v-for="m in MODOS"
+          v-for="m in VISTAS"
           :key="m.id"
           type="button"
-          class="btn-modo"
-          :class="{ activo: modoActivo === m.id }"
-          :aria-pressed="modoActivo === m.id ? 'true' : 'false'"
-          @click="seleccionarModo(m.id)"
-        >
-          <Icono :icono="m.id" tamano="sm" />
-          <span>{{ m.label }}</span>
-        </button>
+          class="btn-vista"
+          :class="{ activo: motorActivo === m.id }"
+          :aria-pressed="motorActivo === m.id ? 'true' : 'false'"
+          :data-testid="'vista-' + m.etiqueta"
+          @click="elegirVista(m.id)"
+        >{{ m.etiqueta }}</button>
       </div>
 
-      <div class="dispositivos">
-        <span class="rotulo-grupo">Dispositivo</span>
-        <button
-          v-for="d in dispositivosDelModo"
-          :key="d.id"
-          type="button"
-          class="btn-dispositivo"
-          :class="{ activo: params.dispositivo === d.id }"
-          :aria-pressed="params.dispositivo === d.id ? 'true' : 'false'"
-          @click="seleccionarDispositivo(d.id)"
-        >
-          {{ d.nombre }}
-        </button>
-
-        <label v-if="params.dispositivo === 'turbina_corriente'" class="campo-cimentacion">
-          <span class="rotulo-grupo">Cimentación</span>
-          <select v-model="cimentacionSeleccionada" @change="redibujar">
-            <option value="pilote">Pilote clavado</option>
-            <option value="gravedad">Bloque de gravedad</option>
-            <option value="tripode">Trípode</option>
-          </select>
-        </label>
-      </div>
-
-      <ControlesFisicos
-        :hm0_m="params.hm0_m"
-        :te_s="params.te_s"
-        :b_pto_ns_m="params.b_pto_ns_m"
-        :modo-energia="modoActivo"
-        :velocidad-corriente="velocidadCorriente"
-        :rango-marea="rangoMarea"
-        :profundidad_m="params.profundidad_m || 30"
-        @update:hm0_m="v => emit('update:params', { hm0_m: v })"
-        @update:te_s="v => emit('update:params', { te_s: v })"
-        @update:b_pto_ns_m="v => emit('update:params', { b_pto_ns_m: v })"
-        @update:velocidad-corriente="alCambiarVelCorriente"
-        @update:rango-marea="alCambiarRangoMarea"
-        @update:profundidad_m="v => emit('update:params', { profundidad_m: v })"
-      />
-
-      <div class="salida">
-        <article class="tarjeta" data-testid="tarjeta-viviendas" aria-live="polite">
-        <h2 class="tarjeta-titulo">
-          <Icono icono="vivienda" tamano="sm" />
-          <span>Alcanza para</span>
-        </h2>
-        <template v-if="viviendas !== null">
-          <p class="tarjeta-cifra">{{ formatearNumero(viviendas, 0) }} <small>viviendas</small></p>
-          <p class="tarjeta-subcifra">
-            <Icono icono="emision" tamano="sm" />
-            <span>{{ formatearNumero(viviendas * 1.8, 1) }} t CO₂ evitadas al año</span>
-          </p>
-        </template>
-        <p v-else-if="cargando" class="tarjeta-estado">
-          <Icono icono="calculando" tamano="sm" />
-          <span>integrando la cadena…</span>
-        </p>
-        <p v-else class="tarjeta-estado semaforo semaforo--pendiente">
+      <div class="escena-acciones">
+        <p v-if="sinSerie" class="aviso-sin-serie">
           <Icono icono="pendiente" tamano="sm" />
-          <span>pendiente — {{ error || "consumo residencial sin fuente verificada" }}</span>
+          <span>{{ sinSerie }}</span>
         </p>
-      </article>
-
-      <article class="tarjeta" data-testid="tesis-contraste">
-        <h2 class="tarjeta-titulo">Frente al umbral de granja comercial</h2>
-        <div class="barras">
-          <div v-for="b in barrasContraste" :key="b.id" class="barra-fila" :data-testid="'barra-' + b.id">
-            <span class="barra-rotulo">{{ b.rotulo }}</span>
-            <span class="barra-pista">
-              <span class="barra-relleno" :class="'barra-relleno--' + b.id" :style="{ inlineSize: b.ancho }"></span>
-            </span>
-            <span class="barra-cifra">{{ b.cifra }} <small>kW/m</small></span>
-            <span class="barra-fuente">{{ b.fuente }}</span>
-          </div>
-        </div>
-      </article>
-      </div>
-
-      <div class="pregunta-bloque" data-testid="pregunta-conductor">
-        <p class="pregunta-linea"><strong>{{ preguntaActiva.pregunta }}</strong></p>
-        <p class="tarea-linea">
-          <span class="tarea-rotulo">Micro-tarea</span>
-          {{ preguntaActiva.tarea }}
-        </p>
-        <p v-if="cumpleTarea" class="veredicto" data-testid="veredicto-positivo" aria-live="polite">
-          <Icono icono="verificado" tamano="sm" />
-          <span>Hm0 en el rango objetivo</span>
-        </p>
+        <button class="btn-lienzo" @click="togglePausa" :aria-pressed="pausado ? 'true' : 'false'">
+          <Icono :icono="pausado ? 'reproducir' : 'pausar'" tamano="sm" />
+          <span>{{ pausado ? "Reanudar" : "Pausar" }}</span>
+        </button>
       </div>
     </div>
 
-    <div v-if="!reducido" class="cabina cabina--acciones">
-      <button class="btn-lienzo" @click="togglePausa" :aria-pressed="pausado ? 'true' : 'false'">
-        <Icono :icono="pausado ? 'reproducir' : 'pausar'" tamano="sm" />
-        <span>{{ pausado ? "Reanudar" : "Pausar" }}</span>
-      </button>
-      <p v-if="sinSerie" class="aviso-sin-serie">
-        <Icono icono="pendiente" tamano="sm" />
-        <span>{{ sinSerie }}</span>
+    <!-- Cabina: qué se simula y con qué números. Las cifras de salida viven
+         en el panel de resultados, a la derecha. -->
+    <div class="cabina">
+      <!-- En móvil el panel de resultados queda muy abajo: esta línea deja ver
+           el efecto de cada mando sin desplazarse. -->
+      <p v-if="resumenMovil" class="resumen-movil" aria-hidden="true">
+        <span><strong>{{ resumenMovil.anual }}</strong> al año</span>
+        <span>FP <strong>{{ resumenMovil.fp }}</strong></span>
       </p>
+      <div class="bloque bloque--recurso">
+        <div class="dispositivos">
+          <span class="rotulo-grupo">Dispositivo</span>
+          <p class="dispositivo-actual">
+            <strong>{{ NOMBRE_DISPOSITIVO[params.dispositivo] ?? params.dispositivo }}</strong>
+            <button type="button" class="btn-cambiar" @click="emit('cambiar-tecnologia')">Cambiar</button>
+          </p>
+
+          <label v-if="params.dispositivo === 'turbina_corriente'" class="campo-cimentacion">
+            <span class="rotulo-grupo">Cimentación</span>
+            <select v-model="cimentacionSeleccionada" @change="redibujar">
+              <option value="pilote">Pilote clavado</option>
+              <option value="gravedad">Bloque de gravedad</option>
+              <option value="tripode">Trípode</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="bloque bloque--controles">
+        <ControlesFisicos
+          :hm0_m="params.hm0_m"
+          :te_s="params.te_s"
+          :b_pto_ns_m="params.b_pto_ns_m"
+          :modo-energia="modoActivo"
+          :dispositivo="params.dispositivo"
+          :velocidad-corriente="velocidadCorriente"
+          :rango-marea="rangoMarea"
+          :profundidad_m="params.profundidad_m || 30"
+          @update:hm0_m="v => emit('update:params', { hm0_m: v })"
+          @update:te_s="v => emit('update:params', { te_s: v })"
+          @update:b_pto_ns_m="v => emit('update:params', { b_pto_ns_m: v })"
+          @update:velocidad-corriente="alCambiarVelCorriente"
+          @update:rango-marea="alCambiarRangoMarea"
+          @update:profundidad_m="v => emit('update:params', { profundidad_m: v })"
+        />
+      </div>
+
+      <div class="bloque bloque--anotaciones">
+        <span class="rotulo-grupo">Qué es cada cosa</span>
+        <ul class="anotaciones-lista">
+          <template v-if="modoActivo === 'undimotriz'">
+            <li><Anotacion elemento="boya" /></li>
+            <li><Anotacion elemento="ola_hm0" termino="Hm0" intuicion="J" /></li>
+            <li><Anotacion elemento="periodo_te" termino="Te" /></li>
+            <li><Anotacion elemento="freno_pto" termino="B_pto" intuicion="freno" /></li>
+            <li><Anotacion elemento="energia" termino="J" intuicion="J" /></li>
+          </template>
+          <li v-else-if="params.dispositivo === 'embalse'"><Anotacion elemento="rango_marea" termino="R_marea" /></li>
+          <li v-else><Anotacion elemento="corriente" termino="V_marea" /></li>
+          <li><Anotacion elemento="fondo" termino="h_fondo" /></li>
+        </ul>
+        <EstadoBloque
+          v-if="modoActivo === 'undimotriz'"
+          :estado="estadoValidez"
+          :motivo="motivoValidez"
+        />
+      </div>
     </div>
   </section>
 </template>
@@ -138,11 +112,14 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, watch, computed } from "vue";
 import { AnimacionCanvas, PROFUNDIDAD_M, type TipoCimentacion } from "../components/AnimacionCanvas";
+import { Animacion3D } from "../components/Animacion3D";
+import Anotacion from "../components/Anotacion.vue";
 import ControlesFisicos from "../components/ControlesFisicos.vue";
+import EstadoBloque from "../components/EstadoBloque.vue";
 import Icono from "../components/Icono.vue";
-import { formatearNumero } from "../utils/formato";
+import { evaluarValidezOleaje } from "../utils/validacion";
+import { formatearNumero, partesEnergiaAnual } from "../utils/formato";
 import type { Params } from "../api";
-import { preguntas, evaluar_cumplimiento } from "../contenido/pedagogia";
 
 const props = defineProps<{
   params: Params;
@@ -150,127 +127,216 @@ const props = defineProps<{
   viviendas: number | null;
   cargando?: boolean;
   error?: string;
-  /** Reducido a miniatura en la esquina: sólo se pinta la escena, sin paneles
-   *  con los que no se puede operar a ese tamaño. */
-  reducido?: boolean;
 }>();
 
-const emit = defineEmits<{ (e: "update:params", v: Partial<Params>): void }>();
+const emit = defineEmits<{ (e: "update:params", v: Partial<Params>): void; (e: "cambiar-tecnologia"): void }>();
 
+const raiz = ref<HTMLElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
+const contenedor3D = ref<HTMLElement | null>(null);
 let animacion: AnimacionCanvas | null = null;
+let motor3d: Animacion3D | null = null;
 const sinSerie = ref("");
 const pausado = ref(false);
 
-const modoActivo = ref<"undimotriz" | "mareomotriz">("undimotriz");
-const cimentacionSeleccionada = ref<TipoCimentacion>("pilote");
-const velocidadCorriente = ref(2.2);
-const rangoMarea = ref(3.5);
+/** Motor pedido por el usuario (Auto = 3D con respaldo 2D) y motor activo
+ *  real: la escena 3D solo se enciende si WebGL aguanta; si no, el 2D
+ *  intacto toma el relevo sin perder la simulación. */
+const motorPedido = ref<"auto" | "motor-3d" | "motor-2d">("auto");
+const motorActivo = ref<"motor-3d" | "motor-2d">("motor-2d");
+const fpsMedio = ref(0);
+const marcasFps: number[] = [];
+let fpsBajoDesde: number | null = null;
+let calidadDegradada = false;
 
-const MODOS = [
-  { id: "undimotriz" as const, label: "Oleaje" },
-  { id: "mareomotriz" as const, label: "Marea" },
-];
-
-const DISPOSITIVOS_UNDIMOTRIZ = [
-  { id: "absorbedor_puntual", nombre: "Absorbedor puntual" },
-  { id: "owc", nombre: "Columna de agua oscilante" },
-];
-
-const DISPOSITIVOS_MAREOMOTRIZ = [
-  { id: "turbina_corriente", nombre: "Turbina de corriente" },
-  { id: "embalse", nombre: "Dique mareal" },
-];
-
-const dispositivosDelModo = computed(() =>
-  modoActivo.value === "mareomotriz" ? DISPOSITIVOS_MAREOMOTRIZ : DISPOSITIVOS_UNDIMOTRIZ
-);
-
-const NOMBRES_SITIO: Record<string, string> = {
-  isla_fuerte: "Isla Fuerte, Caribe colombiano",
-  san_andres: "San Andrés, Caribe insular",
-  tumaco: "Tumaco, Pacífico colombiano",
-  bahia_malaga: "Bahía Málaga, Pacífico",
-  islas_rosario: "Islas del Rosario",
-  puerto_bolivar: "Puerto Bolívar, La Guajira",
-  bahia_fundy: "Bahía de Fundy, Canadá",
-  pentland_firth: "Pentland Firth, Escocia",
-  la_rance: "Estuario de La Rance, Francia",
-  severn_estuary: "Estuario del Severn, Reino Unido",
-  cook_strait: "Estrecho de Cook, Nueva Zelanda",
-  estrecho_magallanes: "Estrecho de Magallanes, Chile",
-  sihwa_lake: "Lago Sihwa, Corea del Sur",
-  oregon_coast: "PacWave, Oregón",
-  hawaii_oahu: "Kaneohe Bay, Oahu",
-  costa_da_morte: "Costa da Morte, Galicia",
-  peniche: "Peniche, Portugal",
-  messina_strait: "Estrecho de Messina, Italia",
-  king_island: "King Island, Tasmania",
-  cape_point: "Cape Point, Sudáfrica",
-  golfo_san_jose: "Golfo San José, Argentina",
-};
-
-const nombreSitioActual = computed(
-  () => NOMBRES_SITIO[props.params.sitio_id || "isla_fuerte"] || "Punto marino seleccionado"
-);
-
-const preguntaActiva = computed(() => preguntas.ver);
-const cumpleTarea = computed(() =>
-  evaluar_cumplimiento("ver", props.resultado as Record<string, unknown> | null)
-);
-
-const barrasContraste = computed(() => {
-  const recursoActual = props.resultado?.eslabones?.[0]?.detalle?.j_w_m;
-  const kwm = recursoActual ? recursoActual / 1000 : 8.9;
-  const umbral = 40.0;
-  const anchoPct = Math.min(100, Math.max(3, (kwm / umbral) * 100));
-
-  return [
-    {
-      id: "sitio",
-      rotulo: nombreSitioActual.value.split(",")[0],
-      cifra: formatearNumero(kwm, 1),
-      ancho: `${anchoPct.toFixed(1)}%`,
-      fuente: "Ortega et al. 2013 — verificado",
-    },
-    {
-      id: "umbral",
-      rotulo: "Umbral de granja",
-      cifra: formatearNumero(40, 1),
-      ancho: "100%",
-      fuente: "Osorio et al. 2016 / Handbook cap. 1",
-    },
-  ];
-});
-
-function seleccionarModo(modo: "undimotriz" | "mareomotriz") {
-  modoActivo.value = modo;
-  if (modo === "mareomotriz") {
-    if (props.params.dispositivo !== "turbina_corriente" && props.params.dispositivo !== "embalse") {
-      emit("update:params", { dispositivo: "turbina_corriente" });
-    }
-  } else if (props.params.dispositivo !== "absorbedor_puntual" && props.params.dispositivo !== "owc") {
-    emit("update:params", { dispositivo: "absorbedor_puntual" });
+function soportaWebGL(): boolean {
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+  } catch {
+    return false;
   }
 }
 
-function seleccionarDispositivo(id: string) {
-  emit("update:params", { dispositivo: id });
+/** Auto solo sube a 3D con GPU real: un rasterizador por software
+ *  (SwiftShader, llvmpipe, Mesa) da WebGL válido pero pocos fps. */
+function aceleracionPorHardware(): boolean {
+  try {
+    const c = document.createElement("canvas");
+    const gl = (c.getContext("webgl2") || c.getContext("webgl")) as WebGLRenderingContext | null;
+    if (!gl) return false;
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    if (!info) return true;
+    const nombre = String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "").toLowerCase();
+    return !/swiftshader|llvmpipe|softpipe|software|microsoft basic/.test(nombre);
+  } catch {
+    return false;
+  }
 }
 
+function onFrame3D(marcaMs: number) {
+  marcasFps.push(marcaMs);
+  if (marcasFps.length > 90) marcasFps.shift();
+  if (marcasFps.length < 30) return;
+  const deltas: number[] = [];
+  for (let i = 1; i < marcasFps.length; i++) deltas.push(marcasFps[i] - marcasFps[i - 1]);
+  deltas.sort((a, b) => a - b);
+  const mediana = deltas[Math.floor(deltas.length / 2)] || 16;
+  fpsMedio.value = Math.min(120, Math.round(1000 / Math.max(1, mediana)));
+  const ahora = typeof performance !== "undefined" ? performance.now() : Date.now();
+  if (fpsMedio.value < 30) {
+    fpsBajoDesde ??= ahora;
+    if (!calidadDegradada && ahora - fpsBajoDesde > 700) {
+      calidadDegradada = true;
+      motor3d?.degradarCalidad();
+    }
+    if (ahora - fpsBajoDesde > 2000) cambiarMotor("motor-2d");
+  } else {
+    fpsBajoDesde = null;
+  }
+}
+
+function payloadComun() {
+  const { hm0_m, te_s, b_pto_ns_m } = props.params;
+  const profundidad = props.params.profundidad_m || PROFUNDIDAD_M;
+  const k = numeroOnda((2 * Math.PI) / te_s, profundidad);
+  const r = props.resultado;
+  const t = r?.series?.t_s ?? null;
+  const z = r?.series?.z_m ?? null;
+  const series =
+    Array.isArray(t) && Array.isArray(z) && t.length && z.length ? { t_s: t, z_m: z } : null;
+  return {
+    series,
+    k,
+    Hm0: hm0_m,
+    Te: te_s,
+    Bpto: b_pto_ns_m,
+    dispositivo: String(r?.metadatos?.dispositivo ?? props.params.dispositivo),
+    profundidad_m: profundidad,
+    modoEnergia: modoActivo.value,
+    cimentacion: cimentacionSeleccionada.value,
+    velocidadCorriente: velocidadCorriente.value,
+    rangoMarea: rangoMarea.value,
+    cantidadUnidades: Number((r as Record<string, unknown> | null | undefined)?.cantidad_unidades) > 0 ? Number((r as Record<string, unknown>).cantidad_unidades) : undefined,
+    potenciaCaptadaW: Number(r?.potencia_nominal_w) || null,
+    modo: String((r as Record<string, unknown> | null | undefined)?.recurso ? String(((r as Record<string, unknown>).recurso as Record<string, unknown>).modo ?? "") : ""),
+  };
+}
+
+/** Enciende el motor pedido sin perder la simulación: alimenta el payload
+ *  común al motor entrante, pausa el saliente y reconecta el monitor. */
+function cambiarMotor(destino: "motor-3d" | "motor-2d") {
+  if (destino === "motor-3d") {
+    if (!contenedor3D.value || !soportaWebGL()) {
+      motorActivo.value = "motor-2d";
+      return;
+    }
+    try {
+      if (!motor3d && contenedor3D.value) {
+        motor3d = new Animacion3D(contenedor3D.value);
+        motor3d.onFrame = onFrame3D;
+      }
+      if (!motor3d) {
+        motorActivo.value = "motor-2d";
+        return;
+      }
+      motor3d.cargarSimulacion(payloadComun() as never);
+      sinSerie.value = motor3d.sinSerieMsg;
+      animacion?.pausar();
+      motorActivo.value = "motor-3d";
+      motor3d.arrancar();
+      if (pausado.value) motor3d.pausar();
+      else motor3d.reanudar();
+      pausado.value = motor3d.pausado;
+      if (canvasRef.value) canvasRef.value.style.visibility = "hidden";
+      if (contenedor3D.value) contenedor3D.value.style.visibility = "visible";
+    } catch {
+      motor3d = null;
+      motorActivo.value = "motor-2d";
+    }
+    return;
+  }
+  animacion?.cargarSimulacion(payloadComun() as never);
+  if (animacion) {
+    sinSerie.value = animacion.sinSerieMsg;
+    motor3d?.pausar();
+    motorActivo.value = "motor-2d";
+    animacion.arrancar();
+    if (pausado.value) animacion.pausar();
+    else animacion.reanudar();
+    pausado.value = animacion.pausado;
+  }
+  if (canvasRef.value) canvasRef.value.style.visibility = "visible";
+  if (contenedor3D.value) contenedor3D.value.style.visibility = "hidden";
+}
+
+const VISTAS = [
+  { id: "motor-2d" as const, etiqueta: "2D" },
+  { id: "motor-3d" as const, etiqueta: "3D" },
+];
+
+function elegirVista(id: "motor-2d" | "motor-3d") {
+  motorPedido.value = id;
+  alCambiarMotor();
+}
+
+function alCambiarMotor() {
+  marcasFps.length = 0;
+  fpsBajoDesde = null;
+  if (motorPedido.value === "motor-2d") cambiarMotor("motor-2d");
+  else if (motorPedido.value === "motor-3d") cambiarMotor("motor-3d");
+  else if (soportaWebGL() && aceleracionPorHardware()) cambiarMotor("motor-3d");
+  else cambiarMotor("motor-2d");
+}
+
+const modoActivo = computed<"undimotriz" | "mareomotriz">(() =>
+  props.params.dispositivo === "turbina_corriente" || props.params.dispositivo === "embalse" ? "mareomotriz" : "undimotriz"
+);
+const cimentacionSeleccionada = ref<TipoCimentacion>("pilote");
+// La marea que manda es la de los params (punto del mapa o mando); si no la
+// hay, la que el motor leyó del sitio.
+const recursoMotor = computed(() => (props.resultado?.recurso ?? {}) as Record<string, number>);
+const velocidadCorriente = computed(() => props.params.velocidad_ms ?? recursoMotor.value.velocidad_ms ?? 0);
+const rangoMarea = computed(() => props.params.rango_m ?? recursoMotor.value.rango_m ?? 0);
+
+/* Aviso de validez del modelo lineal: se calcula sobre los valores de los
+   controles, sin tocar el resultado del servicio. Fuera de rango se avisa
+   en palabras, sin cifras con apariencia de exactas. */
+const validez = computed(() =>
+  evaluarValidezOleaje({
+    hm0: props.params.hm0_m,
+    te: props.params.te_s,
+    profundidad: props.params.profundidad_m || PROFUNDIDAD_M,
+  })
+);
+const estadoValidez = computed<'pendiente' | 'error' | 'resultado'>(() =>
+  validez.value.estado === 'fuera' ? 'error' : validez.value.estado === 'limite' ? 'pendiente' : 'resultado'
+);
+const motivoValidez = computed(() => validez.value.mensaje || 'Oleaje dentro del rango del modelo lineal.');
+
+const resumenMovil = computed(() => {
+  const r = props.resultado as { produccion_anual_mwh?: number; factor_planta?: number } | null | undefined;
+  if (!r || !Number.isFinite(r.produccion_anual_mwh) || !Number.isFinite(r.factor_planta)) return null;
+  const e = partesEnergiaAnual(r.produccion_anual_mwh as number);
+  return { anual: `${e.valor} ${e.unidad.replace("/año", "")}`, fp: `${formatearNumero((r.factor_planta as number) * 100, 1)} %` };
+});
+
+const NOMBRE_DISPOSITIVO: Record<string, string> = {
+  absorbedor_puntual: "Absorbedor puntual",
+  turbina_corriente: "Turbina de corriente",
+  embalse: "Dique de marea",
+};
+
 function alCambiarVelCorriente(v: number) {
-  velocidadCorriente.value = v;
-  redibujar();
+  emit("update:params", { velocidad_ms: v });
 }
 
 function alCambiarRangoMarea(v: number) {
-  rangoMarea.value = v;
-  redibujar();
+  emit("update:params", { rango_m: v });
 }
 
 /** Número de onda por Newton-Raphson sobre la relación de dispersión. Sólo se
- *  usa para dibujar la longitud de onda a escala; no interviene en el cálculo,
- *  que llega ya resuelto desde el servicio. */
+ *  usa para dibujar la longitud de onda a escala; no interviene en el cálculo. */
 function numeroOnda(omega: number, h: number): number {
   const g = 9.81;
   const arg = (omega * omega * h) / g;
@@ -292,74 +358,90 @@ function numeroOnda(omega: number, h: number): number {
 
 function redibujar() {
   if (!animacion) return;
-  const { hm0_m, te_s, b_pto_ns_m } = props.params;
-  const profundidad = props.params.profundidad_m || PROFUNDIDAD_M;
-  const k = numeroOnda((2 * Math.PI) / te_s, profundidad);
-
-  const r = props.resultado;
-  const t = r?.series?.t_s ?? null;
-  const z = r?.series?.z_m ?? null;
-  const series =
-    Array.isArray(t) && Array.isArray(z) && t.length && z.length ? { t_s: t, z_m: z } : null;
-
-  animacion.cargarSimulacion({
-    series,
-    k,
-    Hm0: hm0_m,
-    Te: te_s,
-    Bpto: b_pto_ns_m,
-    dispositivo: String(r?.metadatos?.dispositivo ?? props.params.dispositivo),
-    profundidad_m: profundidad,
-    modoEnergia: modoActivo.value,
-    cimentacion: cimentacionSeleccionada.value,
-    velocidadCorriente: velocidadCorriente.value,
-    rangoMarea: rangoMarea.value,
-    potenciaCaptadaW: Number(r?.potencia_nominal_w) || null,
-  });
+  const payload = payloadComun();
+  if (motorActivo.value === "motor-3d" && motor3d) {
+    motor3d.cargarSimulacion(payload as never);
+    sinSerie.value = motor3d.sinSerieMsg;
+    motor3d.arrancar();
+    if (pausado.value) motor3d.pausar();
+    pausado.value = motor3d.pausado;
+    return;
+  }
+  animacion.cargarSimulacion(payload as never);
   sinSerie.value = animacion.sinSerieMsg;
   animacion.arrancar();
   pausado.value = animacion.pausado;
 }
 
 function togglePausa() {
-  if (!animacion) return;
-  if (animacion.pausado) animacion.reanudar();
-  else animacion.pausar();
-  pausado.value = animacion.pausado;
+  const activo = motorActivo.value === "motor-3d" && motor3d ? motor3d : animacion;
+  if (!activo) return;
+  if (activo.pausado) activo.reanudar();
+  else activo.pausar();
+  pausado.value = activo.pausado;
 }
 
-onMounted(() => {
-  modoActivo.value =
-    props.params.dispositivo === "turbina_corriente" || props.params.dispositivo === "embalse"
-      ? "mareomotriz"
-      : "undimotriz";
+/** La carcasa llama aquí al pulsar «Simular este emplazamiento»: la escena
+ *  recibe el foco y un destello breve para que se vea dónde pasó la acción. */
+function enfocar() {
+  const el = raiz.value;
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  el.setAttribute("data-destello", "");
+  setTimeout(() => el.removeAttribute("data-destello"), 900);
+}
 
+defineExpose({ enfocar });
+
+onMounted(() => {
   if (!canvasRef.value) return;
   animacion = new AnimacionCanvas(canvasRef.value);
+  // Ya no hay tira de lectura sobre el lienzo: el corte llega hasta el borde.
+  animacion.pie = 0;
   redibujar();
+  // Auto: 3D si WebGL aguanta, si no el 2D intacto sigue al mando.
+  alCambiarMotor();
 });
 
-onBeforeUnmount(() => animacion?.detener());
+onBeforeUnmount(() => {
+  animacion?.detener();
+  motor3d?.liberar();
+  motor3d = null;
+});
 
 watch(
   () => [props.params, props.resultado, modoActivo.value],
-  () => {
-    if (props.params.dispositivo === "turbina_corriente" || props.params.dispositivo === "embalse") {
-      modoActivo.value = "mareomotriz";
-    }
-    redibujar();
-  },
+  () => redibujar(),
   { deep: true }
 );
 </script>
 
 <style scoped>
 .ver {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   inline-size: 100%;
   block-size: 100%;
+  min-block-size: 0;
+  overflow: auto;
+  background: var(--lienzo);
+  outline: none;
+}
+
+/* ---- Escena ---- */
+/* La escena se queda con el alto que dejan los mandos: en pantallas altas
+   crece en vez de dejar una franja vacía bajo la cabina. */
+.escena {
+  position: relative;
+  flex: 1 1 auto;
+  min-block-size: 18rem;
   overflow: hidden;
   background: var(--map-oceano);
+  transition: box-shadow var(--dur-media) var(--ease-salida);
+}
+
+.ver[data-destello] .escena {
+  box-shadow: inset 0 0 0 3px var(--rol-captado);
 }
 
 .oleaje {
@@ -370,316 +452,48 @@ watch(
   display: block;
 }
 
-/* ---- Cabina: los paneles que flotan sobre la escena ---- */
-.cabina {
+/* Escena 3D con respaldo 2D: el lienzo 3D vive encima sólo cuando el motor
+   activo es el 3D; el 2D intacto sigue debajo y toma el relevo sin perder
+   la simulación si WebGL falla o el ritmo cae bajo 30 fps. */
+.lienzo-3d {
   position: absolute;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-}
-
-.cabina--controles {
-  inset-block-start: var(--s-2);
-  inset-inline-start: var(--s-2);
-  inline-size: min(23rem, 40vw);
-  /* La miniatura vive abajo a la izquierda, justo debajo: la cabina termina
-     antes de llegar a ella. */
-  max-block-size: calc(
-    100% - var(--lectura-alto, 0px) - var(--miniatura-alto, 0px) - var(--s-6)
-  );
-  overflow: auto;
-  padding: var(--s-3);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-caja);
-  background: var(--panel);
-  box-shadow: var(--sombra-caja);
-}
-
-/* Salida dentro de la misma cabina: así el lado derecho del corte queda
-   entero para la costa, la subestación y la red, que es donde termina la
-   cadena y hay que poder verla. */
-.salida {
-  display: grid;
-  gap: var(--s-2);
-}
-
-.cabina--acciones {
-  inset-block-end: calc(var(--lectura-alto, 0px) + var(--s-2));
-  inset-inline-end: var(--s-2);
-  align-items: end;
-}
-
-.cabina-cabecera {
-  display: grid;
-  gap: 2px;
-}
-
-.titulo-nivel {
-  font-size: var(--text-seccion);
-  font-weight: 700;
-  color: var(--tinta);
-  margin: 0;
-}
-
-.sitio-actual {
-  margin: 0;
-  font-size: var(--text-meta);
-  color: var(--tenue);
-}
-
-/* ---- Selección de recurso y dispositivo ---- */
-.modos {
-  display: flex;
-  gap: var(--s-1);
-}
-
-.btn-modo {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: var(--s-1) var(--s-2);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--lienzo);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-modo.activo {
-  background: var(--rol-mar-profundo);
-  border-color: var(--rol-mar-profundo);
-  color: var(--panel);
-}
-
-.dispositivos {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-1);
-}
-
-.rotulo-grupo {
-  font-size: var(--text-meta);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--tenue);
-}
-
-.btn-dispositivo {
-  padding: 2px 8px;
-  border: 1px solid var(--borde-suave);
-  border-radius: var(--radio);
-  background: var(--lienzo);
-  font-size: var(--text-meta);
-  cursor: pointer;
-}
-
-.btn-dispositivo.activo {
-  border-color: var(--rol-mar-profundo);
-  background: var(--acento-suave);
-  font-weight: 600;
-}
-
-.campo-cimentacion {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  inset: 0;
   inline-size: 100%;
-}
-
-.campo-cimentacion select {
-  flex: 1;
-  min-inline-size: 0;
-  padding: 2px 6px;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  background: var(--panel);
-  font-size: var(--text-meta);
-}
-
-/* ---- Pregunta conductora ---- */
-.pregunta-bloque {
-  display: grid;
-  gap: 2px;
-  padding: var(--s-2);
-  border-radius: var(--radio);
-  background: var(--superficie);
-}
-
-.pregunta-linea {
-  margin: 0;
-  font-size: var(--text-meta);
-}
-
-.tarea-linea {
-  margin: 0;
-  font-size: 11px;
-  color: var(--tenue);
-}
-
-.tarea-rotulo {
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-inline-end: 4px;
-}
-
-.veredicto {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--conf-verificado);
-}
-
-/* ---- Tarjetas de salida ---- */
-.tarjeta > *,
-.barra-fila > * {
-  min-inline-size: 0;
-  overflow-wrap: anywhere;
-}
-
-.tarjeta {
-  display: grid;
-  align-content: start;
-  gap: var(--s-1);
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-caja);
-  background: var(--panel);
-  box-shadow: var(--sombra-caja);
-}
-
-.tarjeta-titulo {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-meta);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--tenue);
-  font-weight: 700;
-  margin: 0;
-}
-
-.tarjeta-cifra {
-  margin: 2px 0 0;
-  font-size: var(--text-cifra);
-  font-weight: 700;
-  line-height: 1.05;
-  color: var(--rol-captado);
-}
-
-.tarjeta-cifra small {
-  font-size: 0.32em;
-  font-weight: 600;
-  color: var(--tenue);
-}
-
-.tarjeta-subcifra {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: var(--tenue);
-}
-
-.tarjeta-estado {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: var(--text-meta);
-  color: var(--tenue);
-  font-style: italic;
-}
-
-.barras {
-  display: grid;
-  gap: var(--s-2);
-  margin-block-start: 2px;
-}
-
-.barra-fila {
-  display: grid;
-  grid-template-columns: minmax(5rem, 1fr) auto;
-  grid-template-areas:
-    'rotulo cifra'
-    'pista pista'
-    'fuente fuente';
-  align-items: baseline;
-  column-gap: var(--s-2);
-}
-
-.barra-rotulo {
-  grid-area: rotulo;
-  font-weight: 600;
-  font-size: var(--text-meta);
-}
-
-.barra-pista {
-  grid-area: pista;
-  display: block;
-  block-size: 0.5rem;
-  margin-block: 2px;
-  border-radius: 2px;
-  background: var(--superficie);
-  overflow: hidden;
-}
-
-.barra-relleno {
-  display: block;
   block-size: 100%;
-  transition: inline-size var(--dur-media) var(--ease-salida);
+  visibility: hidden;
 }
 
-.barra-relleno--sitio {
-  background: var(--rol-mar-medio);
+.ver[data-motor="motor-3d"] .lienzo-3d {
+  visibility: visible;
 }
 
-.barra-relleno--umbral {
-  background: repeating-linear-gradient(135deg, var(--tenue) 0 3px, transparent 3px 7px);
+.ver[data-motor="motor-3d"] .oleaje {
+  visibility: hidden;
 }
 
-.barra-cifra {
-  grid-area: cifra;
-  font-size: var(--text-seccion);
-  font-weight: 700;
-  white-space: nowrap;
+/* Abajo a la izquierda: la esquina superior derecha es del minimapa. */
+.escena-acciones {
+  position: absolute;
+  inset-block-end: var(--s-3);
+  inset-inline-start: var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
 }
 
-.barra-cifra small {
-  font-size: 0.55em;
-  font-weight: 600;
-  color: var(--tenue);
-}
-
-.barra-fuente {
-  grid-area: fuente;
-  font-size: 11px;
-  color: var(--tenue);
-}
-
-/* ---- Acciones sobre la escena ---- */
 .btn-lienzo {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: var(--s-1) 10px;
-  border: 1px solid oklch(1 0 0 / 0.25);
+  border: 1px solid var(--marco-linea);
   border-radius: var(--radio);
-  background: oklch(0.24 0.02 238 / 0.85);
-  color: oklch(0.97 0.004 106);
+  background: oklch(0.24 0.02 238 / 0.82);
+  color: var(--marco-tinta);
   font-weight: 600;
   font-size: var(--text-meta);
   cursor: pointer;
+  backdrop-filter: blur(6px);
 }
 
 .btn-lienzo:hover {
@@ -693,14 +507,182 @@ watch(
   margin: 0;
   padding: var(--s-1) var(--s-2);
   border-radius: var(--radio);
-  background: var(--panel);
+  background: oklch(1 0 0 / 0.8);
   color: var(--tenue);
   font-size: var(--text-meta);
 }
 
-@media (width <= 56rem) {
-  .cabina--controles {
-    inline-size: min(18rem, 62vw);
+/* Conmutador de vista 2D | 3D: arriba a la izquierda, siempre a la vista. */
+.escena-modo {
+  position: absolute;
+  inset-block-start: var(--s-3);
+  inset-inline-start: var(--s-3);
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--marco-linea);
+  border-radius: var(--radio-caja);
+  background: oklch(0.24 0.02 238 / 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.btn-vista {
+  min-inline-size: 3rem;
+  padding: 4px 12px;
+  border: none;
+  border-radius: calc(var(--radio-caja) - 3px);
+  background: transparent;
+  color: var(--marco-tenue);
+  font-weight: 700;
+  font-size: var(--text-meta);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--ease-salida), color var(--dur-rapida) var(--ease-salida);
+}
+
+.btn-vista:hover {
+  color: var(--marco-tinta);
+}
+
+.btn-vista.activo {
+  background: var(--marco-captado);
+  color: var(--marco);
+}
+
+/* ---- Cabina: dispositivo y mandos en una fila, anotaciones debajo ---- */
+.cabina {
+  display: grid;
+  grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
+  grid-template-areas:
+    "recurso controles"
+    "anotaciones anotaciones";
+  flex: none;
+  align-items: start;
+  gap: var(--s-3);
+  padding: var(--s-3);
+}
+
+.bloque--recurso { grid-area: recurso; }
+
+.resumen-movil {
+  display: none;
+}
+.bloque--controles { grid-area: controles; }
+.bloque--anotaciones { grid-area: anotaciones; }
+
+.bloque {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-inline-size: 0;
+}
+
+.rotulo-grupo {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tenue);
+}
+
+/* Anotaciones clicables de la escena: qué es cada cosa, en lista. */
+.anotaciones-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Aviso de validez del modelo: reutiliza EstadoBloque con sus estados. */
+.bloque--anotaciones {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio-caja);
+  background: var(--panel);
+}
+
+/* ---- Dispositivo en uso; se cambia en el paso 2 ---- */
+.dispositivos {
+  display: grid;
+  gap: var(--s-1);
+}
+
+.dispositivo-actual {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin: 0;
+}
+
+.btn-cambiar {
+  min-block-size: 2.75rem;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--borde-suave);
+  border-radius: var(--radio);
+  background: var(--panel);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-cambiar:hover {
+  border-color: var(--borde);
+}
+
+.campo-cimentacion {
+  display: grid;
+  gap: 4px;
+  margin-block-start: var(--s-1);
+}
+
+.campo-cimentacion select {
+  min-inline-size: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--panel);
+  font-size: var(--text-meta);
+}
+
+@media (width <= 64rem) {
+  .escena {
+    flex: none;
+    aspect-ratio: 16 / 9;
+    min-block-size: 14rem;
+  }
+
+  .cabina {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "resumen" "recurso" "controles" "anotaciones";
+  }
+
+  .resumen-movil {
+    grid-area: resumen;
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin: 0;
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--radio);
+    background: var(--marco);
+    color: var(--marco-tinta);
+    font-size: var(--text-meta);
+  }
+
+  .resumen-movil strong {
+    font-family: var(--font-display);
+    font-size: var(--text-seccion);
+    color: var(--marco-captado);
   }
 }
 </style>

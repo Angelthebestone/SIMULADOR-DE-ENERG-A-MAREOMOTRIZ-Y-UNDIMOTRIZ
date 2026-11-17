@@ -12,6 +12,8 @@ export const intuiciones: Record<string, string> = {
   contexto: 'reune las condiciones del sitio y del oleaje bajo las que se calculan las demás fórmulas.',
   densidad_potencia: 'mismo significado que J, con notación distinta: kilovatios por metro de frente de ola en lugar de vatios.',
   LCOE: 'coste de producir un MWh incluyendo el repago de la inversión (CRF) y el coste de operación y mantenimiento del año.',
+  boya: 'la boya sube y baja con la ola; su movimiento es lo que el equipo convierte en electricidad.',
+  freno: 'el freno justo extrae más energía; si frena de más, la boya casi no se mueve y sale menos.',
 }
 
 export function intuicionDe(id: string): string {

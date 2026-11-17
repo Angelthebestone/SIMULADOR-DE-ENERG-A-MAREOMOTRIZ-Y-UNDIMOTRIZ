@@ -1,8 +1,1 @@
-{
-  "registros_totales": 1114534,
-  "dias_con_rango_calculable": 898,
-  "rango_medio_m": 2.62,
-  "rango_mediana_m": 2.6,
-  "rango_maximo_m": 6.95,
-  "rango_minimo_m": 0.06
-}
+{"archivo_diario": "nivel_mar_tumaco_diario_2023-2025.csv", "dias_con_rango_calculable": 898, "rango_maximo_m": 6.95, "rango_mediana_m": 2.6, "rango_medio_diario_m": 2.62, "rango_medio_m": 2.62, "rango_minimo_m": 0.06, "registros_totales": 1114534, "validacion_esri": {"error_relativo_pct": 20.8, "estado": "verificado", "fuente": "datos/mareas/rango_mareal_esri.json (tumaco, 2*(M2+S2+K1+O1) sobre FES2014 via teselas LERC)", "rango_esri_m": 3.165, "rango_observado_m": 2.62}}

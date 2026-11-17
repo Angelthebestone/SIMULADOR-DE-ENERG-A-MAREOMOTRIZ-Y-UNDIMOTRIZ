@@ -17,6 +17,7 @@
     "estado": "verificado"
   },
   "ejemplos": "Dispositivos en conducto, colector embudo sumergido",
+  "ejemplo_corto": "Sin proyecto comercial: solo conductos y colectores",
   "desenlace_comercial": "Rara vez aumento neto compensa coste arrastre - investigacion 2.2E",
   "fuente_taxonomia": "EMEC enclosed tips / Venturi"
 }

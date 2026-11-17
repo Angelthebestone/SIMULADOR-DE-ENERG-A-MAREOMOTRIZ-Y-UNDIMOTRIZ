@@ -19,7 +19,7 @@ export type Pregunta = {
 export const preguntas: Record<Nivel, Pregunta> = {
   ver: {
     pregunta:
-      '¿Cuántas viviendas de Isla Fuerte podrías alimentar si subes la altura significativa de ola a 2 m?',
+      '¿Cuántas viviendas podrías alimentar si subes la altura significativa de ola a 2 m?',
     tarea:
       'Sube Hm0 hasta 2,0 m y deja Te en 7,0 s hasta ver la cifra de viviendas.',
     verificar: (r) => {
@@ -47,9 +47,9 @@ export const preguntas: Record<Nivel, Pregunta> = {
   },
   disenar: {
     pregunta:
-      '¿Cuánto cuesta cada MWh del dispositivo frente al diésel ZNI y a la red SIN?',
+      '¿Cuánto cuesta cada MWh del dispositivo frente al diésel de una isla y a la red interconectada?',
     tarea:
-      'Edita CAPEX y OPEX hasta que el coste por MWh quede por debajo del diésel y, si es posible, por debajo del SIN.',
+      'Edita CAPEX y OPEX hasta que el coste por MWh quede por debajo del diésel y, si es posible, por debajo de la red.',
     verificar: (r) => {
       const lcoe = Number((r?.extras as Record<string, unknown> | undefined)?.lcoe ?? NaN)
       const lcoeSin = Number((r?.extras as Record<string, unknown> | undefined)?.lcoe_sin ?? NaN)
@@ -68,4 +68,63 @@ export function evaluar_cumplimiento(nivel: Nivel, resultado: Record<string, unk
   } catch {
     return false
   }
+}
+
+/** Explicación breve de un elemento de la escena: qué es y qué hace. */
+export type AnotacionContenido = {
+  /** Nombre corto que se muestra en el botón. */
+  titulo: string
+  /** Qué es, en una línea. */
+  queEs: string
+  /** Qué hace dentro de la escena, en una línea. */
+  funcion: string
+}
+
+/** Un registro por elemento animado: boya, ola, freno, energía y fondo. */
+export const anotaciones: Record<string, AnotacionContenido> = {
+  boya: {
+    titulo: 'Boya',
+    queEs: 'Cuerpo que sube y baja con la ola y entrega movimiento al equipo.',
+    funcion: 'Su vaivén es lo que luego se convierte en electricidad.',
+  },
+  ola_hm0: {
+    titulo: 'Altura de ola',
+    queEs: 'Altura media del tercio de olas más altas, en metros.',
+    funcion: 'Si crece, la boya se mueve más y llega más energía.',
+  },
+  periodo_te: {
+    titulo: 'Periodo del oleaje',
+    queEs: 'Tiempo medio entre crestas seguidas, en segundos.',
+    funcion: 'Marca el ritmo al que la boya sube y baja.',
+  },
+  freno_pto: {
+    titulo: 'Freno del equipo',
+    queEs: 'Resistencia que opone el equipo al movimiento de la boya.',
+    funcion: 'Con el freno justo se extrae más; si frena de más, la boya casi no se mueve.',
+  },
+  energia: {
+    titulo: 'Energía que trae la ola',
+    queEs: 'Energía que cruza cada metro de frente de ola por segundo.',
+    funcion: 'Es el punto de partida: todo lo que sigue sale de ahí.',
+  },
+  fondo: {
+    titulo: 'Fondo',
+    queEs: 'Profundidad del lugar, en metros.',
+    funcion: 'En fondo bajo la ola se acorta y se empina.',
+  },
+  corriente: {
+    titulo: 'Corriente de marea',
+    queEs: 'Agua que se mueve con la marea, en metros por segundo.',
+    funcion: 'Su empuje mueve la turbina cuando el recurso es la marea.',
+  },
+  rango_marea: {
+    titulo: 'Rango de marea',
+    queEs: 'Diferencia de altura entre pleamar y bajamar, en metros.',
+    funcion: 'Un rango mayor guarda más agua tras el dique.',
+  },
+}
+
+/** Devuelve la explicación del elemento, o nulo si no existe. */
+export function anotacionDe(id: string): AnotacionContenido | null {
+  return anotaciones[id] ?? null
 }

@@ -67,6 +67,12 @@
         @update:crf="v => emitirSupuesto('crf', v)"
         @update:rho="v => emitirSupuesto('rho', v)"
       />
+      <ul class="anotaciones-lista">
+        <li><Anotacion elemento="boya" /></li>
+        <li><Anotacion elemento="freno_pto" termino="B_pto" intuicion="freno" /></li>
+        <li><Anotacion elemento="energia" termino="J" intuicion="J" /></li>
+      </ul>
+      <EstadoBloque v-if="avisoRango" :estado="estadoRango" :motivo="motivoRango" />
     </section>
 
     <section id="sec-aep-lcoe" class="seccion" tabindex="0" aria-labelledby="h-aep-lcoe">
@@ -188,8 +194,10 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import GraficaPlotly from '../components/GraficaPlotly.vue'
 import EstadoBloque from '../components/EstadoBloque.vue'
 import Icono from '../components/Icono.vue'
+import Anotacion from '../components/Anotacion.vue'
 import ControlesSupuestos from '../components/ControlesSupuestos.vue'
 import { formatearNumero } from '../utils/formato'
+import { evaluarValidezOleaje } from '../utils/validacion'
 import type { Params } from '../api'
 
 const props = defineProps<{
@@ -259,6 +267,21 @@ const rho = computed(()=> props.params?.rho ?? 1025)
 function emitirSupuesto(clave: 'eta_pto'|'eta_gen'|'crf'|'rho', valor: number){
   emit('update:params', { [clave]: valor } as Partial<Params>)
 }
+
+/* Aviso de rango del modelo en Diseñar: solo lectura de params, sin tocar
+   el cálculo ni los criterios. Aparece si la ola sale del rango lineal. */
+const validezRango = computed(()=> {
+  const rec = (props.resultado?.recurso ?? {}) as Record<string, unknown>
+  const hm0 = Number(rec.hm0 ?? rec.Hm0 ?? props.params?.hm0_m ?? NaN)
+  const te = Number(rec.te ?? rec.Te ?? props.params?.te_s ?? NaN)
+  const prof = Number(props.params?.profundidad_m ?? 30)
+  if (!Number.isFinite(hm0) || !Number.isFinite(te)) return null
+  return evaluarValidezOleaje({ hm0, te, profundidad: prof })
+})
+const avisoRango = computed(()=> !!validezRango.value && validezRango.value.estado !== 'valido')
+const estadoRango = computed<'pendiente' | 'error'>(()=>
+  validezRango.value?.estado === 'fuera' ? 'error' : 'pendiente')
+const motivoRango = computed(()=> validezRango.value?.mensaje ?? '')
 
 const capex = ref(0)
 const opex = ref(0)
@@ -471,6 +494,11 @@ watch(()=> props.figuras, ()=> {
 @media (max-width: 60rem){ .graficas-par{ grid-template-columns:1fr } }
 
 .prosa{ margin:0; color: var(--tenue); font-size: var(--text-cuerpo); max-inline-size: 60rem }
+
+/* Anotaciones clicables de los supuestos: qué es cada cosa, en lista. */
+.anotaciones-lista{
+  display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; list-style:none;
+}
 
 .veredicto{
   flex:0 0 auto; border-top:1px solid var(--borde-suave); padding-top: var(--s-2);

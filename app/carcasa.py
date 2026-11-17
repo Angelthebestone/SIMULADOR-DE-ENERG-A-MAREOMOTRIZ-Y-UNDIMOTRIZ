@@ -191,7 +191,10 @@ def comprobar_motor() -> tuple[bool, str]:
     Usado por la tarea 15.5, la tarea 146 (arranque en equipo limpio,
     variante "motor ausente") y por ``pruebas/test_motor_renderizado.py``.
     """
-    if webview is None:
+    # Se resuelve en la llamada, no en el import: las pruebas simulan la
+    # ausencia del paquete parcheando `sys.modules`.
+    modulo = sys.modules.get("webview", webview)
+    if modulo is None:
         return (
             False,
             "Motor de renderizado WebView2 no encontrado. Instale Microsoft Edge "
@@ -260,7 +263,13 @@ def crear_ventana() -> Any:
     Devuelve el objeto ventana que `webview.create_window` retorna, para
     inspeccion en pruebas que mockean pywebview.
     """
-    if webview is None:
+    # El import se hace aqui, no al cargar el modulo: asi el fallo se ve al
+    # abrir la ventana (y las pruebas pueden simular la ausencia del paquete).
+    try:
+        import webview as motor
+    except ImportError:
+        motor = None  # type: ignore[assignment]
+    if motor is None:
         raise RuntimeError(
             "pywebview no esta instalado. Para abrir la ventana nativa ejecuta "
             "`pip install pywebview` en un entorno con WebView2 (Windows) o "
@@ -275,14 +284,14 @@ def crear_ventana() -> Any:
         )
 
     api = _APIWebview()
-    ventana = webview.create_window(
+    ventana = motor.create_window(
         title="Simulador Energia Marina",
         url=str(ruta),
         js_api=api,
         width=1280,
         height=720,
     )
-    webview.start()
+    motor.start()
     return ventana
 
 

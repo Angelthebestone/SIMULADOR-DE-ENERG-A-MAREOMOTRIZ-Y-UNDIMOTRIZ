@@ -1,3 +1,10 @@
+<!--
+  Comparar — cadena de pérdidas, catálogo de convertidores, fichas de cierre,
+  comparador de dos tecnologías y discrepancia entre fuentes para un mismo punto.
+
+  Se monta en el paso 4 del flujo (lectura «Comparar»): la simulabilidad de
+  cada ficha la declara el archivo con su marca, no la deduce la pantalla.
+-->
 <template>
   <section class="comparar" aria-labelledby="titulo-comparar">
     <h1 id="titulo-comparar" class="titulo-nivel">Comparar</h1>

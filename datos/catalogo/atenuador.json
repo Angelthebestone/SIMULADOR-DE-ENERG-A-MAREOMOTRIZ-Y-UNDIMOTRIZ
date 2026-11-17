@@ -30,6 +30,7 @@
     "estado": "pendiente"
   },
   "ejemplos": "Pelamis P1/P2 (750 kW, 180 m, 1350 t)",
+  "ejemplo_corto": "Pelamis P1 y P2, 750 kW y 180 m de eslora",
   "desenlace_comercial": "Pelamis Wave Power administracion noviembre 2014, activos a Wave Energy Scotland - pese a peor CWR, mayor despliegue comercial undimotriz. Fuente: investigacion_convertidores_marinos.md 3.1",
   "fuente_taxonomia": "EMEC https://www.emec.org.uk/marine-energy/wave-devices/ - atenuador",
   "nota": "Leccion: eficiencia hidrodinamica no decide, decide coste por MWh"

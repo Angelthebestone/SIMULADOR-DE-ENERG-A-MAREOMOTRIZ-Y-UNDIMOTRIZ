@@ -1,0 +1,68 @@
+{
+  "isla_fuerte": {
+    "nombre": "Isla Fuerte",
+    "lat": 9.39,
+    "lon": -76.18,
+    "rango_m": 0.515,
+    "estado": "verificado",
+    "tesela_z": 4,
+    "tesela_col": 3,
+    "tesela_fila": 9,
+    "pixel_x": 188,
+    "pixel_y": 111
+  },
+  "san_andres": {
+    "nombre": "San Andrés",
+    "lat": 12.569,
+    "lon": -81.701,
+    "rango_m": 0.475,
+    "estado": "verificado",
+    "tesela_z": 4,
+    "tesela_col": 3,
+    "tesela_fila": 9,
+    "pixel_x": 137,
+    "pixel_y": 81
+  },
+  "tumaco": {
+    "nombre": "Tumaco",
+    "lat": 1.903,
+    "lon": -78.912,
+    "rango_m": 3.165,
+    "estado": "verificado",
+    "tesela_z": 4,
+    "tesela_col": 3,
+    "tesela_fila": 9,
+    "pixel_x": 162,
+    "pixel_y": 180
+  },
+  "islas_rosario": {
+    "nombre": "Islas del Rosario",
+    "lat": 10.235,
+    "lon": -75.741,
+    "rango_m": 0.5,
+    "estado": "verificado",
+    "tesela_z": 4,
+    "tesela_col": 3,
+    "tesela_fila": 9,
+    "pixel_x": 192,
+    "pixel_y": 103
+  },
+  "bahia_malaga": {
+    "nombre": "Bahía Málaga",
+    "lat": 3.925,
+    "lon": -77.349,
+    "rango_m": 3.461,
+    "estado": "verificado",
+    "tesela_z": 4,
+    "tesela_col": 3,
+    "tesela_fila": 9,
+    "pixel_x": 177,
+    "pixel_y": 161
+  },
+  "_fecha_consulta": "2026-09-08T00:40:46.473181+00:00",
+  "_servicio": "https://tiledimageservices.arcgis.com/bDAhvQYMG4WL8O5o/arcgis/rest/services/Global_Tidal_Range_meters2/ImageServer",
+  "_metodo": "2*(M2+S2+K1+O1) sobre FES2014 vía teselas LERC",
+  "_atribucion": "FES2014 was produced by Noveltis, Legos and CLS and distributed by Aviso+, with support from Cnes",
+  "_nota_runtime": "El simulador NUNCA depende del servicio en runtime: solo consume los valores cacheados en rango_mareal_esri.json. Este script es ingesta puntual, no codigo del simulador.",
+  "_estado": "verificado"
+}

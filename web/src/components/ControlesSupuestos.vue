@@ -14,7 +14,7 @@
           :max="c.max"
           :step="c.step"
           :value="c.valor"
-          :aria-describedby="c.id + '-meta'"
+          :aria-describedby="c.id + '-meta ' + c.id + '-efecto'"
           @input="c.emitir(($event.target as HTMLInputElement).valueAsNumber)"
         />
         <span class="tope">{{ c.formato(c.max) }}</span>
@@ -22,6 +22,7 @@
       <output :id="c.id + '-valor'" :for="c.id" class="valor">
         {{ c.formato(c.valor) }} <span class="unidad">{{ c.unidad }}</span>
       </output>
+      <p :id="c.id + '-efecto'" class="efecto">{{ c.efecto }}</p>
       <p :id="c.id + '-meta'" class="meta">
         defecto {{ c.formato(c.defecto) }} ·
         rango {{ c.formato(c.min) }}–{{ c.formato(c.max) }} ·
@@ -66,6 +67,7 @@ const controles = computed(() => [
     defecto: 0.65,
     valor: props.eta_pto,
     formato: (v: number) => formatearNumero(v, 2),
+    efecto: 'Si sube, se aprovecha más del movimiento; si baja, se pierde más.',
     fuente: "Falnes 2002 cap. 4",
     emitir: (v: number) => emit("update:eta_pto", v),
   },
@@ -80,6 +82,7 @@ const controles = computed(() => [
     defecto: 0.90,
     valor: props.eta_gen,
     formato: (v: number) => formatearNumero(v, 2),
+    efecto: 'Si sube, llega más a la red; si baja, se calienta más el equipo.',
     fuente: "Handbook cap. 1",
     emitir: (v: number) => emit("update:eta_gen", v),
   },
@@ -94,6 +97,7 @@ const controles = computed(() => [
     defecto: 0.08,
     valor: props.crf,
     formato: (v: number) => formatearNumero(v, 3),
+    efecto: 'Si sube, cada MWh sale más caro; si baja, sale más barato.',
     fuente: "tasa 8% vida 20 años",
     emitir: (v: number) => emit("update:crf", v),
   },
@@ -108,6 +112,7 @@ const controles = computed(() => [
     defecto: 1025,
     valor: props.rho,
     formato: (v: number) => formatearNumero(v, 0),
+    efecto: 'Si sube, el agua pesa más y trae algo más de energía.',
     fuente: "agua de mar nominal",
     emitir: (v: number) => emit("update:rho", v),
   },
@@ -197,6 +202,15 @@ const controles = computed(() => [
   font-size: var(--text-meta);
   color: var(--tenue);
   line-height: 1.3;
+}
+
+/* Qué pasa si sube o baja: línea propia sobre la de defecto y rango. */
+.efecto {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+  line-height: 1.35;
 }
 
 /* Una columna cuando el contenedor se estrecha. */

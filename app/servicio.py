@@ -82,6 +82,10 @@ class Parametros:
     eta_gen: float = 0.90
     crf: float = 0.08
     rho: float = 1_025.0
+    # Marea elegida en el mapa o en los controles. None = la del sitio, para
+    # que un punto fuera de datos/sitios/ no simule con corriente cero.
+    rango_m: float | None = None
+    velocidad_ms: float | None = None
 
 
 def _acotar(params: Parametros) -> tuple[Parametros, list[str]]:
@@ -97,7 +101,11 @@ def _acotar(params: Parametros) -> tuple[Parametros, list[str]]:
     prof, ac_p = acotar("profundidad", params.profundidad_m)
     masa, ac_m = acotar("masa_boya", params.masa_kg)
     diametro, ac_d = acotar("diametro_boya", params.diametro_m)
-    avisos = [a.motivo for a in (ac_h, ac_t, ac_b, ac_p, ac_m, ac_d) if a is not None]
+    rango, ac_r = (None, None) if params.rango_m is None else acotar("rango_mareal", params.rango_m)
+    vel, ac_v = (
+        (None, None) if params.velocidad_ms is None else acotar("velocidad_corriente", params.velocidad_ms)
+    )
+    avisos = [a.motivo for a in (ac_h, ac_t, ac_b, ac_p, ac_m, ac_d, ac_r, ac_v) if a is not None]
     acotados = replace(
         params,
         hm0_m=hm0,
@@ -106,6 +114,8 @@ def _acotar(params: Parametros) -> tuple[Parametros, list[str]]:
         profundidad_m=prof,
         masa_kg=masa,
         diametro_m=diametro,
+        rango_m=rango,
+        velocidad_ms=vel,
     )
     return acotados, avisos
 
@@ -118,6 +128,48 @@ def crear_dispositivo(params: Parametros) -> DispositivoBase:
     if params.dispositivo == "embalse":
         return EmbalseMareal()
     return AbsorbedorPuntual(_config_absorbedor(params))
+
+
+# Periodos de la marea semidiurna lunar (M2) y del ciclo vivas-muertas (M2-S2).
+_T_M2_S = 12.42 * 3600.0
+_T_VIVAS_MUERTAS_S = 14.77 * 86400.0
+# En muertas la corriente de pico cae a la mitad que en vivas (S2/M2 ~ 1/3).
+_FRACCION_MUERTAS = 0.5
+
+
+def serie_corriente_mareal(pico_vivas_ms: float, v_nominal_ms: float) -> tuple[np.ndarray, np.ndarray]:
+    """Velocidad a lo largo de un ciclo vivas-muertas a partir del pico en vivas.
+
+    La turbina real no ve un pico constante: la corriente pasa por cero cuatro
+    veces al dia y el pico cambia con la luna. Por encima de la velocidad
+    nominal la turbina limita su potencia (paso de pala o perdida), asi que la
+    serie se recorta ahi; sin eso el generador recortaria la media y el factor
+    de planta saldria cercano al 100 %.
+    """
+    t = np.arange(0.0, _T_VIVAS_MUERTAS_S, 600.0)
+    medio = (1.0 + _FRACCION_MUERTAS) / 2.0
+    amplitud = pico_vivas_ms * (medio + (1.0 - medio) * np.cos(2.0 * np.pi * t / _T_VIVAS_MUERTAS_S))
+    v = np.abs(amplitud * np.sin(2.0 * np.pi * t / _T_M2_S))
+    return np.minimum(v, v_nominal_ms), t
+
+
+def resolver(params: Parametros, recurso: dict[str, Any], contexto: ContextoRecurso) -> Resultado:
+    dispositivo = crear_dispositivo(params)
+    if not isinstance(dispositivo, TurbinaCorriente):
+        return dispositivo.resolver(recurso, contexto)
+    cfg = dispositivo.config
+    area = math.pi * cfg.diametro_m**2 / 4.0
+    # Velocidad a la que la potencia captada llega a la nominal tras PTO (95 %) y generador (95 %).
+    v_nominal = (cfg.potencia_nominal_w / (0.95 * 0.95) / (0.5 * contexto.rho * area * cfg.cp)) ** (1.0 / 3.0)
+    pico = float(recurso.get("velocidad_ms", 0.0))
+    v, t = serie_corriente_mareal(pico, v_nominal)
+    resultado = dispositivo.resolver({**recurso, "velocidad_ms": v, "tiempo_s": t}, contexto)
+    resultado.recurso = dict(recurso)
+    if pico > v_nominal:
+        resultado.avisos.append(
+            f"Por encima de {v_nominal:.1f} m/s la turbina limita su potencia a la nominal, como las turbinas reales."
+        )
+    return resultado
 
 
 def _config_absorbedor(params: Parametros) -> ConfigAbsorbedor:
@@ -155,6 +207,10 @@ def recurso_de(params: Parametros, sitio: dict[str, Any]) -> dict[str, Any]:
             velocidad_ms = 0.0
     else:
         velocidad_ms = 0.0
+    if params.rango_m is not None:
+        rango_m = params.rango_m
+    if params.velocidad_ms is not None:
+        velocidad_ms = params.velocidad_ms
     return {
         "hm0": params.hm0_m,
         "te": params.te_s,
@@ -365,7 +421,7 @@ def simular(
         return _abandonado(params, avisos)
     sitio = cargar_sitio(params.sitio_id)
     contexto = ContextoRecurso(profundidad_m=params.profundidad_m, rho=params.rho)
-    resultado = crear_dispositivo(params).resolver(recurso_de(params, sitio), contexto)
+    resultado = resolver(params, recurso_de(params, sitio), contexto)
     resultado = _aplicar_rendimientos(resultado, params.eta_pto, params.eta_gen)
     # La animacion necesita un eje de tiempo. Si el dispositivo ya integro su
     # propia posicion, solo se le pone el eje: sobreescribir z_m con una senoide
@@ -423,7 +479,7 @@ def comparar_dos(params: Parametros, clave_a: str, clave_b: str) -> dict[str, An
     contexto = ContextoRecurso(profundidad_m=params.profundidad_m, rho=params.rho)
     recurso = recurso_de(params, sitio)
     salidas = [
-        crear_dispositivo(replace(params, dispositivo=clave)).resolver(dict(recurso), contexto)
+        resolver(replace(params, dispositivo=clave), dict(recurso), contexto)
         for clave in (clave_a, clave_b)
     ]
     return {

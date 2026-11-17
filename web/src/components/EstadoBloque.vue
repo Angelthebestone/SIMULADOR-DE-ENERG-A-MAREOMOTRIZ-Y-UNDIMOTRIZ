@@ -83,7 +83,9 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e:'activar'):void; (e:'cancelar'):void }>()
 
-const citaCompleta = computed(()=> props.cita || 'Ortega et al. 2013, Renewable Energy 57, 240-248 — Isla Fuerte 8,9 kW/m revisado por pares — Copernicus Marine GLOBAL_ANALYSISFORECAST_WAV_001_027 1/12° (~9 km), celda 9,42N -76,17W ~3,3 km, 2015-2024, datos/cmems/resumen_oleaje_cmems.json — ERA5-Ocean via Open-Meteo, rejilla 0,5° (celda 9,5N -76,0W ~23 km), 2015-2024, 87672 registros, datos/oleaje/resumen_oleaje_era5.json — GMRT Lamont-Doherty batimetría transecto radial')
+// Sin cita propia, el bloque no nombra ningún punto: el recurso se lee de la
+// rejilla mundial y cada sitio aporta su fuente cuando la tiene.
+const citaCompleta = computed(()=> props.cita || 'Fuente del recurso: Open-Meteo Marine (ERA5-Ocean, MFWAM y Mercator SMOC), malla mundial local')
 const citaTruncada = computed(()=> {
   const c = citaCompleta.value
   return c.length > 140 ? c.slice(0,140) + '…' : c

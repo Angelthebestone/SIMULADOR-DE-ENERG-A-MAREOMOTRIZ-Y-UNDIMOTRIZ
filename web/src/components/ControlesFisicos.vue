@@ -6,6 +6,9 @@
           <span>{{ c.etiqueta }}</span>
           <Glosario :term="c.simbolo" class="simbolo">{{ c.simbolo }}</Glosario>
         </label>
+        <output :id="c.id + '-valor'" :for="c.id" class="valor">
+          {{ c.formato(c.valor) }} <span class="unidad">{{ c.unidad }}</span>
+        </output>
         <div class="pista">
           <span class="tope">{{ c.formato(c.min) }}</span>
           <input
@@ -15,14 +18,15 @@
             :max="c.max"
             :step="c.step"
             :value="c.valor"
-            :aria-describedby="c.id + '-valor'"
+            :aria-describedby="c.id + '-valor ' + c.id + '-efecto'"
+            :style="{ '--p': ((c.valor - c.min) / (c.max - c.min)) * 100 + '%' }"
             @input="c.emitir(($event.target as HTMLInputElement).valueAsNumber)"
           />
           <span class="tope">{{ c.formato(c.max) }}</span>
         </div>
-        <output :id="c.id + '-valor'" :for="c.id" class="valor">
-          {{ c.formato(c.valor) }} <span class="unidad">{{ c.unidad }}</span>
-        </output>
+        <p :id="c.id + '-efecto'" class="efecto">
+          {{ c.efecto }}
+        </p>
       </div>
     </div>
   </div>
@@ -39,6 +43,7 @@ const props = withDefaults(
     te_s: number;
     b_pto_ns_m: number;
     modoEnergia?: "undimotriz" | "mareomotriz";
+    dispositivo?: string;
     velocidadCorriente?: number;
     rangoMarea?: number;
     profundidad_m?: number;
@@ -74,6 +79,7 @@ const controlesOndas = computed(() => [
     step: 0.1,
     valor: props.hm0_m,
     formato: (v: number) => formatearNumero(v, 1),
+    efecto: 'Si sube, llega más energía y la boya se mueve más; si baja, la cifra cae.',
     emitir: (v: number) => emit("update:hm0_m", v),
   },
   {
@@ -86,6 +92,7 @@ const controlesOndas = computed(() => [
     step: 0.1,
     valor: props.te_s,
     formato: (v: number) => formatearNumero(v, 1),
+    efecto: 'Si sube, la ola se alarga y trae más energía; si baja, la ola se acorta.',
     emitir: (v: number) => emit("update:te_s", v),
   },
   {
@@ -98,6 +105,7 @@ const controlesOndas = computed(() => [
     step: 1_000,
     valor: props.b_pto_ns_m,
     formato: (v: number) => formatearNumero(v / 1000, 0),
+    efecto: 'Si sube, frena más y la boya se mueve menos; si baja, la boya se mueve más suelta.',
     emitir: (v: number) => emit("update:b_pto_ns_m", v),
   },
 ]);
@@ -105,26 +113,28 @@ const controlesOndas = computed(() => [
 const controlesMareas = computed(() => [
   {
     id: "ctrl-vel-corriente",
-    etiqueta: "Velocidad de corriente mareal",
+    etiqueta: "Corriente de pico en mareas vivas",
     simbolo: "V_marea",
     unidad: "m/s",
-    min: 0.5,
-    max: 5.5,
+    min: 0,
+    max: 5,
     step: 0.1,
     valor: props.velocidadCorriente,
     formato: (v: number) => formatearNumero(v, 1),
+    efecto: 'La corriente sube y baja con cada marea; la turbina produce con el cubo de la velocidad.',
     emitir: (v: number) => emit("update:velocidadCorriente", v),
   },
   {
     id: "ctrl-rango-marea",
-    etiqueta: "Rango mareal (pleamar - bajamar)",
+    etiqueta: "Rango de marea medio (pleamar − bajamar)",
     simbolo: "R_marea",
     unidad: "m",
-    min: 0.5,
-    max: 16.0,
+    min: 0,
+    max: 15,
     step: 0.1,
     valor: props.rangoMarea,
     formato: (v: number) => formatearNumero(v, 1),
+    efecto: 'Si sube, hay más agua embalsada y más energía; si baja, hay menos.',
     emitir: (v: number) => emit("update:rangoMarea", v),
   },
   {
@@ -137,14 +147,17 @@ const controlesMareas = computed(() => [
     step: 1,
     valor: props.profundidad_m,
     formato: (v: number) => formatearNumero(v, 0),
+    efecto: 'Si baja mucho, la ola se acorta y se empina; si sube, la ola viaja más libre.',
     emitir: (v: number) => emit("update:profundidad_m", v),
   },
 ]);
 
 const controlesActivos = computed(() => {
-  if (props.modoEnergia === "mareomotriz") {
-    return controlesMareas.value;
-  }
+  // Cada obra mareomotriz responde a una sola variable de la marea: la turbina
+  // a la corriente, el dique al rango. La profundidad no entra en ninguno de los
+  // dos cálculos. Mostrar las demás serían mandos muertos.
+  if (props.dispositivo === "embalse") return controlesMareas.value.filter((c) => c.id === "ctrl-rango-marea");
+  if (props.modoEnergia === "mareomotriz") return controlesMareas.value.filter((c) => c.id === "ctrl-vel-corriente");
   return controlesOndas.value;
 });
 </script>
@@ -161,15 +174,17 @@ const controlesActivos = computed(() => {
 
 .controles-grid {
   display: grid;
-  gap: var(--s-3);
+  gap: var(--s-4);
 }
 
+/* Cada control: etiqueta y cifra en la misma fila, la pista debajo a todo
+   el ancho. La cifra grande a la derecha es lo que se lee al mover. */
 .control {
   display: grid;
-  grid-template-columns: minmax(13rem, 19rem) 1fr auto;
-  align-items: center;
-  column-gap: var(--s-4);
-  row-gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--s-3);
+  row-gap: 6px;
 }
 
 .control > * {
@@ -178,6 +193,7 @@ const controlesActivos = computed(() => {
 
 .etiqueta {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
   font-weight: 600;
@@ -186,12 +202,33 @@ const controlesActivos = computed(() => {
 }
 
 .simbolo {
+  font-family: var(--font-mono);
   font-size: var(--text-meta);
   font-weight: 400;
   color: var(--tenue);
 }
 
+.valor {
+  font-family: var(--font-display);
+  text-align: end;
+  font-weight: 600;
+  font-size: var(--text-nivel);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--tinta);
+  white-space: nowrap;
+}
+
+.unidad {
+  font-family: var(--font-sans);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--tenue);
+}
+
 .pista {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -199,16 +236,86 @@ const controlesActivos = computed(() => {
 }
 
 .tope {
-  font-size: var(--text-meta);
+  font-size: 11px;
   color: var(--tenue);
+  min-inline-size: 1.6rem;
 }
 
+.tope:last-child {
+  text-align: end;
+}
+
+/* Qué pasa si sube o baja: una línea bajo la pista, en tono tenue. */
+.efecto {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: var(--text-meta);
+  color: var(--tenue);
+  line-height: 1.35;
+}
+
+/* Deslizador propio: pista fina con el tramo recorrido en el azul del
+   recurso, tirador redondo con anillo. La fracción --p la pone la plantilla. */
 .pista input[type="range"] {
   flex: 1;
   min-inline-size: 0;
   block-size: 1.5rem;
+  margin: 0;
   cursor: pointer;
-  accent-color: var(--rol-recurso);
+  appearance: none;
+  background: transparent;
+}
+
+.pista input[type="range"]::-webkit-slider-runnable-track {
+  block-size: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--rol-recurso) var(--p, 0%), var(--superficie) var(--p, 0%));
+}
+
+.pista input[type="range"]::-moz-range-track {
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--superficie);
+}
+
+.pista input[type="range"]::-moz-range-progress {
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--rol-recurso);
+}
+
+.pista input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  inline-size: 18px;
+  block-size: 18px;
+  margin-block-start: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--rol-recurso);
+  box-shadow: 0 1px 3px oklch(0.2 0.02 240 / 0.3);
+  transition: transform var(--dur-rapida) var(--ease-salida);
+}
+
+.pista input[type="range"]::-moz-range-thumb {
+  inline-size: 14px;
+  block-size: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  background: var(--rol-recurso);
+  box-shadow: 0 1px 3px oklch(0.2 0.02 240 / 0.3);
+}
+
+.pista input[type="range"]:hover::-webkit-slider-thumb,
+.pista input[type="range"]:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.pista input[type="range"]:focus-visible {
+  outline: none;
+}
+
+.pista input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px var(--acento-suave), 0 0 0 5px var(--foco);
 }
 
 @media (pointer: coarse) {
@@ -216,40 +323,25 @@ const controlesActivos = computed(() => {
     block-size: 2.75rem;
   }
 }
+@container (inline-size >= 34rem) {
+  .controles-grid {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--s-6);
+  }
 
-.valor {
-  min-inline-size: 6.5rem;
-  text-align: end;
-  font-weight: 700;
-  font-size: var(--text-seccion);
-  line-height: 1.1;
-  color: var(--tinta);
-}
-
-.unidad {
-  font-size: var(--text-meta);
-  font-weight: 600;
-  color: var(--tenue);
-}
-
-@container (width < 34rem) {
+  /* En columna estrecha la cifra va bajo la etiqueta: lado a lado se pisan. */
   .control {
-    grid-template-columns: 1fr auto;
-  }
-
-  .pista {
-    grid-column: 1 / -1;
-    order: 3;
-  }
-
-  .valor {
-    text-align: end;
-    min-inline-size: 0;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
   }
 
   .etiqueta {
-    overflow-wrap: anywhere;
+    font-size: 14px;
+  }
+
+  .valor {
+    font-size: 24px;
+    text-align: start;
   }
 }
 </style>
-

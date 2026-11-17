@@ -1,103 +1,159 @@
 import { createApp } from 'vue'
 import './styles/tokens.css'
+import './styles/fuentes.css'
 import './styles/semaforo.css'
 import './styles/app.css'
+import './flujo/flujo.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Ver from './views/Ver.vue'
-import Comparar from './views/Comparar.vue'
+import Portada from './views/Portada.vue'
+import Tecnologia from './views/Tecnologia.vue'
+import OrigenDatos from './views/OrigenDatos.vue'
 import MapaView from './components/MapaView.vue'
 import Icono from './components/Icono.vue'
 import DialogoFuentes from './components/DialogoFuentes.vue'
+import Resultados from './components/Resultados.vue'
 import type { SitioMapa } from './map/mapa'
 import { simular, cancelar, type Params } from './api'
-import { formatearNumero } from './utils/formato'
+import {
+  PARAMS_INICIALES,
+  dispositivoPorDefecto,
+  familiaDeDispositivo,
+  type Familia,
+  type Origen,
+  type Paso,
+  PASOS,
+  SITIO_INICIAL,
+} from './flujo/estado'
 
 const CITA = `SIMULADOR DE ENERGÍA MARINA — RECURSO, CAPTURA Y COSTES
-Ortega et al. (2013) · ERA5-Ocean vía Open-Meteo Marine · GMRT Lamont-Doherty · RUNAP · XM
-Natural Earth para el contorno de tierra. Repositorio público con datos reproducibles.`
+Recurso de oleaje: ERA5-Ocean vía Open-Meteo Marine (MFWAM) · Marea: FES2014 (Esri) y estaciones IOC
+Plantas reales: Wikipedia, EMEC, Tethys (PNNL) y K-water · Captura: Falnes (2002), Babarit et al. (2012)
+Medición revisada por pares de uno de los puntos de la carta: Ortega et al. (2013), Renewable Energy 57, 8,9 kW/m
+Batimetría: GEBCO 2023 y GMRT Lamont-Doherty · Contorno de tierra: Natural Earth
+Repositorio público con datos reproducibles.`
 
+// La portada es la puerta de entrada: mar realista a pantalla completa, sin
+// barra de pasos ni cadena de lectura. Al elegir familia se entra al flujo.
+// Los pasos siguientes también van a pantalla completa: sin barra superior.
 const PLANTILLA = `
-  <div id="app" :data-sustentacion="sustentacion ? '' : null" style="--escala:1">
-    <header class="barra">
-      <div class="marca">
-        <Icono icono="simulador" tamano="lg" />
-        <div>
-          <strong>Simulador de Energía Marina</strong>
-          <span class="marca-sub">Oleaje y mareas · recurso, captura y red</span>
-        </div>
-      </div>
+  <div
+    id="app"
+    :class="claseModo"
+    :data-sustentacion="sustentacion ? '' : null"
+    style="--escala:1"
+  >
+    <header v-if="paso !== 1" class="barra-flujo">
+      <ol class="pasos" aria-label="Pasos">
+        <li v-for="p in PASOS" :key="p.id">
+          <button
+            type="button"
+            class="paso"
+            :class="{ hecho: p.id < paso, actual: p.id === paso }"
+            :aria-current="p.id === paso ? 'step' : undefined"
+            :disabled="p.id > paso"
+            @click="irA(p.id)"
+          >
+            <span class="paso-num">{{ p.id }}</span>
+            <span class="paso-nombre">{{ p.nombre }}</span>
+          </button>
+        </li>
+      </ol>
+
+      <p v-if="paso === 4" class="sitio-chip" data-testid="sitio-actual">
+        <Icono icono="marca" tamano="sm" />
+        <span>{{ origen === 'personalizado' ? 'Valores libres (sin punto en el mapa)' : nombreSitio }}</span>
+      </p>
+
+      <p v-if="offline" class="aviso-red" data-testid="aviso-offline">
+        <Icono icono="offline" tamano="sm" />
+        <span>sin conexión — datos locales</span>
+      </p>
+
       <div class="acciones-barra">
-        <button class="btn-barra" @click="abrirFuentes">
+        <button class="btn-barra" data-testid="abrir-fuentes" @click="abrirFuentes">
           <Icono icono="fuentes" />
           <span>Fuentes</span>
         </button>
         <button class="btn-barra" data-testid="sustentacion" @click="toggleSustentacion" :aria-pressed="sustentacion ? 'true':'false'" title="Modo presentación (Ctrl+E, ESC para salir)">
           <Icono icono="proyector" />
-          <span>{{ sustentacion ? '2,1×' : '1×' }}</span>
+          <span>{{ sustentacion ? 'Proyectando 2,1×' : 'Proyectar' }}</span>
         </button>
       </div>
     </header>
 
-    <nav class="tabs" role="tablist" aria-label="Pantallas del simulador">
-      <button v-for="(t,i) in tabs" :key="t.id" role="tab" :id="'tab-'+t.id" :aria-controls="'panel-'+t.id" :aria-selected="activa===t.id ? 'true':'false'" :tabindex="activa===t.id ? 0 : -1" @click="alClickTab(t.id)" @keydown="alTecla($event,i)" :ref="el=>{ if(el) tabRefs[i]=el }">
-        <Icono :icono="t.id" />
-        <span class="tab-label">{{ t.label }}</span>
-      </button>
-    </nav>
+    <main class="tablero flujo">
+      <div class="etapa">
+        <Portada v-if="paso === 1" @elegir-familia="alElegirFamilia" />
 
-    <section :id="'panel-'+activa" :class="'panel panel--'+activa" role="tabpanel" :aria-labelledby="'tab-'+activa" tabindex="0" @keydown="alTeclaPanel">
-      <!-- Carta y simulador comparten pantalla: uno ocupa el escenario y el
-           otro queda reducido abajo a la izquierda. Pulsar el reducido los
-           intercambia; ninguno se desmonta, así que el mapa conserva su
-           encuadre y la animación su fotograma. -->
-      <div v-show="activa==='simulador'" class="escenario">
-        <div class="marco" :class="pleno==='mapa' ? 'marco--pleno' : 'marco--reducido'">
-          <MapaView
-            :reducido="pleno!=='mapa'"
-            @seleccionar-sitio="alSeleccionarSitioMapa"
-            @ir-a-simulador="alIrASimulador" />
-          <button v-if="pleno!=='mapa'" class="marco-tapa" @click="intercambiar('mapa')" aria-label="Ampliar la carta mundial">
-            <span>Carta mundial</span>
-            <Icono icono="expandir" tamano="sm" />
-          </button>
-        </div>
+        <Tecnologia
+          v-else-if="paso === 2"
+          :familia="familia"
+          :dispositivo="params.dispositivo"
+          @elegir-tecnologia="alElegirTecnologia"
+          @continuar="irA(3)"
+          @volver="irA(1)"
+        />
 
-        <div class="marco" :class="pleno==='ver' ? 'marco--pleno' : 'marco--reducido'">
-          <Ver
-            :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
-            :reducido="pleno!=='ver'"
-            @update:params="aplicarParams" />
-          <button v-if="pleno!=='ver'" class="marco-tapa" @click="intercambiar('ver')" aria-label="Ampliar el simulador">
-            <span>Simulador</span>
-            <Icono icono="expandir" tamano="sm" />
-          </button>
-        </div>
+        <OrigenDatos
+          v-else-if="paso === 3"
+          :origen="origen"
+          :params="params"
+          :sitio-id="params.sitio_id"
+          :sitio-nombre="nombreSitio"
+          :sitio-fuente="fuenteSitio"
+          :dispositivo="params.dispositivo"
+          @elegir-origen="alElegirOrigen"
+          @update:params="aplicarParams"
+          @seleccionar-sitio="alSeleccionarSitioMapa"
+          @ir-a-simulador="alIrASimulador"
+          @continuar="irA(4)"
+          @volver="irA(2)"
+        />
 
-        <!-- Lectura de la cadena, siempre a la vista sobre el escenario. -->
-        <div class="lectura" role="status" aria-live="polite" data-testid="barra-kpis">
-          <div v-for="k in kpis" :key="k.id" class="kpi" :data-testid="'kpi-'+k.id" :data-estado="k.pendiente ? 'pendiente' : 'ok'">
-            <span class="kpi-etiqueta">{{ k.etiqueta }}</span>
-            <span v-if="cargando" class="kpi-esqueleto" aria-hidden="true"></span>
-            <span v-else-if="k.pendiente" class="kpi-pendiente semaforo semaforo--pendiente">
-              <Icono icono="pendiente" tamano="sm" />
-              <span>pendiente</span>
-            </span>
-            <span v-else class="kpi-valor">{{ k.valor }} <small class="kpi-unidad">{{ k.unidad }}</small></span>
+        <div v-else class="panel-simulacion">
+          <div class="simulacion-escena">
+            <Ver
+              ref="ver"
+              :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error"
+              @update:params="aplicarParams" @cambiar-tecnologia="irA(2)" />
+
+            <!-- Mapa flotante: el estudiante cambia de punto sin salir de la escena. -->
+            <aside class="mapa-flotante" :class="{ replegado: mapaReplegado }" aria-label="Emplazamiento">
+              <div class="mapa-flotante-barra">
+                <span class="mapa-flotante-titulo">Emplazamiento</span>
+                <button
+                  type="button"
+                  class="mapa-flotante-toggle"
+                  :aria-expanded="mapaReplegado ? 'false' : 'true'"
+                  data-testid="alternar-mapa-mini"
+                  @click="mapaReplegado = !mapaReplegado"
+                >
+                  <Icono :icono="mapaReplegado ? 'mapa' : 'cerrar'" tamano="sm" />
+                  <span>{{ mapaReplegado ? 'Ver mapa' : 'Ocultar' }}</span>
+                </button>
+              </div>
+              <div v-if="!mapaReplegado" class="mapa-flotante-caja">
+                <MapaView
+                  compacto
+                  :centro="centroSitio"
+                  :sitio-activo="params.sitio_id"
+                  :dispositivo="params.dispositivo"
+                  @seleccionar-sitio="alSeleccionarSitioMapa"
+                  @ir-a-simulador="alSeleccionarSitioMapa" />
+              </div>
+            </aside>
           </div>
 
-          <p v-if="error" class="aviso aviso--error" data-testid="aviso-error">
-            <Icono icono="error" tamano="sm" />
-            <span>{{ error }}</span>
-          </p>
-          <p v-else-if="offline" class="aviso" data-testid="aviso-offline">
-            <Icono icono="offline" tamano="sm" />
-            <span>sin conexión — datos locales</span>
-          </p>
+          <Resultados
+            :params="params" :resultado="resultado" :viviendas="viviendas" :cargando="cargando" :error="error">
+            <p v-if="origen === 'personalizado'" class="nota-hipotetico" data-testid="nota-hipotetico">
+              Resultado hipotético: estos números se escribieron a mano y no pertenecen a ningún punto del mapa.
+            </p>
+          </Resultados>
         </div>
       </div>
-
-      <Comparar v-if="activa==='comparar'" :resultado="resultado" :cargando="cargando" />
-    </section>
+    </main>
 
     <DialogoFuentes ref="dialogoFuentes" :cita="citaLarga" />
   </div>
@@ -105,102 +161,100 @@ const PLANTILLA = `
 
 const app = createApp({
   template: PLANTILLA,
-  components: { Ver, Comparar, MapaView, Icono, DialogoFuentes },
+  components: { Ver, Portada, Tecnologia, OrigenDatos, MapaView, Icono, DialogoFuentes, Resultados },
   data() {
     return {
-      activa: 'simulador' as string,
-      /** Cuál de los dos ocupa el escenario; el otro queda reducido. */
-      pleno: 'mapa' as 'mapa' | 'ver',
+      PASOS,
       sustentacion: false,
       offline: false,
+      mapaReplegado: window.innerWidth < 768,
+      centroSitio: null as [number, number] | null,
+      paso: 1 as Paso,
+      familia: 'undimotriz' as Familia,
+      origen: 'lugar' as Origen,
       resultado: null as Record<string, any> | null,
       viviendas: null as number | null,
       error: '' as string,
       cargando: false,
-      params: {
-        hm0_m: 1.5,
-        te_s: 7.0,
-        b_pto_ns_m: 80_000,
-        profundidad_m: 30,
-        sitio_id: 'isla_fuerte',
-        dispositivo: 'absorbedor_puntual',
-        eta_pto: 0.65,
-        eta_gen: 0.90,
-        crf: 0.08,
-        rho: 1025,
-      } as Params,
-      tabs: [
-        { id: 'simulador', label: 'Simulador' },
-        { id: 'comparar', label: 'Comparar tecnologías' },
-      ] as Array<{id:string; label:string}>,
-      tabRefs: [] as HTMLElement[],
+      nombreSitio: SITIO_INICIAL.absorbedor_puntual.nombre,
+      fuenteSitio: SITIO_INICIAL.absorbedor_puntual.fuente,
+      params: { ...PARAMS_INICIALES } as Params,
       citaLarga: CITA,
       temporizador: 0 as unknown as ReturnType<typeof setTimeout>,
+      peticion: 0,
     }
   },
   computed: {
-    kpis(): Array<{ id: string; etiqueta: string; valor: string; unidad: string; pendiente: boolean }> {
-      const r = this.resultado
-      const kwm = Number(r?.eslabones?.[0]?.detalle?.j_w_m ?? NaN) / 1000
-      const w = Number(r?.potencia_nominal_w ?? NaN)
-      const mwh = Number(r?.produccion_anual_mwh ?? NaN)
-      const fp = Number(r?.factor_planta ?? NaN)
-      const celda = (id: string, etiqueta: string, v: number, unidad: string, dec: number) => ({
-        id,
-        etiqueta,
-        unidad,
-        pendiente: !Number.isFinite(v),
-        valor: Number.isFinite(v) ? formatearNumero(v, dec) : '',
-      })
-      return [
-        celda('recurso', 'Recurso', kwm, 'kW/m', 1),
-        celda('potencia', 'Potencia captada', w / 1000, 'kW', 1),
-        celda('anual', 'Producción anual', mwh, 'MWh/año', 1),
-        celda('factor', 'Factor de planta', fp * 100, '%', 1),
-      ]
+    claseModo(): string {
+      if (this.paso === 1) return 'modo-portada'
+      if (this.paso === 2) return 'modo-tecnologia'
+      if (this.paso === 3) return 'modo-origen'
+      return 'modo-simulacion'
     },
   },
   methods: {
+    irA(p: Paso) {
+      this.paso = p
+    },
+    alElegirFamilia(f: Familia) {
+      this.familia = f
+      this.alElegirTecnologia(dispositivoPorDefecto(f))
+      this.paso = 2
+    },
+    alElegirTecnologia(id: string) {
+      this.familia = familiaDeDispositivo(id)
+      const inicio = SITIO_INICIAL[id]
+      if (inicio) {
+        this.centroSitio = null
+        this.nombreSitio = inicio.nombre
+        this.fuenteSitio = inicio.fuente
+      }
+      this.aplicarParams({ ...inicio?.params, dispositivo: id })
+    },
+    alElegirOrigen(o: Origen) {
+      this.origen = o
+    },
     aplicarParams(cambios: Partial<Params>) {
       Object.assign(this.params, cambios)
+      if (cambios.dispositivo) this.familia = familiaDeDispositivo(cambios.dispositivo)
     },
     abrirFuentes() {
       ;(this.$refs.dialogoFuentes as { abrir: () => void } | undefined)?.abrir()
     },
-    intercambiar(cual: 'mapa' | 'ver') {
-      this.pleno = cual
-    },
     alSeleccionarSitioMapa(s: SitioMapa) {
-      const cambios: Partial<Params> = {
-        sitio_id: s.id,
-      }
+      const cambios: Partial<Params> = { sitio_id: s.id }
       if (s.hm0_m) cambios.hm0_m = s.hm0_m
       if (s.te_s) cambios.te_s = s.te_s
       if (s.profundidad_m) cambios.profundidad_m = s.profundidad_m
-      if (s.tipo === 'mareomotriz') {
-        cambios.dispositivo = 'turbina_corriente'
-      } else if (s.tipo === 'undimotriz') {
-        cambios.dispositivo = 'absorbedor_puntual'
-      }
+      cambios.rango_m = s.rango_m ?? undefined
+      cambios.velocidad_ms = s.velocidad_ms ?? undefined
+      this.origen = 'lugar'
+      this.centroSitio = Number.isFinite(s.lon) && Number.isFinite(s.lat) ? [s.lon, s.lat] : null
+      this.nombreSitio = s.nombre || this.nombreSitio
+      this.fuenteSitio = s.fuente || this.fuenteSitio
       this.aplicarParams(cambios)
     },
     alIrASimulador(s: SitioMapa) {
       this.alSeleccionarSitioMapa(s)
-      this.pleno = 'ver'
+      this.paso = 4
+      ;(this.$refs.ver as { enfocar?: () => void } | undefined)?.enfocar?.()
     },
     async ejecutar() {
+      // La boya tarda más que la turbina: una respuesta vieja no debe pisar a la nueva.
+      const peticion = ++this.peticion
       this.cargando = true
       this.error = ''
       try {
         const respuesta = (await simular({ ...this.params })) as Record<string, any>
+        if (peticion !== this.peticion) return
         if (respuesta?.error) this.error = String(respuesta.error)
         this.resultado = respuesta?.resultado ?? null
         const v = respuesta?.extras?.viviendas
         this.viviendas = typeof v === 'number' ? v : (v?.viviendas ?? null)
       } catch (e) {
-        this.error = e instanceof Error ? e.message : 'no se pudo calcular'
+        if (peticion === this.peticion) this.error = e instanceof Error ? e.message : 'no se pudo calcular'
       } finally {
-        this.cargando = false
+        if (peticion === this.peticion) this.cargando = false
       }
     },
     programar() {
@@ -211,6 +265,7 @@ const app = createApp({
       this.sustentacion = !this.sustentacion
       const root = document.documentElement
       if (this.sustentacion) {
+        this.mapaReplegado = true
         root.setAttribute('data-sustentacion', '')
         root.style.setProperty('--escala', '2.1')
         root.style.fontSize = 'calc(16px * 2.1)'
@@ -222,40 +277,8 @@ const app = createApp({
         window.dispatchEvent(new CustomEvent('sustentacion', { detail: { escala: 1 } }))
       }
     },
-    alTecla(e: KeyboardEvent, i: number) {
-      const n = this.tabs.length
-      if (e.key === 'ArrowRight') { e.preventDefault(); const j = (i + 1) % n; this.activa = this.tabs[j].id; this.$nextTick(()=> this.enfocarEncabezado()) }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); const j = (i - 1 + n) % n; this.activa = this.tabs[j].id; this.$nextTick(()=> this.enfocarEncabezado()) }
-      else if (e.key === 'Home') { e.preventDefault(); this.activa = this.tabs[0].id; this.$nextTick(()=> this.enfocarEncabezado()) }
-      else if (e.key === 'End') { e.preventDefault(); this.activa = this.tabs[n-1].id; this.$nextTick(()=> this.enfocarEncabezado()) }
-    },
-    /** El foco vive en el encabezado del panel tras conmutar; las flechas
-     *  tienen que seguir recorriendo las pantallas desde ahí. Sólo cuando el
-     *  foco está en el encabezado: dentro del panel las flechas son de los
-     *  controles (deslizadores, listas), no de las pestañas. */
-    alTeclaPanel(e: KeyboardEvent) {
-      const destino = e.target as HTMLElement | null
-      if (!destino || destino.id !== 'titulo-' + this.activa) return
-      const i = this.tabs.findIndex(t => t.id === this.activa)
-      if (i >= 0) this.alTecla(e, i)
-    },
-    alClickTab(id: string) {
-      this.activa = id
-      // Tras click el foco se queda en el botón, que es lo esperado con ratón.
-    },
-    enfocarEncabezado() {
-      // WAI-ARIA tabs: el foco pasa al contenido del nuevo tabpanel.
-      const panel = document.getElementById('panel-' + this.activa)
-      const heading = panel?.querySelector('h1, h2, [role="heading"]') as HTMLElement | null
-      if (heading) {
-        if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1')
-        heading.focus({ preventScroll: false })
-      }
-    },
     onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        // Con un diálogo abierto, ESC es suyo: lo cierra el <dialog> nativo y
-        // aquí no se cancela nada ni se conmuta la sustentación.
         if (document.querySelector('dialog[open]')) return
         if (this.sustentacion) this.toggleSustentacion()
         cancelar()

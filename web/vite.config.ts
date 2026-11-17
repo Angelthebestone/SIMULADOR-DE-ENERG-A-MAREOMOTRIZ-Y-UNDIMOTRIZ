@@ -227,6 +227,15 @@ function apiMocksPlugin(): Plugin {
     const url = req.url || "";
 
     if (url.startsWith("/api/simular") && req.method === "POST") {
+      // MOTOR_URL apunta a `api/simular.py` servido en local: el dev server
+      // enseña entonces las cifras del motor Python y no las del mock.
+      const motor = process.env.MOTOR_URL;
+      if (motor) {
+        const r = await fetch(motor, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(await leerCuerpo(req)) });
+        res.statusCode = r.status;
+        res.setHeader("Content-Type", "application/json");
+        return res.end(await r.text());
+      }
       return responder(res, contratoSimulado(await leerCuerpo(req)));
     }
 

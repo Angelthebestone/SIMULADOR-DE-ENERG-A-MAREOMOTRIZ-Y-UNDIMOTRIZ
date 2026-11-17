@@ -36,30 +36,30 @@ defineProps<{ cita: string }>()
 // enteras porque este es el sitio donde se viene a leerlas.
 const GRUPOS = [
   {
-    titulo: 'Recurso y emplazamiento',
+    titulo: 'Recurso marino en cualquier punto',
     refs: [
-      { clave: 'Ortega et al. 2013', texto: 'Renewable Energy 57, 240-248. Isla Fuerte 8,9 kW/m, revisado por pares. Valor de diseño.' },
-      { clave: 'Osorio et al. 2016 / Handbook cap. 1', texto: 'Umbral de 40 kW/m citado como referencia de rentabilidad para granjas undimotrices.' },
-      { clave: 'Copernicus Marine', texto: 'GLOBAL_ANALYSISFORECAST_WAV_001_027, rejilla 1/12° (≈9 km). Celda 9,42 N 76,17 W, a 3,3 km del sitio. Periodo 2015-2024.' },
-      { clave: 'ERA5-Ocean vía Open-Meteo', texto: 'Rejilla 0,5° (celda 9,5 N 76,0 W, a 23 km). Periodo 2015-2024, 87.672 registros.' },
-      { clave: 'GMRT', texto: 'Lamont-Doherty Earth Observatory. Batimetría del transecto radial.' },
-      { clave: 'RUNAP', texto: 'Parques Nacionales Naturales. 37 áreas marinas protegidas, 305.335 km².' },
+      { clave: 'ERA5-Ocean vía Open-Meteo Marine', texto: 'Reanálisis global de oleaje (Hm0, Te) en rejilla de 0,5°, 2015-2024. Alimenta la carta mundial y los puntos que eliges a mano.' },
+      { clave: 'FES2014 (Esri)', texto: 'Rango de marea global a partir de las constituyentes M2, S2, K1 y O1.' },
+      { clave: 'GEBCO 2023 · GMRT', texto: 'Batimetría: profundidad del fondo y transectos hacia la costa.' },
+      { clave: 'Natural Earth', texto: 'Contorno de tierra y línea de costa de la carta.' },
+      { clave: 'Fuentes de cada sitio', texto: 'Cada punto de la carta cita su origen (EMEC, Wavec, FORCE, K-water, US DOE…). Medición revisada por pares de uno de ellos: Ortega et al. 2013, Renewable Energy 57, 240-248 (8,9 kW/m).' },
+    ],
+  },
+  {
+    titulo: 'Plantas reales',
+    refs: [
+      { clave: 'Wikipedia · EMEC · Tethys (PNNL)', texto: 'Potencia instalada, año de puesta en marcha y cierre de cada planta del catálogo.' },
+      { clave: 'K-water', texto: 'Generación anual de Sihwa (552,7 GWh), La Rance (544 GWh) y Annapolis (54 GWh).' },
     ],
   },
   {
     titulo: 'Dispositivo y límites teóricos',
     refs: [
       { clave: 'Falnes 2002', texto: 'Cota superior de la potencia absorbible por un cuerpo oscilante, P_max = |Fe|² / (8B).' },
+      { clave: 'Babarit et al. 2012', texto: 'Coeficientes hidrodinámicos de referencia para la boya cilíndrica.' },
+      { clave: 'Betz', texto: 'Límite de 16/27 de la energía de una corriente que puede extraer un rotor.' },
       { clave: 'Handbook cap. 1 §4.3', texto: 'Techos de absorción según simetría: 50 % simétrico, cerca del 100 % no simétrico.' },
       { clave: 'EMEC', texto: 'Taxonomía de los ocho convertidores undimotrices y los siete de corriente mareal.' },
-    ],
-  },
-  {
-    titulo: 'Coste y sistema eléctrico',
-    refs: [
-      { clave: 'Superservicios', texto: 'Costo unitario ZNI y SIN, tarifas aplicadas y operación diaria.' },
-      { clave: 'XM / API_XM', texto: 'Precio de bolsa nacional y factor de emisión de CO₂ equivalente por kWh.' },
-      { clave: 'CRF 8 % · 20 años', texto: 'Factor de recuperación de capital usado para anualizar el CAPEX en el LCOE.' },
     ],
   },
 ] as const

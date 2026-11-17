@@ -310,7 +310,7 @@ En `datos/mareas/`:
 
 | Archivo | Contenido |
 |---|---|
-| `nivel_mar_tumaco_ioc_2023-2025.csv` | 1.114.534 registros de 1-2 minutos, sensor radar preferido |
+| `nivel_mar_tumaco_ioc_2023-2025.csv` | 1.114.534 registros de 1-2 minutos, sensor radar preferido. Borrado del repo el 2026-09-09 (32,5 MB); se regenera con `descargar_mareas_tumaco.py` y se reduce con `procesar_tumaco_diario.py` |
 | `resumen_mareas_tumaco.json` | Rango mareal diario: medio, mediana, percentiles, máximo |
 | `descargar_mareas_tumaco.py` | Regenera la serie y el resumen. Solo biblioteca estándar. |
 

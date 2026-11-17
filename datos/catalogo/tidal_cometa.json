@@ -23,6 +23,7 @@
     "estado": "verificado"
   },
   "ejemplos": "Minesto Dragon 12 1,2 MW 12 m 28 t Vestmanna Feroe feb 2024 conectado red",
+  "ejemplo_corto": "Minesto Dragon 12, en Vestmanna (islas Feroe), conectado en 2024",
   "desenlace_comercial": "Activo febrero 2024 - ventaja habilita baja velocidad cometa, desventaja control activo y fatiga umbilical",
   "fuente_taxonomia": "EMEC tidal kite"
 }
