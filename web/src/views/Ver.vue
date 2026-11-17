@@ -474,12 +474,12 @@ watch(
 }
 
 /* ---- Escena ---- */
+/* La escena se queda con el alto que dejan los mandos: en pantallas altas
+   crece en vez de dejar una franja vacía bajo la cabina. */
 .escena {
   position: relative;
-  flex: none;
-  aspect-ratio: 21 / 9;
-  min-block-size: 15rem;
-  max-block-size: 58%;
+  flex: 1 1 auto;
+  min-block-size: 18rem;
   overflow: hidden;
   background: var(--map-oceano);
   transition: box-shadow var(--dur-media) var(--ease-salida);
@@ -516,10 +516,11 @@ watch(
   visibility: hidden;
 }
 
+/* Abajo a la izquierda: la esquina superior derecha es del minimapa. */
 .escena-acciones {
   position: absolute;
   inset-block-end: var(--s-3);
-  inset-inline-end: var(--s-3);
+  inset-inline-start: var(--s-3);
   display: flex;
   align-items: center;
   gap: var(--s-2);
@@ -600,6 +601,7 @@ watch(
   grid-template-areas:
     "recurso controles"
     "anotaciones anotaciones";
+  flex: none;
   align-items: start;
   gap: var(--s-3);
   padding: var(--s-3);
@@ -727,7 +729,9 @@ watch(
 
 @media (width <= 64rem) {
   .escena {
-    max-block-size: none;
+    flex: none;
+    aspect-ratio: 16 / 9;
+    min-block-size: 14rem;
   }
 
   .cabina {

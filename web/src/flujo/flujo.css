@@ -82,8 +82,8 @@ main.tablero.flujo {
   inset-inline-end: var(--s-3);
   display: flex;
   flex-direction: column;
-  inline-size: min(22rem, calc(100% - 2rem));
-  max-block-size: min(16rem, 50%);
+  inline-size: min(20rem, calc(100% - 2rem));
+  max-block-size: min(15rem, 45%);
   border: 1px solid var(--borde-suave);
   border-radius: var(--radio-caja);
   background: var(--panel);

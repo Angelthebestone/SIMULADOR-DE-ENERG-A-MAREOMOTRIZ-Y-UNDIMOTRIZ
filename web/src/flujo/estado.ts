@@ -30,19 +30,19 @@ export const TECNOLOGIAS_POR_FAMILIA: Record<
     {
       id: 'embalse',
       nombre: 'Dique de marea',
-      descripcion: 'Embalse que se llena con la pleamar y se vacía con la bajamar (m)',
+      descripcion: 'Embalse que se llena con la pleamar y se vacía con la bajamar',
     },
     {
       id: 'turbina_corriente',
       nombre: 'Turbina de corriente',
-      descripcion: 'Rotor sumergido que gira con la corriente de marea (m/s)',
+      descripcion: 'Rotor sumergido que gira con la corriente de marea',
     },
   ],
   undimotriz: [
     {
       id: 'absorbedor_puntual',
       nombre: 'Absorbedor puntual',
-      descripcion: 'Boya que sube y baja con la ola (m, s)',
+      descripcion: 'Boya que sube y baja con la ola',
     },
   ],
 }

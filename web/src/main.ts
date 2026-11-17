@@ -259,6 +259,7 @@ const app = createApp({
       this.sustentacion = !this.sustentacion
       const root = document.documentElement
       if (this.sustentacion) {
+        this.mapaReplegado = true
         root.setAttribute('data-sustentacion', '')
         root.style.setProperty('--escala', '2.1')
         root.style.fontSize = 'calc(16px * 2.1)'

@@ -26,6 +26,8 @@
       </div>
     </div>
 
+    <p v-if="mediaTexto" class="media" data-testid="potencia-media">{{ mediaTexto }}</p>
+
     <p v-if="error" class="aviso aviso--error" data-testid="aviso-error">
       <Icono icono="error" tamano="sm" />
       <span>{{ error }}</span>
@@ -116,6 +118,17 @@ const kpis = computed(() => {
     { id: "anual", etiqueta: "Producción anual", valor: aep.valor, unidad: aep.unidad, pendiente: !aep.valor },
     { id: "factor", etiqueta: "Factor de planta", valor: Number.isFinite(fp) ? formatearNumero(fp, 1) : "", unidad: "%", pendiente: !Number.isFinite(fp) },
   ];
+});
+
+/** La potencia nominal es el techo; lo que entrega de media a lo largo del año
+ *  es la producción anual repartida en 8 760 h. Decirlo evita leer un factor
+ *  de planta bajo como un error. */
+const mediaTexto = computed(() => {
+  const r = props.resultado;
+  const nominal = num(r?.potencia_nominal_w);
+  const media = (num(r?.produccion_anual_mwh) * 1e6) / 8760;
+  if (!(nominal > 0) || !Number.isFinite(media)) return "";
+  return `De media entrega ${textoPotencia(media)} de sus ${textoPotencia(nominal)} nominales a lo largo del año.`;
 });
 
 const NOMBRES: Record<string, string> = {
@@ -262,6 +275,12 @@ const avisos = computed(() => {
 @keyframes latido {
   from { opacity: 0.45; }
   to { opacity: 0.9; }
+}
+
+.media {
+  margin: calc(var(--s-2) * -1) 0 0;
+  font-size: var(--text-meta);
+  color: var(--tenue);
 }
 
 .aviso {

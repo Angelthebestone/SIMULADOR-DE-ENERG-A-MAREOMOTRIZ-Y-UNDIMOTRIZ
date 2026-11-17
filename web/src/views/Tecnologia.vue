@@ -11,7 +11,8 @@
       <p class="marca">{{ nombreFamilia }}</p>
       <h1 id="titulo-tecnologia">Elige la tecnología</h1>
       <p class="bajada">
-        Cada familia aprovecha una parte distinta del mar. Solo una sigue con tus números.
+        Elige el dispositivo que vas a simular. Debajo están las demás tecnologías que se han
+        probado en el mar, para consulta.
       </p>
 
       <div class="opciones" role="group" aria-label="Tecnologías de la familia">
@@ -33,9 +34,8 @@
         </button>
       </div>
 
-      <p v-if="familia === 'mareomotriz'" class="nota">
-        La columna de agua oscilante no se ofrece aquí; su ficha sigue en Comparar para consulta.
-      </p>
+
+      <ReferenciasCatalogo :familia="familia" />
 
       <div class="navegacion">
         <button type="button" class="btn-atras" data-testid="volver-inicio" @click="emit('volver')">
@@ -54,6 +54,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { MarRealista } from '../components/MarRealista'
 import { AnimacionCanvas } from '../components/AnimacionCanvas'
 import { TECNOLOGIAS_POR_FAMILIA, type Familia } from '../flujo/estado'
+import ReferenciasCatalogo from '../components/ReferenciasCatalogo.vue'
 
 const props = defineProps<{
   familia: Familia
@@ -230,8 +231,8 @@ onBeforeUnmount(() => {
     radial-gradient(ellipse 70% 55% at 50% 48%, oklch(0.1 0.02 240 / 0.18) 0%, transparent 70%),
     linear-gradient(
       180deg,
-      oklch(0.12 0.03 240 / 0.35) 0%,
-      oklch(0.12 0.03 240 / 0.12) 35%,
+      oklch(0.12 0.03 240 / 0.62) 0%,
+      oklch(0.12 0.03 240 / 0.38) 40%,
       oklch(0.08 0.02 240 / 0.28) 100%
     );
 }
@@ -263,7 +264,7 @@ onBeforeUnmount(() => {
 
 .tecnologia h1 {
   margin: 0;
-  font-size: var(--text-nivel);
+  font-size: clamp(1.9rem, 3.5vw, 2.6rem);
   letter-spacing: -0.01em;
   color: oklch(0.98 0.005 106);
 }
@@ -271,8 +272,10 @@ onBeforeUnmount(() => {
 .bajada {
   margin: 0;
   max-inline-size: 36rem;
-  color: oklch(0.88 0.01 220);
-  font-size: var(--text-cuerpo);
+  color: oklch(0.98 0.005 106);
+  font-size: 16px;
+  font-weight: 500;
+  text-shadow: 0 1px 3px oklch(0.1 0.02 240 / 0.7), 0 0 18px oklch(0.1 0.02 240 / 0.6);
 }
 
 .opciones {
@@ -359,7 +362,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--s-2);
-  margin-block-start: var(--s-2);
+  margin-block-start: var(--s-4);
 }
 
 .btn-atras,

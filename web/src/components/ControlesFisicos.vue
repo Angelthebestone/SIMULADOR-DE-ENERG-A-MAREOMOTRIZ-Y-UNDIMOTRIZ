@@ -176,13 +176,6 @@ const controlesActivos = computed(() => {
   gap: var(--s-4);
 }
 
-@container (inline-size >= 40rem) {
-  .controles-grid {
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-    gap: var(--s-6);
-  }
-}
-
 /* Cada control: etiqueta y cifra en la misma fila, la pista debajo a todo
    el ancho. La cifra grande a la derecha es lo que se lee al mover. */
 .control {
@@ -205,7 +198,6 @@ const controlesActivos = computed(() => {
   font-weight: 600;
   font-size: var(--text-cuerpo);
   cursor: pointer;
-  overflow-wrap: anywhere;
 }
 
 .simbolo {
@@ -328,6 +320,27 @@ const controlesActivos = computed(() => {
 @media (pointer: coarse) {
   .pista input[type="range"] {
     block-size: 2.75rem;
+  }
+}
+@container (inline-size >= 34rem) {
+  .controles-grid {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--s-6);
+  }
+
+  /* En columna estrecha la cifra va bajo la etiqueta: lado a lado se pisan. */
+  .control {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
+  }
+
+  .etiqueta {
+    font-size: 14px;
+  }
+
+  .valor {
+    font-size: 24px;
+    text-align: start;
   }
 }
 </style>
