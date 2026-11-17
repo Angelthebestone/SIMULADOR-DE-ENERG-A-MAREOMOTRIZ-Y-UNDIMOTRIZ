@@ -21,6 +21,14 @@ export interface OptsDique2D {
   escalaV?: number;
   /** Nivel de la lámina del vaso. Si falta, se anima con `rangoMarea`. */
   yEmbalse?: number;
+  /** Nivel instantáneo del mar (marea). Si falta, el mar se queda en `yMedio`. */
+  yMar?: number;
+  /** Salto h en metros, con signo (+ = el mar está más alto: llenado). */
+  saltoM?: number;
+  /** Ángulo del rodete (rad), integrado con el caudal. */
+  giro?: number;
+  /** Avance del agua por el conducto (píxeles, con signo). */
+  avance?: number;
   /** Perfil del terreno: el vaso se recorta contra él para quedar contenido. */
   terrenoY?: (px: number) => number;
   /** Borde derecho del vaso (píxeles). */
@@ -243,6 +251,23 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
   ctx.clip();
   ctx.fillStyle = P.tunel;
   ctx.fillRect(cx - semiMar, yTunel - medioTunel, semiMar + semiEmb, medioTunel * 2);
+  // Filetes de agua: recorren el conducto con el caudal (se paran con h = 0).
+  if (opts.avance !== undefined) {
+    const largoTunel = semiMar + semiEmb;
+    const viveza = Math.min(1, Math.sqrt(Math.abs(opts.saltoM ?? 1)) / 1.2);
+    ctx.strokeStyle = `rgba(190,236,246,${(0.55 * viveza).toFixed(3)})`;
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 14; i++) {
+      const semilla = Math.sin(i * 12.9898) * 43758.5453;
+      const u = semilla - Math.floor(semilla);
+      const fx = cx - semiMar + ((((u * largoTunel + opts.avance * (0.8 + 0.4 * u)) % largoTunel) + largoTunel) % largoTunel);
+      const fy = yTunel - medioTunel + 4 + ((i * 7) % (medioTunel * 2 - 8));
+      ctx.beginPath();
+      ctx.moveTo(fx - 5 - 9 * viveza, fy);
+      ctx.lineTo(fx, fy);
+      ctx.stroke();
+    }
+  }
   // Brillo interno del conducto.
   const gTun = ctx.createLinearGradient(0, yTunel - medioTunel, 0, yTunel + medioTunel);
   gTun.addColorStop(0, "rgba(255,255,255,0.06)");
@@ -289,7 +314,7 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
   // Rotor de 4 palas lima (como la escena 3D).
   ctx.save();
   ctx.translate(cx, yTunel);
-  ctx.rotate(t * 5 + Math.abs(fase) * 0.8);
+  ctx.rotate(opts.giro ?? t * 5 + Math.abs(fase) * 0.8);
   for (let i = 0; i < 4; i++) {
     const ang = (i * Math.PI) / 2;
     ctx.save();
@@ -320,22 +345,38 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
         ? false
         : true
       : yEmbalse > yMedio;
+  const yMarAhora = opts.yMar ?? yMedio;
 
   const colorFlecha = haciaEmbalse ? P.flechaLlenado : P.flechaVaciado;
-  for (let i = 0; i < 3; i++) {
-    const fx = cx - semiCresta - 16 + i * 22;
-    flecha(ctx, fx, yTunel + 14, haciaEmbalse ? 1 : -1, colorFlecha);
+  // Sin salto no hay caudal: las flechas desaparecen en la estoa.
+  if (opts.saltoM === undefined || Math.abs(opts.saltoM) > 0.15) {
+    for (let i = 0; i < 3; i++) {
+      const fx = cx - semiCresta - 16 + i * 22;
+      flecha(ctx, fx, yTunel + 14, haciaEmbalse ? 1 : -1, colorFlecha);
+    }
   }
 
   // ---- Cota del salto h ----------------------------------------------------
   // La cota vive a la derecha del dique, entre las dos láminas: es la variable
   // que mueve la turbina y la que el estudiante tiene que poder leer.
   const xCota = cx + semiEmb + 30;
-  const yAlta = Math.min(yMedio, yEmbalse);
-  const yBaja = Math.max(yMedio, yEmbalse);
+  const yAlta = Math.min(yMarAhora, yEmbalse);
+  const yBaja = Math.max(yMarAhora, yEmbalse);
+  // El nivel del mar se prolonga a trazos por encima del vaso: el salto h es
+  // el hueco entre esa línea y la lámina del embalse.
+  if (opts.yMar !== undefined) {
+    ctx.strokeStyle = P.acento;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(cx - semiCresta - 30, yMarAhora);
+    ctx.lineTo(xCota + 10, yMarAhora);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   if (yBaja - yAlta > 2) {
-    ctx.strokeStyle = "rgba(238,245,247,0.9)";
-    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = opts.yMar !== undefined ? P.acento : "rgba(238,245,247,0.9)";
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(xCota, yAlta);
     ctx.lineTo(xCota, yBaja);
@@ -359,7 +400,7 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
 
   if (sinRotulo) return;
 
-  const saltoM = Math.abs(yEmbalse - yMedio) / Math.max(1, escalaV);
+  const saltoM = Math.abs(opts.saltoM ?? (yEmbalse - yMedio) / Math.max(1, escalaV));
   const ciclo =
     ["llenado", "vaciado", "bidireccional", "bombeo"].includes(modo) && modo
       ? modo
@@ -369,7 +410,7 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
 
   // Chip del salto junto a la cota, no en la coronación: así el número y la
   // altura medida se leen en el mismo sitio.
-  const chipSalto = `Salto ${saltoM.toFixed(1).replace(".", ",")} m · ${ciclo}`;
+  const chipSalto = `Salto h = ${saltoM.toFixed(1).replace(".", ",")} m · ${ciclo}`;
   ctx.font = "12px system-ui, sans-serif";
   ctx.textAlign = "center";
   const anchoSalto = (ctx.measureText?.(chipSalto)?.width ?? chipSalto.length * 6.5) + 14;
@@ -381,7 +422,7 @@ export function dibujarDique2D(ctx: CanvasRenderingContext2D, opts: OptsDique2D)
   ctx.fillStyle = "rgb(238 245 247)";
   ctx.fillText(chipSalto, xCota + 12 + anchoSalto / 2, ySalto);
 
-  const texto = "Dique mareal";
+  const texto = "Dique de marea";
   ctx.font = "600 12px system-ui, sans-serif";
   const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6.5) + 16;
   ctx.fillStyle = "rgba(15,26,36,0.8)";

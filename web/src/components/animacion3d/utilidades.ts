@@ -4,6 +4,8 @@
 // @ts-ignore — three se empaqueta por Vite sin @types (build verificado)
 import * as THREE from "three";
 import type { MaterialEstandar3D, Malla3D, Sprite3D } from "./tipos";
+import { sumergir } from "./agua";
+import { texturaArena, texturaDesgaste } from "./texturas";
 
 // ---------------------------------------------------------------------------
 // Rótulos
@@ -365,231 +367,73 @@ export function disponerEtiquetas(
 }
 
 // ---------------------------------------------------------------------------
-// Materiales y mar
+// Materiales y lecho
 // ---------------------------------------------------------------------------
 
+/** Material estándar que además sabe verse bajo el agua (ver `sumergir`). */
 export function crearMat(
   color: number,
   extra: Record<string, unknown> = {}
 ): MaterialEstandar3D {
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.75,
-    metalness: 0.08,
-    ...(extra as THREE.MeshStandardMaterialParameters),
-  });
-}
-
-const VERT_AGUA = `
-varying vec3 vWorldPos;
-varying vec3 vNormalW;
-varying float vFogDepth;
-void main() {
-  vec4 worldPos = modelMatrix * vec4( position, 1.0 );
-  vWorldPos = worldPos.xyz;
-  vNormalW = normalize( mat3( modelMatrix ) * normal );
-  vec4 mvPosition = viewMatrix * worldPos;
-  vFogDepth = - mvPosition.z;
-  gl_Position = projectionMatrix * mvPosition;
-}`;
-
-const FRAG_AGUA = `
-uniform vec3 uDeep;
-uniform vec3 uShallow;
-uniform vec3 uSky;
-uniform vec3 uEspuma;
-uniform vec3 uSunDir;
-uniform vec3 uSunColor;
-uniform vec3 uFogColor;
-uniform float uFogNear;
-uniform float uFogFar;
-uniform float uNivel;
-uniform float uAmp;
-uniform float uOpacidad;
-uniform float uTiempo;
-// Ventana didáctica: dentro del rectángulo (xmin, xmax, zmin, zmax) el agua
-// se recorta para dejar ver un corte sumergido (sala de máquinas del dique).
-uniform vec4 uVentana;
-uniform float uVentanaActiva;
-varying vec3 vWorldPos;
-varying vec3 vNormalW;
-varying float vFogDepth;
-void main() {
-  vec3 N = normalize( vNormalW );
-  vec3 V = normalize( cameraPosition - vWorldPos );
-  // Rizo de viento: perturba la normal en el fragmento (no hace falta más
-  // geometría) para que la superficie tenga brillos y no sea un plano liso.
-  vec2 p = vWorldPos.xz;
-  float r1 = sin( p.x * 0.85 + uTiempo * 1.25 ) * cos( p.y * 0.63 - uTiempo * 0.95 );
-  float r2 = sin( p.x * 1.7 + p.y * 1.3 - uTiempo * 1.9 + 1.3 );
-  float r3 = sin( p.x * 0.35 - p.y * 0.5 + uTiempo * 0.7 );
-  vec3 Nf = normalize( N + vec3( r1 * 0.035 + r3 * 0.02, 0.0, r2 * 0.04 ) );
-  float ndv = clamp( dot( Nf, V ), 0.0, 1.0 );
-  float fres = pow( 1.0 - ndv, 3.0 );
-  float dist = length( cameraPosition - vWorldPos );
-  // Azul profundo lejos; más claro y translúcido cerca de la cámara.
-  vec3 base = mix( uShallow, uDeep, smoothstep( 4.0, 70.0, dist ) );
-  vec3 col = mix( base, uSky, clamp( fres * 0.3, 0.0, 0.3 ) );
-  // Crestas de la ola: un velo de espuma muy tenue.
-  float cresta = smoothstep( 0.15, 0.85, ( vWorldPos.y - uNivel ) / max( uAmp, 0.01 ) );
-  col = mix( col, uEspuma, cresta * 0.3 );
-  // Destello del sol sobre las caras inclinadas.
-  vec3 H = normalize( uSunDir + V );
-  float nh = max( dot( Nf, H ), 0.0 );
-  float spec = pow( nh, 180.0 ) * 1.5 + pow( nh, 22.0 ) * 0.12;
-  col += uSunColor * spec;
-  // Niebla lineal: el agua lejana se funde con el cielo del horizonte.
-  float fogFactor = smoothstep( uFogNear, uFogFar, vFogDepth );
-  col = mix( col, uFogColor, fogFactor );
-  // Corte didáctico: cerca se ve el dispositivo; lejos el agua es opaca.
-  float alpha = uOpacidad * ( 0.62 + 0.38 * smoothstep( 4.0, 55.0, dist ) );
-  if ( uVentanaActiva > 0.5 ) {
-    float enX = step( uVentana.x, vWorldPos.x ) * step( vWorldPos.x, uVentana.y );
-    float enZ = step( uVentana.z, vWorldPos.z ) * step( vWorldPos.z, uVentana.w );
-    float enVentana = enX * enZ;
-    float dx = min( abs( vWorldPos.x - uVentana.x ), abs( vWorldPos.x - uVentana.y ) );
-    float dz = min( abs( vWorldPos.z - uVentana.z ), abs( vWorldPos.z - uVentana.w ) );
-    float borde = ( 1.0 - smoothstep( 0.0, 0.22, min( dx, dz ) ) ) * enVentana;
-    // Marco de espuma en el borde de la ventana: se lee como un corte, no
-    // como un agujero accidental. El interior se descarta (no hay lámina de
-    // agua atravesando la sala de máquinas).
-    if ( enVentana > 0.5 && borde < 0.01 ) discard;
-    col = mix( col, uEspuma, borde * 0.45 );
-    alpha = max( alpha, borde * 0.7 );
-  }
-  gl_FragColor = vec4( col, alpha );
-  #include <tonemapping_fragment>
-  #include <colorspace_fragment>
-}`;
-
-/**
- * Lámina de mar ondulada. Devuelve malla y la copia base de vértices.
- * Shader propio (una pasada): azul profundo, Fresnel contenido, destello de
- * sol, espuma en crestas y niebla. Mucho más barato que postprocesar.
- */
-export function crearSuperficieMar(
-  ancho: number,
-  fondo: number,
-  y: number,
-  calidadBaja: boolean,
-  niebla?: { color: number; near: number; far: number }
-): { malla: Malla3D; base: Float32Array; ancho: number } {
-  // Más segmentos: el oleaje del motor deforma vértices; con pocos se ven
-  // plegados tipo "cinta" en vez de ola.
-  const nx = calidadBaja ? 40 : 84;
-  const nz = calidadBaja ? 14 : 30;
-  const geo = new THREE.PlaneGeometry(ancho, fondo, nx, nz);
-  geo.rotateX(-Math.PI / 2);
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uDeep: { value: new THREE.Color(0x062c40) },
-      uShallow: { value: new THREE.Color(0x0f5f80) },
-      uSky: { value: new THREE.Color(0xb4cedc) },
-      uEspuma: { value: new THREE.Color(0xe6f6fa) },
-      uSunDir: { value: new THREE.Vector3(12, 20, 10).normalize() },
-      uSunColor: { value: new THREE.Color(0xfff0d0) },
-      uFogColor: { value: new THREE.Color(niebla?.color ?? 0xa8c8da) },
-      uFogNear: { value: niebla?.near ?? 30 },
-      uFogFar: { value: niebla?.far ?? 105 },
-      uNivel: { value: y },
-      uAmp: { value: 0.75 },
-      uOpacidad: { value: 0.9 },
-      uTiempo: { value: 0 },
-      uVentana: { value: new THREE.Vector4(0, 0, 0, 0) },
-      uVentanaActiva: { value: 0 },
-    },
-    vertexShader: VERT_AGUA,
-    fragmentShader: FRAG_AGUA,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.FrontSide,
-  });
-  const m = new THREE.Mesh(geo, material);
-  m.position.y = y;
-  m.renderOrder = 2;
-  const base = (geo.attributes.position.array as Float32Array).slice();
-  return { malla: m, base, ancho };
-}
-
-/** Mantiene el nivel/amplitud del shader de agua al día (marea, Hm0). */
-export function actualizarNivelAgua(
-  malla: Malla3D,
-  nivel: number,
-  amp: number,
-  tiempo = 0
-) {
-  const mat = malla.material as THREE.ShaderMaterial;
-  const u = mat?.uniforms;
-  if (!u) return;
-  if (u.uNivel) u.uNivel.value = nivel;
-  if (u.uAmp) u.uAmp.value = Math.max(0.05, amp);
-  if (u.uTiempo) u.uTiempo.value = tiempo;
-}
-
-/** Volumen translúcido bajo la superficie: da masa al agua sin tapar las piezas. */
-export function crearVolumenBajo(
-  ancho: number,
-  alto: number,
-  fondo: number,
-  y: number
-): Malla3D {
-  const vol = new THREE.Mesh(
-    new THREE.BoxGeometry(ancho, alto, fondo),
+  return sumergir(
     new THREE.MeshStandardMaterial({
-      color: 0x0a2c3c,
-      transparent: true,
-      opacity: 0.16,
-      depthWrite: false,
-      roughness: 0.6,
-      metalness: 0,
+      color,
+      roughness: 0.75,
+      metalness: 0.08,
+      ...(extra as THREE.MeshStandardMaterialParameters),
     })
   );
-  vol.position.y = y;
-  vol.renderOrder = 1;
-  return vol;
 }
 
-/** Catenaria simple de evacuación con pulso. */
+/** Acero pintado con uso: roces, regueros y un relieve fino en el brillo. */
+export function crearMatPintado(
+  color: number,
+  extra: Record<string, unknown> = {}
+): MaterialEstandar3D {
+  const t = texturaDesgaste();
+  return crearMat(color, {
+    map: t,
+    roughnessMap: t,
+    bumpMap: t,
+    bumpScale: 0.6,
+    roughness: 0.55,
+    metalness: 0.25,
+    ...extra,
+  });
+}
+
+/** Cable de evacuación tendido sobre el lecho, con el pulso de energía. */
 export function crearCableConPulso(
   puntos: THREE.Vector3[],
   radio = 0.09
 ): { cable: Malla3D; curva: THREE.CatmullRomCurve3; pulso: Malla3D } {
   const curva = new THREE.CatmullRomCurve3(puntos);
   const cable = new THREE.Mesh(
-    new THREE.TubeGeometry(curva, Math.max(20, puntos.length * 8), radio, 6, false),
-    crearMat(0x1a2228)
+    new THREE.TubeGeometry(curva, Math.max(40, puntos.length * 14), radio, 8, false),
+    crearMat(0x15191c, { roughness: 0.6, metalness: 0.1 })
   );
+  cable.castShadow = true;
+  // El pulso es un símbolo (energía que viaja), no un objeto: no lo tiñe el agua.
   const pulso = new THREE.Mesh(
-    new THREE.SphereGeometry(0.22, 10, 8),
-    crearMat(0xc7e14a)
+    new THREE.SphereGeometry(radio * 2.3, 14, 10),
+    new THREE.MeshBasicMaterial({ color: 0xc7e14a })
   );
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(radio * 4.6, 14, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0xc7e14a,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+    })
+  );
+  pulso.add(halo);
   return { cable, curva, pulso };
 }
 
 /**
- * Lecho marino ocre compartido (caja). La granja pide más ancho/fondo para las
- * dos filas de turbinas; el resto de escenas usa medidas más contenidas.
- */
-export function crearLecho(
-  modoEnergia: "undimotriz" | "mareomotriz",
-  dispositivo: string
-): Malla3D {
-  const esGranja = modoEnergia === "mareomotriz" && dispositivo !== "embalse";
-  const ancho = esGranja ? 120 : 56;
-  const fondo = esGranja ? 80 : 36;
-  const geo = new THREE.BoxGeometry(ancho, 1.2, fondo);
-  const lecho = new THREE.Mesh(
-    geo,
-    crearMat(0x8d7a52, { roughness: 0.95, metalness: 0.02 })
-  );
-  lecho.position.set(0, -6.6, 0);
-  lecho.receiveShadow = true;
-  return lecho;
-}
-
-/**
- * Lecho de arena con dunas suaves y color por vértice. Una sola malla, sin
- * texturas: se lee como fondo marino y no como una mancha plana.
+ * Lecho de arena: dunas suaves en la malla, rizaduras de corriente en el
+ * relieve y vetas de color por vértice. El tinte azul lo pone el agua.
  */
 export function crearLechoArena(
   ancho: number,
@@ -598,8 +442,8 @@ export function crearLechoArena(
   calidadBaja: boolean,
   opciones: { amplitud?: number; tono?: number } = {}
 ): Malla3D {
-  const segX = calidadBaja ? 18 : 44;
-  const segZ = calidadBaja ? 12 : 28;
+  const segX = calidadBaja ? 24 : 64;
+  const segZ = calidadBaja ? 16 : 44;
   const geo = new THREE.PlaneGeometry(ancho, fondo, segX, segZ);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -614,33 +458,57 @@ export function crearLechoArena(
       Math.cos(z * 0.17 - 0.4) * 0.3 +
       Math.sin((x + z) * 0.07) * 0.25;
     pos.setY(i, duna * amp);
-    // Variación suave (sin ruido blanco): vetas de arena más clara y oscura.
     const veta =
       Math.sin(x * 0.9 + Math.sin(z * 0.7) * 2.1) *
       Math.cos(z * 0.8 + Math.sin(x * 0.5) * 1.7);
-    const claro = (0.86 + veta * 0.14) * tono;
-    const alto = duna * amp > 0 ? 1.06 : 0.94;
-    // Arena algo fría (bajo el agua) y con vetas: no es un desierto.
-    colores[i * 3] = 0.1 * claro * alto;
-    colores[i * 3 + 1] = 0.12 * claro * alto;
-    colores[i * 3 + 2] = 0.13 * claro * alto;
+    const claro = (0.9 + veta * 0.1) * tono * (duna > 0 ? 1.05 : 0.93);
+    colores[i * 3] = 0.8 * claro;
+    colores[i * 3 + 1] = 0.72 * claro;
+    colores[i * 3 + 2] = 0.56 * claro;
   }
   geo.setAttribute("color", new THREE.BufferAttribute(colores, 3));
   geo.computeVertexNormals();
+  const arena = texturaArena().clone();
+  arena.repeat.set(ancho / 7, fondo / 7);
+  arena.needsUpdate = true;
   const lecho = new THREE.Mesh(
     geo,
-    new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.97,
-      metalness: 0.0,
-    })
+    sumergir(
+      // Lambert: la arena es mate y ocupa media pantalla; no merece el coste
+      // del sombreado físico con entorno.
+      new THREE.MeshLambertMaterial({
+        vertexColors: true,
+        map: arena,
+        bumpMap: arena,
+        bumpScale: 1.4,
+      })
+    )
   );
   lecho.position.y = y;
   lecho.receiveShadow = true;
   return lecho;
 }
 
-/** Rocas dispersas de bajo poliedro: dan escala y textura al lecho. */
+/** Roca irregular: icosaedro deformado con senos (sin caras regulares). */
+function geometriaRoca(semilla: number): THREE.BufferGeometry {
+  const geo = new THREE.IcosahedronGeometry(1, 2);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const d =
+      1 +
+      0.2 * Math.sin(x * 3.1 + semilla) * Math.cos(y * 2.7 + semilla * 1.7) +
+      0.14 * Math.sin(z * 4.3 + semilla * 0.6) +
+      0.08 * Math.sin((x + y + z) * 7.1 + semilla);
+    pos.setXYZ(i, x * d, y * d, z * d);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Rocas dispersas, semienterradas en la arena: dan escala al lecho. */
 export function crearRocasLecho(
   cantidad: number,
   ancho: number,
@@ -649,11 +517,11 @@ export function crearRocasLecho(
   semilla = 7
 ): THREE.Group {
   const g = new THREE.Group();
-  const mats = [
-    crearMat(0x3f463f, { roughness: 0.92, metalness: 0.02 }),
-    crearMat(0x4b4f45, { roughness: 0.9, metalness: 0.02 }),
-    crearMat(0x343a36, { roughness: 0.94, metalness: 0.02 }),
-  ];
+  const t = texturaDesgaste();
+  const mats = [0x5a5f58, 0x6b6a5e, 0x4a504c].map((c) =>
+    crearMat(c, { roughness: 0.95, metalness: 0.0, bumpMap: t, bumpScale: 2.5, flatShading: true })
+  );
+  const geos = [geometriaRoca(1.3), geometriaRoca(4.1), geometriaRoca(7.7)];
   let s = (semilla >>> 0) || 1;
   const rnd = () => {
     s = (s * 1664525 + 1013904223) >>> 0;
@@ -662,16 +530,12 @@ export function crearRocasLecho(
   const radioMax = Math.min(ancho, fondo) * 0.38;
   for (let i = 0; i < cantidad; i++) {
     const ang = rnd() * Math.PI * 2;
-    const rad = 3.2 + rnd() * radioMax;
-    const esc = 0.18 + rnd() * 0.52;
-    const roca = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(1, 0),
-      mats[i % mats.length]
-    );
-    // Semienterradas: se apoyan en la arena, no flotan.
+    const rad = 3.6 + rnd() * radioMax;
+    const esc = 0.2 + rnd() * 0.55;
+    const roca = new THREE.Mesh(geos[i % geos.length], mats[i % mats.length]);
     roca.position.set(
       Math.cos(ang) * rad,
-      y - 0.08 + esc * 0.06,
+      y - 0.05 + esc * 0.1,
       Math.sin(ang) * rad * 0.72
     );
     roca.scale.set(
@@ -679,127 +543,10 @@ export function crearRocasLecho(
       esc * (0.4 + rnd() * 0.45),
       esc * (0.8 + rnd() * 0.7)
     );
-    roca.rotation.set(rnd() * 3.1, rnd() * 3.1, rnd() * 3.1);
+    roca.rotation.set(rnd() * 0.5, rnd() * 3.1, rnd() * 0.5);
     roca.castShadow = true;
     roca.receiveShadow = true;
     g.add(roca);
   }
   return g;
-}
-
-/**
- * Red eléctrica de tierra: centro de transformación + postes AT + línea.
- * Coherente con el esquema del dique (centro de transformación y torres).
- */
-export function crearRedElectrica(g: Grupo3DLike): void {
-  // Centro de transformacion en tierra (derecha) + linea de postes a borde.
-  const tierra = new THREE.Mesh(new THREE.BoxGeometry(8, 3.4, 10), crearMat(0xa8b0b4, { roughness: 0.9 }));
-  tierra.position.set(17, -4.2, -2);
-  tierra.castShadow = true;
-  g.add(tierra);
-  const sub = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 1.6), crearMat(0x4a5660));
-  sub.position.set(15.6, -1.8, -2);
-  sub.castShadow = true;
-  g.add(sub);
-  for (let i = 0; i < 3; i++) {
-    const poste = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.09, 0.11, 5, 8),
-      crearMat(0x3a4650)
-    );
-    poste.position.set(8 + i * 3.4, 0.4, -4.5);
-    g.add(poste);
-    const cruceta = new THREE.Mesh(
-      new THREE.BoxGeometry(1.4, 0.1, 0.1),
-      crearMat(0x3a4650)
-    );
-    cruceta.position.set(8 + i * 3.4, 2.4, -4.5);
-    g.add(cruceta);
-  }
-  const pts = [
-    new THREE.Vector3(4, 2.4, -4.5),
-    new THREE.Vector3(22, 2.6, -4.5),
-  ];
-  const linea = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color: 0x222222 })
-  );
-  g.add(linea);
-}
-
-/**
- * Environment map equirectangular procedural (cielo + mar).
- * Sin él, los materiales metálicos se ven casi negros.
- */
-export function crearEntornoMarino(): THREE.Texture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    const cielo = ctx.createLinearGradient(0, 0, 0, 128);
-    cielo.addColorStop(0, "rgb(46 102 152)");
-    cielo.addColorStop(0.45, "rgb(126 174 206)");
-    cielo.addColorStop(0.82, "rgb(184 212 228)");
-    cielo.addColorStop(1, "rgb(214 230 238)");
-    ctx.fillStyle = cielo;
-    ctx.fillRect(0, 0, 512, 128);
-    const mar = ctx.createLinearGradient(0, 128, 0, 256);
-    mar.addColorStop(0, "rgb(38 104 136)");
-    mar.addColorStop(0.35, "rgb(18 68 94)");
-    mar.addColorStop(1, "rgb(7 34 50)");
-    ctx.fillStyle = mar;
-    ctx.fillRect(0, 128, 512, 128);
-    // Mancha de sol: el metal coge un reflejo cálido y el agua, brillo.
-    const sol = ctx.createRadialGradient(360, 46, 2, 360, 46, 58);
-    sol.addColorStop(0, "rgba(255, 250, 228, 0.95)");
-    sol.addColorStop(0.35, "rgba(255, 244, 210, 0.45)");
-    sol.addColorStop(1, "rgba(255, 244, 210, 0)");
-    ctx.fillStyle = sol;
-    ctx.fillRect(300, 0, 120, 110);
-    // Reflejo del sol sobre el mar.
-    const brillo = ctx.createLinearGradient(0, 128, 0, 200);
-    brillo.addColorStop(0, "rgba(255, 240, 205, 0.28)");
-    brillo.addColorStop(1, "rgba(255, 240, 205, 0)");
-    ctx.fillStyle = brillo;
-    ctx.fillRect(320, 128, 80, 72);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.mapping = THREE.EquirectangularReflectionMapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/**
- * Cielo degradado para scene.background. La banda del horizonte coincide con
- * el color de niebla de las escenas: el agua lejana se funde con el cielo.
- */
-export function crearCielo(): THREE.Texture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 64;
-  canvas.height = 512;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    const grad = ctx.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0.0, "rgb(24 70 118)");
-    grad.addColorStop(0.2, "rgb(56 116 162)");
-    grad.addColorStop(0.36, "rgb(94 150 190)");
-    grad.addColorStop(0.45, "rgb(140 182 208)");
-    grad.addColorStop(0.49, "rgb(164 198 214)");
-    grad.addColorStop(0.5, "rgb(168 200 216)");
-    grad.addColorStop(0.53, "rgb(132 172 192)");
-    grad.addColorStop(0.62, "rgb(70 126 156)");
-    grad.addColorStop(0.78, "rgb(28 80 110)");
-    grad.addColorStop(1.0, "rgb(10 42 64)");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 512);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.mapping = THREE.EquirectangularReflectionMapping;
-  return tex;
-}
-
-/** Grupo mínimo que acepta add() — evita acoplar a THREE.Group en la firma. */
-interface Grupo3DLike {
-  add(...objetos: unknown[]): unknown;
 }

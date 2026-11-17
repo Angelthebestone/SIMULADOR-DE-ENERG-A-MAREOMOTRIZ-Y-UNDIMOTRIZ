@@ -18,6 +18,8 @@ export interface OptsGranja2D {
   t: number;
   /** Corriente en m/s — regula el giro del rotor. */
   velocidadCorriente: number;
+  /** Ángulo del rotor (rad) ya integrado en el tiempo. Si falta, se deriva de `t`. */
+  giro?: number;
   /** Unidades de la granja (1–6). La principal va en `x`. */
   cantidadUnidades?: number;
   /** Tipo de cimentación (por defecto gravedad, como la referencia). */
@@ -284,12 +286,10 @@ function dibujarRotor(
   ctx: CanvasRenderingContext2D,
   x: number,
   yRotor: number,
-  t: number,
-  velocidadCorriente: number,
+  giro: number,
   escala = 1
 ): void {
   const radio = 52 * escala;
-  const giro = t * velocidadCorriente * 2.1;
 
   // Góndola.
   const gg = ctx.createLinearGradient(x - 6, yRotor - 10, x + 6, yRotor + 10);
@@ -456,7 +456,8 @@ export function dibujarGranja2D(ctx: CanvasRenderingContext2D, opts: OptsGranja2
 
     dibujarEmbudo(ctx, ux, yCorona);
     dibujarBaliza(ctx, ux, yCorona - 38, t + i * 0.4);
-    dibujarRotor(ctx, ux + 4, yRotor, t, velocidadCorriente, s);
+    // ω = TSR·U/R con TSR 4,5 y R 10 m: la punta va 4,5 veces más rápida que el agua.
+    dibujarRotor(ctx, ux + 4, yRotor, (opts.giro ?? t * velocidadCorriente * 0.45) + i * 0.7, s);
 
     if (esPrincipal) {
       // Sombra suave del rotor sobre el agua (profundidad).

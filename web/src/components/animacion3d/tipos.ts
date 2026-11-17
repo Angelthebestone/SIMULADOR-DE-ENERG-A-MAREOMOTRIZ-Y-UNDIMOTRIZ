@@ -56,6 +56,8 @@ export interface ContextoEscena3D {
   readonly modoEnergia: ModoEnergia3D;
   readonly series: { t_s: number[]; z_m: number[] } | null;
   readonly calidadBaja: boolean;
+  /** Segundos desde el fotograma anterior (0 al redibujar en pausa). */
+  readonly dt: number;
   /** Material estándar con color y extras opcionales. */
   mat(color: number, extra?: Record<string, unknown>): MaterialEstandar3D;
   /** Crea un sprite de texto reutilizable. */
@@ -72,8 +74,6 @@ export interface ContextoEscena3D {
 export interface ManijasEscena3D {
   rotores: Grupo3D[];
   mar: Malla3D | null;
-  marBase: Float32Array | null;
-  marAncho: number;
   flotador: Malla3D | null;
   mastil: Malla3D | null;
   nivelEmbalse: Malla3D | null;
@@ -94,6 +94,8 @@ export interface ManijasEscena3D {
   espumaEmbalse: Malla3D | null;
   ultimoTextoSalto: string;
   ultimoTextoCiclo: string;
+  /** Estado propio de la escena entre fotogramas (ángulos, partículas…). */
+  estado: Record<string, any>;
 }
 
 /** Encuadre de cámara, fondo y niebla de una escena. */
@@ -111,6 +113,12 @@ export interface Encuadre3D {
   radio?: number;
   /** Margen extra sobre la esfera (1 = justo al borde). Por defecto 1,1. */
   margen?: number;
+  /** Dirección hacia el sol. Cada escena la elige para que su cara vista
+   *  quede iluminada y el destello caiga sobre el agua. */
+  sol?: { x: number; y: number; z: number };
+  /** Unidades de mundo por metro de ola. 1 = ola exagerada (se ve el oleaje
+   *  mover la boya); las escenas de marea usan su escala vertical real. */
+  escalaOla?: number;
 }
 
 /** Una escena concreta: dique, absorbedor o granja. */
@@ -121,14 +129,6 @@ export interface Escena3D {
   construir(g: Grupo3D, ctx: ContextoEscena3D): ManijasEscena3D;
   /** Actualiza manijas según el tiempo. El render lo hace el motor. */
   animar(t: number, ctx: ContextoEscena3D, manijas: ManijasEscena3D): void;
-  /** Profundidad (en Z) de la lámina de mar al degradar calidad. */
-  marFondo?(ancho: number): number;
-  /** Ajusta la lámina de mar recién creada (p. ej. la ventana del dique). */
-  configurarMar?(malla: Malla3D): void;
-  /** Si es true, el motor no añade lecho ni red eléctrica de tierra. */
-  omiteEntornoTierra?: boolean;
-  /** Hook previo a construir: environment map, tone mapping, luces extra. */
-  configurarEscena?(escenaThree: EscenaThree3D): void;
 }
 
 /** Manijas vacías: las escenas rellenan solo lo que usan. */
@@ -136,8 +136,6 @@ export function manijasVacias(): ManijasEscena3D {
   return {
     rotores: [],
     mar: null,
-    marBase: null,
-    marAncho: 34,
     flotador: null,
     mastil: null,
     nivelEmbalse: null,
@@ -155,5 +153,6 @@ export function manijasVacias(): ManijasEscena3D {
     espumaEmbalse: null,
     ultimoTextoSalto: "",
     ultimoTextoCiclo: "",
+    estado: {},
   };
 }

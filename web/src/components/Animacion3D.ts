@@ -17,21 +17,22 @@ import type {
 } from "./animacion3d/tipos";
 import { manijasVacias, PROFUNDIDAD_M_3D } from "./animacion3d/tipos";
 import {
-  actualizarNivelAgua,
   crearEtiqueta,
-  crearLecho,
   crearMat,
-  crearRedElectrica,
-  crearSuperficieMar,
   disponerEtiquetas,
   pintarEtiqueta,
   type ZonaReservadaPx,
 } from "./animacion3d/utilidades";
+import { Ambiente, UNIFORMES_MAR } from "./animacion3d/ambiente";
 import { escenaAbsorbedor } from "./animacion3d/escenas/absorbedor";
 import { escenaDique } from "./animacion3d/escenas/dique";
 import { escenaGranja } from "./animacion3d/escenas/granja";
 
 export { PROFUNDIDAD_M_3D };
+
+/** Metros reales por unidad de mundo en horizontal (30 m de calado ≈ 6 u). */
+const M_POR_UNIDAD = 4.8;
+const SOL_POR_DEFECTO = { x: 0.62, y: 0.58, z: 0.42 };
 export type { ModoEnergia3D, Payload3D, TipoCimentacion3D };
 
 function serieValida(s: Payload3D["series"]): s is { t_s: number[]; z_m: number[] } {
@@ -87,11 +88,31 @@ export class Animacion3D {
   /** Controles flotantes medidos en el DOM que los rótulos deben esquivar. */
   private zonasRotulos: ZonaReservadaPx[] = [];
   private zonasMedidasMs = 0;
+  private ambiente: Ambiente;
+  private sol: THREE.DirectionalLight;
+  /** Lo que obliga a reconstruir la geometría (el resto se anima en vivo). */
+  private firma = "";
+  private tPrevio = 0;
+  /** Resolución adaptativa: fracción del pixelRatio base que se renderiza. */
+  private dprBase = 1;
+  private escalaRes = 1;
+  private ventanaMs: number[] = [];
+  private marcaPrevia = 0;
+  private ventanasHolgadas = 0;
+  private escalaAntesDeSubir = 0;
+  private vetoSubidaHasta = 0;
+  private tBase = 0;
+  private dt = 0;
 
   constructor(contenedor: HTMLElement) {
     this.contenedor = contenedor;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
+    this.dprBase = Math.min(window.devicePixelRatio || 1, 2);
+    this.renderer.setPixelRatio(this.dprBase);
     this.renderer.shadowMap.enabled = true;
     // PCF (no PCFSoft): mismo aspecto didáctico, más barato y sin aviso de
     // deprecación en consola.
@@ -104,7 +125,7 @@ export class Animacion3D {
     this.renderer.domElement.style.height = "100%";
     // ACES + sRGB: evita el lavado de colores del tonemap lineal por defecto.
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 0.92;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     contenedor.appendChild(this.renderer.domElement);
 
@@ -122,17 +143,16 @@ export class Animacion3D {
     this.camera.add(this.grupoEtiquetas);
     this.scene.add(this.camera);
 
-    const hemi = new THREE.HemisphereLight(0xdceef6, 0x24424f, 0.95);
-    this.scene.add(hemi);
-    const sol = new THREE.DirectionalLight(0xfff2dc, 1.65);
-    sol.position.set(12, 20, 10);
-    sol.castShadow = true;
-    sol.shadow.mapSize.set(1024, 1024);
-    this.scene.add(sol);
-    // Relleno suave desde el otro lado: evita que el metal quede a manchas.
-    const relleno = new THREE.DirectionalLight(0xbfdcef, 0.45);
-    relleno.position.set(-10, 8, -6);
-    this.scene.add(relleno);
+    // La luz ambiente la da el cielo horneado (entorno PMREM); el sol aporta
+    // la direccional y las sombras.
+    this.ambiente = new Ambiente(this.renderer, false);
+    this.sol = new THREE.DirectionalLight(new THREE.Color(1.0, 0.95, 0.86), 2.6);
+    this.sol.castShadow = true;
+    this.sol.shadow.mapSize.set(1024, 1024);
+    this.sol.shadow.bias = -0.0004;
+    this.sol.shadow.normalBias = 0.03;
+    this.scene.add(this.sol);
+    this.scene.add(this.sol.target);
 
     if (typeof window !== "undefined" && window.matchMedia) {
       const m = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -184,9 +204,21 @@ export class Animacion3D {
       this.series = { t_s: [...payload.series.t_s], z_m: [...payload.series.z_m] };
       this.sinSerieMsg = "";
     }
-    this.t0 = null;
-    this.construir();
-    this.dibujar(0);
+    // Los mandos (Hm0, Te, corriente, rango…) se leen en cada fotograma: solo
+    // se rehace la geometría si cambia la escena o su estructura. Así el
+    // arrastre de un deslizador no reinicia el oleaje.
+    if (this.firmaActual() !== this.firma) this.construir();
+    this.dibujar(this.tPrevio);
+  }
+
+  private firmaActual(): string {
+    return [
+      this.dispositivo === "embalse" ? "dique" : this.modoEnergia,
+      this.cantidadUnidades,
+      this.cimentacion,
+      this.modoEmbalse,
+      this.calidadBaja,
+    ].join("|");
   }
 
   private muestrearSerie(t: number): number | null {
@@ -194,7 +226,10 @@ export class Animacion3D {
     const { t_s, z_m } = this.series;
     const tDur = t_s[t_s.length - 1] - t_s[0];
     if (tDur <= 0) return z_m[0];
-    const tLoop = t_s[0] + (t % tDur);
+    // Bucle sobre los últimos 10 periodos: régimen permanente, sin el
+    // arranque desde el reposo y sin salto al repetir (10 periodos enteros).
+    const ventana = this.Te > 0 && tDur > 10 * this.Te ? 10 * this.Te : tDur;
+    const tLoop = t_s[t_s.length - 1] - ventana + (t % ventana);
     let lo = 0;
     let hi = t_s.length - 1;
     while (hi - lo > 1) {
@@ -231,6 +266,7 @@ export class Animacion3D {
       modoEnergia: this.modoEnergia,
       series: this.series,
       calidadBaja: this.calidadBaja,
+      dt: this.dt,
       mat: crearMat,
       hacerEtiqueta: crearEtiqueta,
       pintarEtiqueta,
@@ -250,12 +286,15 @@ export class Animacion3D {
     if (this.raiz) {
       this.scene.remove(this.raiz);
       this.raiz.traverse((o: THREE.Object3D) => {
+        // Mallas, líneas y nubes de puntos.
         const m = o as THREE.Mesh;
-        if (m.isMesh) {
-          m.geometry?.dispose?.();
-          const mat = m.material as THREE.Material | THREE.Material[];
-          if (Array.isArray(mat)) mat.forEach((x) => x.dispose?.());
-          else mat?.dispose?.();
+        if (!m.geometry) return;
+        m.geometry.dispose?.();
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        for (const x of mats as THREE.MeshStandardMaterial[]) {
+          // Las texturas compartidas viven en caché; solo se sueltan los clones.
+          if (x?.map?.userData?.desechable) x.map.dispose();
+          x?.dispose?.();
         }
       });
       this.raiz = null;
@@ -288,29 +327,41 @@ export class Animacion3D {
 
   private construir() {
     this.limpiar();
+    this.firma = this.firmaActual();
     this.escena = this.elegirEscena();
     // El contexto va primero: algunas escenas adaptan su encuadre al número
     // de unidades o al modo.
     const ctx = this.contexto();
     const enc = this.escena.encuadre(ctx);
     this.encuadre = enc;
-    this.scene.background = new THREE.Color(enc.fondo);
+    const horizonte = new THREE.Color(enc.fondo);
     this.scene.fog = new THREE.Fog(enc.fondo, enc.niebla.near, enc.niebla.far);
-    // Limpia environment de la escena anterior; la escena nueva puede reponerlo.
-    this.scene.environment = null;
-    this.escena.configurarEscena?.(this.scene);
+    const s = enc.sol ?? SOL_POR_DEFECTO;
+    const dirSol = new THREE.Vector3(s.x, s.y, s.z).normalize();
+    this.ambiente.aplicar(this.scene, dirSol, horizonte);
+
+    // Sombras: la caja de la luz abraza la esfera de la escena.
+    const centro = new THREE.Vector3(enc.lookAt.x, enc.lookAt.y, enc.lookAt.z);
+    const r = (enc.radio ?? 8) * 1.35;
+    this.sol.position.copy(centro).addScaledVector(dirSol, 60);
+    this.sol.target.position.copy(centro);
+    const cam = this.sol.shadow.camera;
+    cam.left = -r;
+    cam.right = r;
+    cam.top = r;
+    cam.bottom = -r;
+    cam.near = 1;
+    cam.far = 140;
+    cam.updateProjectionMatrix();
+
+    // Cada escena parte de un mar sin embalse; el dique fija el suyo.
+    UNIFORMES_MAR.uDivisorZ.value = -1e6;
+    UNIFORMES_MAR.uTurbidez.value = 1;
+    UNIFORMES_MAR.uCorteX.value = 1e6;
 
     const g = new THREE.Group();
     this.raiz = g;
     this.scene.add(g);
-
-    // Suelo y red de tierra compartidos, salvo que la escena los gestione
-    // (la granja de corriente los omite: estropean el encuadre de la referencia).
-    if (!this.escena.omiteEntornoTierra) {
-      g.add(crearLecho(this.modoEnergia, this.dispositivo));
-      crearRedElectrica(g);
-    }
-
     this.manijas = this.escena.construir(g, ctx);
     this.recogerEtiquetas(g);
     this.ajustar();
@@ -324,6 +375,9 @@ export class Animacion3D {
     this.camera.updateProjectionMatrix();
     // La UI flotante cambia de tamaño con el lienzo: se vuelve a medir.
     this.zonasMedidasMs = 0;
+    const tam = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    UNIFORMES_MAR.uPxPorUnidad.value =
+      tam.y / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
     this.aplicarEncuadre();
   }
 
@@ -359,30 +413,24 @@ export class Animacion3D {
     this.camera.updateMatrixWorld();
   }
 
-  /** Oleaje sobre la malla de mar que la escena haya dejado en manijas. */
-  private animarOleaje(t: number) {
-    const { mar, marBase, marAncho } = this.manijas;
-    if (!mar || !marBase) return;
+  /**
+   * Ola del modelo hacia la GPU: misma eta(x,t) que el corte 2D. La longitud
+   * de onda se dibuja a la escala horizontal de la escena, acotada para que
+   * siempre quepa al menos una cresta en el encuadre.
+   */
+  private actualizarMar(t: number) {
     const omega = (2 * Math.PI) / (this.Te > 0 ? this.Te : 7);
-    const k = this.k > 0 ? this.k : 0.08;
-    const pos = mar.geometry.attributes.position as THREE.BufferAttribute;
-    const arr = pos.array as Float32Array;
-    const dominio = this.lambda > 0 ? 2.2 * this.lambda : 120;
-    const ampSec = (this.Hm0 / 2) * 0.2;
-    for (let i = 0; i < pos.count; i++) {
-      const bx = marBase[i * 3];
-      const bz = marBase[i * 3 + 2];
-      const xM = (bx / marAncho) * dominio;
-      // Ola principal (la del modelo) + mar de fondo corto: superficie viva
-      // sin cambiar la física que mueve al dispositivo.
-      const chop =
-        ampSec *
-        Math.cos(0.62 * k * xM + 0.4 * k * bz - 1.35 * omega * t + 1.6);
-      arr[i * 3 + 1] = marBase[i * 3 + 1] + this.eta(xM, t, omega, k) + chop;
-    }
-    pos.needsUpdate = true;
-    mar.geometry.computeVertexNormals();
-    actualizarNivelAgua(mar, mar.position.y, this.Hm0 / 2, t);
+    const lambdaM = this.lambda > 0 ? this.lambda : 80;
+    const lambdaMundo = Math.max(12, Math.min(70, lambdaM / M_POR_UNIDAD));
+    const escala = this.encuadre?.escalaOla ?? 1;
+    UNIFORMES_MAR.uTiempo.value = t;
+    UNIFORMES_MAR.uOla.value.set(
+      (this.Hm0 / 2) * escala,
+      (2 * Math.PI) / lambdaMundo,
+      omega
+    );
+    const y = this.manijas.mar?.position.y ?? 0;
+    UNIFORMES_MAR.uNiveles.value.set(y, y);
   }
 
   /** Pulso de energía a lo largo del cable de evacuación. */
@@ -394,7 +442,9 @@ export class Animacion3D {
   }
 
   dibujar(t: number) {
-    this.animarOleaje(t);
+    this.dt = Math.max(0, Math.min(0.1, t - this.tPrevio));
+    this.tPrevio = t;
+    this.actualizarMar(t);
     this.escena.animar(t, this.contexto(), this.manijas);
     this.animarPulso(t);
     this.disponerRotulos();
@@ -440,7 +490,15 @@ export class Animacion3D {
     const w = Math.max(2, this.contenedor.clientWidth || 800);
     const h = Math.max(2, this.contenedor.clientHeight || 400);
     this.medirZonasRotulos(w, h);
-    disponerEtiquetas(this.etiquetas, this.camera, w, h, {
+    // En un lienzo pequeño solo caben los rótulos que explican la física;
+    // el resto taparía la escena.
+    const tope = h < 300 || w < 520 ? 2 : h < 440 ? 3 : 99;
+    const visibles = this.etiquetas.filter((sp) => {
+      const cabe = ((sp.userData.prioridad as number | undefined) ?? 5) <= tope;
+      if (!cabe) sp.visible = false;
+      return cabe;
+    });
+    disponerEtiquetas(visibles, this.camera, w, h, {
       franjaSuperiorPx: 56,
       zonas: this.zonasRotulos,
       separacionPx: 6,
@@ -448,49 +506,78 @@ export class Animacion3D {
     });
   }
 
-  /** Degrada calidad visual sin tocar la respuesta: pixelRatio a 1, sombras
-   *  fuera y mar con menos segmentos (fondo según escena.marFondo). Idempotente. */
+  /** Degrada calidad visual sin tocar la respuesta: pixelRatio a 1, sin
+   *  sombras y geometría, agua y partículas en su versión ligera. Idempotente. */
   degradarCalidad() {
+    if (this.calidadBaja) return;
     this.calidadBaja = true;
+    this.dprBase = 1;
     try {
-      this.renderer.setPixelRatio(1);
+      this.renderer.setPixelRatio(this.escalaRes);
     } catch {
       /* lienzo ya liberado */
     }
     this.renderer.shadowMap.enabled = false;
-    const { mar } = this.manijas;
-    if (!mar || !this.raiz) return;
-    const y = mar.position.y;
-    const x = mar.position.x;
-    const z = mar.position.z;
-    const ancho = this.manijas.marAncho;
-    const fondo =
-      this.escena.marFondo?.(ancho) ?? (ancho >= 50 ? 24 : ancho >= 38 ? 16 : 14);
-    this.raiz.remove(mar);
-    mar.geometry?.dispose?.();
-    const mat = mar.material as THREE.Material | THREE.Material[];
-    if (Array.isArray(mat)) mat.forEach((m) => m.dispose?.());
-    else mat?.dispose?.();
-    const nuevo = crearSuperficieMar(ancho, fondo, 0, true, {
-      color: this.encuadre?.fondo ?? 0xb4cedc,
-      near: this.encuadre?.niebla.near ?? 30,
-      far: this.encuadre?.niebla.far ?? 105,
-    });
-    // La escena puede tener uniformes propios (p. ej. la ventana del dique).
-    this.escena.configurarMar?.(nuevo.malla);
-    nuevo.malla.position.y = y;
-    nuevo.malla.position.x = x;
-    nuevo.malla.position.z = z;
-    this.raiz.add(nuevo.malla);
-    this.manijas.mar = nuevo.malla;
-    this.manijas.marBase = nuevo.base;
-    this.manijas.marAncho = nuevo.ancho;
-    if (this.manijas.nivelMar) this.manijas.nivelMar = nuevo.malla;
+    this.construir();
+  }
+
+  /**
+   * Mantiene el ritmo en GPU integradas bajando la resolución de render (no
+   * la geometría ni la física) cuando el fotograma medio pasa de ~21 ms, y la
+   * recupera con cautela cuando sobra tiempo. Va antes que el monitor de la
+   * vista, que solo actúa por debajo de 30 fps.
+   */
+  private gobernarResolucion(ahora: number) {
+    const dt = ahora - this.marcaPrevia;
+    this.marcaPrevia = ahora;
+    // Pestaña en segundo plano o compilación de shaders: no es ritmo real.
+    if (dt <= 0 || dt > 250) {
+      this.ventanaMs.length = 0;
+      return;
+    }
+    this.ventanaMs.push(dt);
+    if (this.ventanaMs.length < 24) return;
+    const media = this.ventanaMs.reduce((a, b) => a + b, 0) / this.ventanaMs.length;
+    this.ventanaMs.length = 0;
+
+    let escala = this.escalaRes;
+    if (media > 21.5) {
+      this.ventanasHolgadas = 0;
+      if (this.escalaAntesDeSubir > 0) {
+        // La subida de prueba no se sostuvo: se vuelve y no se reintenta pronto.
+        escala = this.escalaAntesDeSubir;
+        this.vetoSubidaHasta = ahora + 30_000;
+      } else {
+        escala *= Math.max(0.7, Math.min(0.93, Math.sqrt(18.5 / media)));
+      }
+    } else if (media < 17.6 && escala < 1 && ahora > this.vetoSubidaHasta) {
+      this.ventanasHolgadas += 1;
+      if (this.ventanasHolgadas >= 8) {
+        this.ventanasHolgadas = 0;
+        this.escalaAntesDeSubir = escala;
+        escala = Math.min(1, escala * 1.12);
+        this.aplicarEscalaRes(escala);
+        return;
+      }
+    }
+    this.escalaAntesDeSubir = 0;
+    this.aplicarEscalaRes(Math.max(0.5, escala));
+  }
+
+  private aplicarEscalaRes(escala: number) {
+    if (Math.abs(escala - this.escalaRes) < 0.01) return;
+    this.escalaRes = escala;
+    this.renderer.setPixelRatio(this.dprBase * escala);
+    this.ajustar();
   }
 
   arrancar() {
     this.ajustar();
-    this.dibujar(0);
+    this.dibujar(this.tPrevio);
+    // Ver.vue llama a arrancar en cada cambio de mando: un solo bucle.
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+    this.t0 = null;
     this.iniciar();
   }
 
@@ -498,9 +585,15 @@ export class Animacion3D {
     if (this.pausado) return;
     const loop = (now: number) => {
       if (this.pausado) return;
-      if (this.t0 === null) this.t0 = now;
-      const t = (now - this.t0) / 1000;
+      // El reloj sigue donde se quedó: ni pausar ni mover un mando hacen
+      // saltar la escena.
+      if (this.t0 === null) {
+        this.t0 = now;
+        this.tBase = this.tPrevio;
+      }
+      const t = this.tBase + (now - this.t0) / 1000;
       this.dibujar(t);
+      this.gobernarResolucion(now);
       try {
         this.onFrame?.(typeof performance !== "undefined" ? performance.now() : Date.now());
       } catch {
@@ -513,6 +606,7 @@ export class Animacion3D {
 
   pausar() {
     this.pausado = true;
+    this.t0 = null;
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
@@ -521,7 +615,6 @@ export class Animacion3D {
 
   reanudar() {
     this.pausado = false;
-    this.t0 = null;
     this.iniciar();
   }
 
@@ -534,6 +627,8 @@ export class Animacion3D {
   liberar() {
     this.detener();
     try {
+      this.limpiar();
+      this.ambiente.liberar();
       this.renderer.dispose();
       this.renderer.domElement.remove();
     } catch {

@@ -24,6 +24,10 @@ const EXAGERACION_VERTICAL = 3;
  *  más alta quepa bajo el horizonte, y con eso la escala deja de depender del
  *  Hm0 actual: la cota crece en proporción a la altura, no a saltos. */
 const HM0_TOPE_M = 4;
+/** Tope del mando de rango de marea: fija la escala vertical de la marea. */
+const RANGO_TOPE_M = 15;
+/** Marea comprimida: un ciclo de 12,4 h en 15 s (igual que la escena 3D). */
+const OMEGA_MAREA = 0.42;
 
 export type TipoCimentacion = "pilote" | "gravedad" | "tripode";
 export type ModoEnergia = "undimotriz" | "mareomotriz";
@@ -104,6 +108,9 @@ export class AnimacionCanvas {
   private medidas: [number, number] = [0, 0];
   private dpr = 0;
   private ultimoT = 0;
+  /** Estado integrado con dt: mover un mando no hace saltar giros ni flujo. */
+  private anguloRotor = 0;
+  private avanceFlujo = 0;
   private observador: ResizeObserver | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -276,6 +283,7 @@ export class AnimacionCanvas {
   }
 
   dibujar(t: number) {
+    const dt = Math.max(0, Math.min(0.1, t - this.ultimoT));
     this.ultimoT = t;
     const [w, h] = this.ajustarDPR();
     if (w < 2 || h < 2) return;
@@ -309,7 +317,7 @@ export class AnimacionCanvas {
     // Dique: la obra cierra el corte por el centro y detrás queda el vaso, un
     // estuario contenido por el terreno de la otra orilla.
     const xDam = w * 0.56;
-    const yFondoDam = nivelMarMedio + h * 0.16;
+    const yFondoDam = nivelMarMedio + h * 0.25;
     const xFinVaso = w * 0.90;
     const yFondoVaso = yFondoDam + 10;
     const yMesetaEmb = nivelMarMedio - h * 0.085;
@@ -323,8 +331,30 @@ export class AnimacionCanvas {
     const pxPorMReal = (fondoMarY - nivelMarMedio) / this.profundidad;
     const escalaOla = Math.min(pxPorM, (nivelMarMedio - horizonteY) / HM0_TOPE_M);
 
+    // Marea del dique: el mar oscila con el rango real (a la escala que deja
+    // el resguardo de la obra) y el embalse lo sigue amortiguado y con
+    // retraso. El salto h es la diferencia; el caudal va con √h (Torricelli).
+    const altoDique = yFondoDam - nivelMarMedio;
+    const resguardo = Math.max(40, altoDique * 0.3);
+    const semiMaxPx = Math.max(8, Math.min(resguardo - 8, 0.58 * altoDique - 0.42 * resguardo - 22));
+    const escalaMarea = semiMaxPx / (RANGO_TOPE_M / 2);
+    const semiMarea = esEmbalse ? (Math.max(0, this.rangoMarea) / 2) * escalaMarea : 0;
+    const nivelMar = nivelMarMedio - Math.sin(t * OMEGA_MAREA) * semiMarea;
+    const yEmbalseMarea = nivelMarMedio - Math.sin(t * OMEGA_MAREA - 0.95) * semiMarea * 0.85;
+    const saltoM = esEmbalse ? (yEmbalseMarea - nivelMar) / escalaMarea : 0;
+    const caudal = Math.sign(saltoM) * Math.sqrt(Math.abs(saltoM));
+    // En el estuario del dique el oleaje llega atenuado.
+    const factorOla = esEmbalse ? 0.3 : 1;
+
+    // Giro y arrastre integrados: turbina de corriente ω = TSR·U/R (R = 10 m,
+    // TSR = 4,5); grupo bulbo, proporcional al caudal.
+    const omegaRotor = esEmbalse ? caudal * 2.4 : (4.5 * Math.max(0, this.velocidadCorriente)) / 10;
+    this.anguloRotor = (this.anguloRotor + omegaRotor * dt) % (Math.PI * 2);
+    const velFlujoPx = esEmbalse ? caudal * 30 : this.velocidadCorriente * 26;
+    this.avanceFlujo += velFlujoPx * dt;
+
     const superficieY = (px: number) =>
-      nivelMarMedio - this.eta((px / w) * dominioM, t, omega, k) * escalaOla;
+      nivelMar - this.eta((px / w) * dominioM, t, omega, k) * escalaOla * factorOla;
 
     const suave = (u: number) => {
       const c = Math.max(0, Math.min(1, u));
@@ -406,8 +436,23 @@ export class AnimacionCanvas {
       return Math.max(y, terrenoY(hasta));
     };
 
-    this.dibujarCielo(ctx, w, horizonteY, nivelMarMedio);
-    this.dibujarAgua(ctx, w, h, nivelMarMedio, fondoMarY, xBordeAgua ?? w, t, superficieY, terrenoY);
+    this.dibujarCielo(ctx, w, horizonteY, nivelMarMedio, t);
+    // En el seno de la ola y en bajamar el mar baja de su nivel medio: detrás
+    // sigue habiendo cielo, no el fondo de la página.
+    ctx.fillStyle = C.cieloBajo;
+    ctx.fillRect(0, nivelMarMedio, w, semiMarea + (this.Hm0 / 2) * escalaOla + 14);
+    const fisAgua = {
+      omega,
+      k,
+      dominioM,
+      amplitudPx: (this.Hm0 / 2) * escalaOla * factorOla,
+      pxPorMReal,
+      // Sentido y viveza del flujo: fijo en la corriente, con signo en el dique.
+      flujo: esEmbalse ? Math.max(-1, Math.min(1, caudal / 1.2)) : Math.min(1, this.velocidadCorriente / 2.5),
+      conEspuma: !esEmbalse,
+      conFlechas: !esEmbalse,
+    };
+    this.dibujarAgua(ctx, w, h, nivelMar, fondoMarY, xBordeAgua ?? w, t, superficieY, terrenoY, fisAgua);
     this.dibujarTerreno(
       ctx,
       w,
@@ -453,16 +498,22 @@ export class AnimacionCanvas {
 
       // Lámina del vaso: sube y baja con la marea, contenida por el terreno de
       // la otra orilla. El nivel del mar es la referencia del salto.
-      const yEmbalse = nivelMarMedio + 4 + 26 * Math.sin(t * 0.4);
-      const haciaEmbalse = yEmbalse > nivelMarMedio + 2;
+      const yEmbalse = yEmbalseMarea;
+      const haciaEmbalse = saltoM > 0;
+      // El velo del mar va antes que la obra: el dique lo corta, no al revés.
+      this.dibujarVeloAgua(ctx, w, h, nivelMar, fondoMarY, xBordeAgua ?? w, t, superficieY, terrenoY);
       dibujarDique2D(ctx, {
         cx: xDam,
         yMedio: nivelMarMedio,
         yFondo: yApoyo,
         t,
         rangoMarea: this.rangoMarea,
-        escalaV: pxPorMReal,
+        escalaV: escalaMarea,
         yEmbalse,
+        yMar: nivelMar,
+        saltoM,
+        giro: this.anguloRotor,
+        avance: this.avanceFlujo,
         terrenoY,
         xFinVaso,
         modo: haciaEmbalse ? "llenado" : "vaciado",
@@ -487,6 +538,7 @@ export class AnimacionCanvas {
           yFondo: yApoyo,
           t,
           velocidadCorriente: this.velocidadCorriente,
+          giro: this.anguloRotor,
           cantidadUnidades: this.cantidadUnidades,
           cimentacion: this.cimentacion,
           sinRotulo: this.modoPrevia,
@@ -495,8 +547,8 @@ export class AnimacionCanvas {
           const yRotor = nivelMarMedio + (yApoyo - nivelMarMedio) * 0.52;
           this.chip(
             ctx,
-            `Corriente ${this.velocidadCorriente.toFixed(1).replace(".", ",")} m/s`,
-            xDispositivo + 104,
+            `Corriente ${this.velocidadCorriente.toFixed(1).replace(".", ",")} m/s · rotor ${Math.round((omegaRotor * 60) / (2 * Math.PI))} rpm`,
+            xDispositivo + 124,
             yRotor - 40
           );
         }
@@ -521,6 +573,12 @@ export class AnimacionCanvas {
       }
 
       this.dibujarRedElectrica(ctx, w, terrenoY, xSub, xTorre);
+    }
+
+    // Velo de agua por delante de lo sumergido: la obra queda dentro del mar,
+    // no pegada encima.
+    if (!esEmbalse) {
+      this.dibujarVeloAgua(ctx, w, h, nivelMar, fondoMarY, xBordeAgua ?? w, t, superficieY, terrenoY);
     }
 
     // En miniatura las anotaciones se pisan unas a otras y no se leen: a ese
@@ -644,12 +702,53 @@ export class AnimacionCanvas {
 
   // ---- Escenario -----------------------------------------------------------
 
-  private dibujarCielo(ctx: CanvasRenderingContext2D, w: number, horizonteY: number, nivelMar: number) {
+  /** Ruido determinista 0..1 por índice: nubes y partículas sin Math.random,
+   *  así dos fotogramas del mismo instante son idénticos. */
+  private azar(i: number, canal = 0): number {
+    const s = Math.sin(i * 12.9898 + canal * 78.233) * 43758.5453;
+    return s - Math.floor(s);
+  }
+
+  private dibujarCielo(ctx: CanvasRenderingContext2D, w: number, horizonteY: number, nivelMar: number, t = 0) {
     const cielo = ctx.createLinearGradient(0, 0, 0, nivelMar);
     cielo.addColorStop(0, C.cieloAlto);
     cielo.addColorStop(1, C.cieloBajo);
     ctx.fillStyle = cielo;
     ctx.fillRect(0, 0, w, nivelMar + 2);
+
+    // Sol velado: un resplandor cálido, no un disco. Da dirección a la luz
+    // de los haces que bajan por el agua.
+    const sx = w * 0.22;
+    const sy = Math.max(22, horizonteY * 0.5);
+    const halo = ctx.createRadialGradient(sx, sy, 0, sx, sy, Math.max(140, w * 0.26));
+    halo.addColorStop(0, "rgba(255,248,222,0.95)");
+    halo.addColorStop(0.07, "rgba(255,244,208,0.6)");
+    halo.addColorStop(0.35, "rgba(255,240,205,0.2)");
+    halo.addColorStop(1, "rgba(255,240,205,0)");
+    ctx.fillStyle = halo;
+    ctx.fillRect(0, 0, w, nivelMar);
+
+    // Bancos de nubes: lóbulos blandos, a la deriva.
+    const esc = Math.max(0.45, Math.min(1.15, nivelMar / 300));
+    for (let i = 0; i < 6; i++) {
+      const deriva = t * 0.0035 * (0.5 + this.azar(i, 1));
+      const cx = (((this.azar(i) * 1.4 + deriva) % 1.4) - 0.2) * w;
+      const cy = nivelMar * (0.1 + 0.46 * this.azar(i, 2));
+      const e = esc * (0.6 + this.azar(i, 3) * 0.9);
+      for (let j = 0; j < 5; j++) {
+        const lx = cx + (j - 2) * 34 * e;
+        const ly = cy - Math.sin(j * 1.3 + i) * 7 * e;
+        const r = (24 + this.azar(i * 7 + j, 4) * 22) * e;
+        const nube = ctx.createRadialGradient(lx, ly - r * 0.2, 0, lx, ly, r * 1.3);
+        nube.addColorStop(0, "rgba(255,255,255,0.62)");
+        nube.addColorStop(0.55, "rgba(255,253,246,0.26)");
+        nube.addColorStop(1, "rgba(255,253,246,0)");
+        ctx.fillStyle = nube;
+        ctx.beginPath();
+        ctx.ellipse(lx, ly, r * 1.5, r * 0.62, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     // Banda de bruma sobre el horizonte: da profundidad sin dibujar nubes.
     const bruma = ctx.createLinearGradient(0, horizonteY - 18, 0, horizonteY + 10);
@@ -854,7 +953,208 @@ export class AnimacionCanvas {
     ctx.globalAlpha = 1;
   }
 
+  /** Abscisa donde el terreno corta la superficie: la orilla del agua. */
+  private bordeAgua(
+    xCosta: number,
+    superficieY: (px: number) => number,
+    terrenoY: (px: number) => number
+  ): number {
+    for (let px = 0; px <= xCosta; px += 3) {
+      if (terrenoY(px) <= superficieY(px)) return px;
+    }
+    return xCosta;
+  }
+
+  /** Recorte con la masa de agua: de la superficie al terreno. */
+  private recortarAgua(
+    ctx: CanvasRenderingContext2D,
+    borde: number,
+    superficieY: (px: number) => number,
+    terrenoY: (px: number) => number
+  ) {
+    const paso = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, superficieY(0));
+    for (let px = paso; px <= borde; px += paso) ctx.lineTo(px, superficieY(px));
+    for (let px = borde; px >= 0; px -= paso) ctx.lineTo(px, terrenoY(px) + 2);
+    ctx.closePath();
+    ctx.clip();
+  }
+
   private dibujarAgua(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    nivelMedio: number,
+    fondoY: number,
+    xCosta: number,
+    t: number,
+    superficieY: (px: number) => number,
+    terrenoY: (px: number) => number,
+    fis: {
+      omega: number;
+      k: number;
+      dominioM: number;
+      amplitudPx: number;
+      pxPorMReal: number;
+      flujo: number;
+      conEspuma: boolean;
+      conFlechas: boolean;
+    }
+  ) {
+    const paso = 3;
+    // El agua llega hasta donde el terreno corta la superficie: la orilla.
+    const borde = this.bordeAgua(xCosta, superficieY, terrenoY);
+
+    ctx.save();
+    this.recortarAgua(ctx, borde, superficieY, terrenoY);
+
+    const agua = ctx.createLinearGradient(0, nivelMedio - 20, 0, fondoY + 20);
+    agua.addColorStop(0, C.aguaSuperficie);
+    agua.addColorStop(0.35, C.aguaMedia);
+    agua.addColorStop(1, C.aguaFondo);
+    ctx.fillStyle = agua;
+    ctx.fillRect(0, nivelMedio - 60, w, h);
+
+    // Luz que entra por la lámina: una franja clara bajo la superficie.
+    const lamina = ctx.createLinearGradient(0, nivelMedio - 24, 0, nivelMedio + 70);
+    lamina.addColorStop(0, "rgba(214,244,226,0.3)");
+    lamina.addColorStop(1, "rgba(214,244,226,0)");
+    ctx.fillStyle = lamina;
+    ctx.fillRect(0, nivelMedio - 60, w, 140);
+
+    // Haces de luz: inclinados según el sol, se mecen y se apagan con la
+    // profundidad. Marcan que hay superficie encima.
+    const haz = ctx.createLinearGradient(0, nivelMedio - 10, 0, fondoY + 20);
+    haz.addColorStop(0, "rgba(255,255,236,0.2)");
+    haz.addColorStop(0.7, "rgba(255,255,236,0.04)");
+    haz.addColorStop(1, "rgba(255,255,236,0)");
+    ctx.fillStyle = haz;
+    for (let i = 0; i < 8; i++) {
+      const deriva = t * 0.009 * (i % 2 ? 1 : -0.6);
+      const x0 = ((((this.azar(i, 5) + deriva) % 1) + 1) % 1) * (borde + 120) - 60;
+      const ancho = 14 + this.azar(i, 6) * 34;
+      const caida = 46 + this.azar(i, 7) * 40;
+      ctx.globalAlpha = 0.45 + 0.4 * Math.sin(t * 0.6 + i * 1.9);
+      ctx.beginPath();
+      ctx.moveTo(x0, nivelMedio - 10);
+      ctx.lineTo(x0 + ancho, nivelMedio - 10);
+      ctx.lineTo(x0 + ancho * 1.8 + caida, fondoY + 20);
+      ctx.lineTo(x0 + caida, fondoY + 20);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    const mareal = this.modoEnergia === "mareomotriz";
+    const sentido = fis.flujo >= 0 ? 1 : -1;
+    const viveza = Math.min(1, Math.abs(fis.flujo));
+
+    // Vector de corriente: sólo en modo mareal. Avanza con el flujo integrado
+    // y, en el dique, cambia de sentido con el salto.
+    if (mareal && fis.conFlechas && viveza > 0.08) {
+      const desplazamiento = ((this.avanceFlujo % 120) + 120) % 120;
+      ctx.strokeStyle = `rgba(232,242,245,${(0.28 * viveza).toFixed(3)})`;
+      ctx.fillStyle = `rgba(232,242,245,${(0.38 * viveza).toFixed(3)})`;
+      ctx.lineWidth = 1.2;
+      for (let fy = nivelMedio + 34; fy < fondoY - 12; fy += 34) {
+        for (let fx = -120 + desplazamiento; fx < borde; fx += 120) {
+          const largo = 26;
+          const punta = sentido > 0 ? fx + largo : fx;
+          ctx.beginPath();
+          ctx.moveTo(fx, fy);
+          ctx.lineTo(fx + largo, fy);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(punta + 5 * sentido, fy);
+          ctx.lineTo(punta - 2 * sentido, fy - 3);
+          ctx.lineTo(punta - 2 * sentido, fy + 3);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+
+    // Partículas en suspensión. Con oleaje describen las órbitas de la ola
+    // lineal, de radio a·e^(−k·z): grandes arriba, casi nulas en el fondo.
+    // Con corriente, las arrastra el flujo y dejan una estela proporcional.
+    const n = 72;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < n; i++) {
+      const bx = this.azar(i, 1) * borde;
+      const by = nivelMedio + 16 + this.azar(i, 2) * (fondoY - nivelMedio - 26);
+      const tam = 0.9 + this.azar(i, 3) * 1.1;
+      let x = bx;
+      let y = by;
+      if (mareal) {
+        x = (((bx + this.avanceFlujo * (0.7 + 0.6 * this.azar(i, 4))) % borde) + borde) % borde;
+        if (y > terrenoY(x) - 5) continue;
+        const estela = (3 + 9 * viveza) * sentido;
+        ctx.strokeStyle = `rgba(236,248,242,${(0.12 + 0.3 * viveza).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.moveTo(x - estela, y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      } else {
+        if (by > terrenoY(bx) - 5) continue;
+        const profM = (by - nivelMedio) / Math.max(0.01, fis.pxPorMReal);
+        const r = fis.amplitudPx * Math.exp(-fis.k * profM);
+        const fase = fis.k * (bx / w) * fis.dominioM - fis.omega * t;
+        x = bx - r * Math.sin(fase);
+        y = by - r * Math.cos(fase);
+        // Alguna órbita se deja dibujada: se ve cómo se cierra y cómo mengua.
+        if (i % 6 === 0 && r > 2.5) {
+          ctx.strokeStyle = "rgba(236,248,242,0.2)";
+          ctx.beginPath();
+          ctx.arc(bx, by, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      ctx.fillStyle = `rgba(236,248,242,${(0.3 + 0.35 * this.azar(i, 8)).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, tam, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Línea de superficie: brillo fino con una sombra debajo que le da grosor.
+    ctx.beginPath();
+    ctx.moveTo(0, superficieY(0) + 2.5);
+    for (let px = paso; px <= borde; px += paso) ctx.lineTo(px, superficieY(px) + 2.5);
+    ctx.strokeStyle = "rgba(10,60,50,0.22)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, superficieY(0));
+    for (let px = paso; px <= borde; px += paso) ctx.lineTo(px, superficieY(px));
+    ctx.strokeStyle = "rgba(255,255,255,0.72)";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Borreguillos: espuma en la cresta sólo cuando la ola es empinada
+    // (Hm0/λ alto): mar de 0,5 m liso, mar de 4 m con rompientes.
+    const peralte = this.lambda > 0 ? this.Hm0 / this.lambda : 0;
+    const rompe = Math.max(0, Math.min(1, (peralte - 0.014) / 0.03));
+    if (fis.conEspuma && rompe > 0 && fis.amplitudPx > 3) {
+      ctx.fillStyle = C.espuma;
+      for (let px = 0; px <= borde - 6; px += 5) {
+        const ys = superficieY(px);
+        const e = (nivelMedio - ys) / fis.amplitudPx;
+        if (e < 0.7) continue;
+        const r = (e - 0.7) * 16 * rompe * (0.6 + 0.8 * this.azar(Math.floor(px / 5), 9));
+        if (r < 0.6) continue;
+        ctx.globalAlpha = 0.35 + 0.4 * rompe;
+        ctx.beginPath();
+        ctx.arc(px + Math.sin(t * 2 + px) * 1.5, ys + 1, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /** Segunda pasada de agua, por delante de la obra sumergida: tinte que
+   *  crece con la profundidad y manchas de luz (cáusticas) sobre el fondo. */
+  private dibujarVeloAgua(
     ctx: CanvasRenderingContext2D,
     w: number,
     h: number,
@@ -865,79 +1165,29 @@ export class AnimacionCanvas {
     superficieY: (px: number) => number,
     terrenoY: (px: number) => number
   ) {
-    const paso = 3;
-    // El agua llega hasta donde el terreno corta la superficie: la orilla.
-    let borde = xCosta;
-    for (let px = 0; px <= xCosta; px += paso) {
-      if (terrenoY(px) <= superficieY(px)) {
-        borde = px;
-        break;
-      }
-    }
-
+    const borde = this.bordeAgua(xCosta, superficieY, terrenoY);
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(0, superficieY(0));
-    for (let px = paso; px <= borde; px += paso) ctx.lineTo(px, superficieY(px));
-    for (let px = borde; px >= 0; px -= paso) ctx.lineTo(px, terrenoY(px) + 2);
-    ctx.closePath();
-    ctx.clip();
-
-    const agua = ctx.createLinearGradient(0, nivelMedio - 20, 0, fondoY + 20);
-    agua.addColorStop(0, C.aguaSuperficie);
-    agua.addColorStop(0.35, C.aguaMedia);
-    agua.addColorStop(1, C.aguaFondo);
-    ctx.fillStyle = agua;
+    this.recortarAgua(ctx, borde, superficieY, terrenoY);
+    const velo = ctx.createLinearGradient(0, nivelMedio, 0, fondoY + 10);
+    velo.addColorStop(0, "rgba(46,120,100,0.05)");
+    velo.addColorStop(1, "rgba(12,44,40,0.36)");
+    ctx.fillStyle = velo;
     ctx.fillRect(0, nivelMedio - 60, w, h);
 
-    // Haces de luz: pocos, muy tenues, inclinados. Marcan que hay superficie
-    // encima sin convertir el agua en un fondo de pantalla.
-    ctx.globalAlpha = 0.07;
-    ctx.fillStyle = "oklch(1 0 0)";
-    for (let i = 0; i < 5; i++) {
-      const x0 = ((i * 0.23 + t * 0.012) % 1) * w;
+    // Cáusticas: la luz que enfocan las olas baila sobre el lecho.
+    ctx.fillStyle = "rgba(255,250,214,1)";
+    for (let i = 0; i < 16; i++) {
+      const x = ((((this.azar(i, 11) + t * 0.006 * (i % 2 ? 1 : -1)) % 1) + 1) % 1) * borde;
+      const y = terrenoY(x);
+      const calado = (y - nivelMedio) / Math.max(1, fondoY - nivelMedio);
+      if (calado < 0.15) continue;
+      ctx.globalAlpha = (0.05 + 0.07 * (0.5 + 0.5 * Math.sin(t * 1.3 + i * 2.1))) * (1.2 - calado * 0.5);
       ctx.beginPath();
-      ctx.moveTo(x0, nivelMedio - 10);
-      ctx.lineTo(x0 + 26, nivelMedio - 10);
-      ctx.lineTo(x0 + 96, fondoY + 20);
-      ctx.lineTo(x0 + 40, fondoY + 20);
-      ctx.closePath();
+      ctx.ellipse(x, y + 1, 14 + this.azar(i, 12) * 22, 2.6, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
-
-    // Vector de corriente: sólo en modo mareal, que es donde la corriente es
-    // la magnitud que se está moviendo con el deslizador.
-    if (this.modoEnergia === "mareomotriz") {
-      const desplazamiento = (t * this.velocidadCorriente * 26) % 120;
-      ctx.strokeStyle = "rgba(232,242,245,0.28)";
-      ctx.fillStyle = "rgba(232,242,245,0.38)";
-      ctx.lineWidth = 1.2;
-      for (let fy = nivelMedio + 34; fy < fondoY - 12; fy += 34) {
-        for (let fx = -120 + desplazamiento; fx < borde; fx += 120) {
-          const largo = 26;
-          ctx.beginPath();
-          ctx.moveTo(fx, fy);
-          ctx.lineTo(fx + largo, fy);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(fx + largo + 5, fy);
-          ctx.lineTo(fx + largo - 2, fy - 3);
-          ctx.lineTo(fx + largo - 2, fy + 3);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-    }
     ctx.restore();
-
-    // Línea de superficie: un trazo fino, no un contorno.
-    ctx.beginPath();
-    ctx.moveTo(0, superficieY(0));
-    for (let px = paso; px <= borde; px += paso) ctx.lineTo(px, superficieY(px));
-    ctx.strokeStyle = "rgba(255,255,255,0.65)";
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
   }
 
   private dibujarEspumaCosta(
@@ -1790,7 +2040,7 @@ export class AnimacionCanvas {
       x,
       coronacion - 44
     );
-    this.rotuloDispositivo(ctx, x, coronacion - 66, "Dique mareal");
+    this.rotuloDispositivo(ctx, x, coronacion - 66, "Dique de marea");
   }
 
   // ---- Rótulos y anotación -------------------------------------------------

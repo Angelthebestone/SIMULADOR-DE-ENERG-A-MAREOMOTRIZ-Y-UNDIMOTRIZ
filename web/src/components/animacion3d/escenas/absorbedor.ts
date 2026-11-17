@@ -1,7 +1,9 @@
 // Escena 3D del absorbedor puntual undimotriz tipo PowerBuoy.
-// Referencia: undimotriz_powerbuoy_partes.jpg
-// Mismo tratamiento de corte didáctico que la granja: sin caja de agua,
-// environment map + cielo, materiales legibles, lecho plano.
+//
+// Lo que enseña: el flotador anular sube y baja con la ola a lo largo del
+// spar, que la placa de arfada mantiene casi quieto; ese movimiento relativo
+// es el que acciona el convertidor (PTO). Las partículas en suspensión
+// describen las órbitas de la ola, que se apagan con la profundidad.
 
 // @ts-ignore — three se empaqueta por Vite sin @types
 import * as THREE from "three";
@@ -9,387 +11,397 @@ import type {
   ContextoEscena3D,
   Encuadre3D,
   Escena3D,
-  EscenaThree3D,
   Grupo3D,
-  Malla3D,
   ManijasEscena3D,
-  Sprite3D,
 } from "../tipos";
 import { manijasVacias } from "../tipos";
+import { crearParticulas, crearSuperficieMar, fijarEstelas } from "../agua";
 import {
   crearCableConPulso,
-  crearCielo,
-  crearEntornoMarino,
   crearEtiqueta,
   crearLechoArena,
+  crearMatPintado,
   crearRocasLecho,
-  crearSuperficieMar,
 } from "../utilidades";
 
 const COL = {
-  amarillo: 0xf5c400,
-  amarilloOscuro: 0xc99600,
-  naranja: 0xe07820,
-  spar: 0x3a424a,
-  sparClaro: 0x5a6570,
-  placa: 0x4a555e,
-  placaNervio: 0x2e363e,
-  pod: 0x6a757e,
-  podClaro: 0x9aa3ab,
-  podTanque: 0xb8c0c6,
-  cable: 0x1a2228,
+  amarillo: 0xf2b705,
+  amarilloOscuro: 0xc28f00,
+  spar: 0x46525c,
+  torre: 0xe6e9ea,
+  rojo: 0xc8261c,
+  placa: 0x3d4850,
+  goma: 0x15181a,
+  pod: 0x7d8890,
+  boyarin: 0xe8641c,
   balizaOn: 0xff3b30,
-  balizaOff: 0x7a1812,
-  arena: 0xc4a86a,
+  balizaOff: 0x6a1410,
 };
 
+const NIVEL = 0;
+const Y_LECHO = -6.2;
+const Y_PLACA = -4.85;
+/** 30 m de calado ocupan |Y_LECHO| unidades. */
+const M_POR_UNIDAD_V = 30 / -Y_LECHO;
+const NIEBLA = { color: 0xa8c8da, near: 40, far: 140 };
+
+/** Catenaria entre dos puntos con una flecha dada (curva suave, no parábola exacta). */
+function catenaria(a: THREE.Vector3, b: THREE.Vector3, flecha: number): THREE.CatmullRomCurve3 {
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 8; i++) {
+    const u = i / 8;
+    const p = a.clone().lerp(b, u);
+    p.y -= Math.sin(u * Math.PI) * flecha * (1 - u * 0.5);
+    pts.push(p);
+  }
+  return new THREE.CatmullRomCurve3(pts);
+}
+
 export const escenaAbsorbedor: Escena3D = {
-  /** Lecho y mar los pinta esta escena; el motor no pone tierra ni AT. */
-  omiteEntornoTierra: true,
-
-  configurarEscena(escenaThree: EscenaThree3D): void {
-    escenaThree.environment = crearEntornoMarino();
-    escenaThree.background = crearCielo();
-  },
-
   encuadre(): Encuadre3D {
     return {
       posicion: { x: 7.0, y: 4.4, z: 16.2 },
       lookAt: { x: 0.9, y: -1.8, z: 0 },
-      fondo: 0xa8c8da,
-      niebla: { near: 40, far: 140 },
+      fondo: NIEBLA.color,
+      niebla: { near: NIEBLA.near, far: NIEBLA.far },
       radio: 6.9,
       margen: 1.02,
+      // Sol alto, por detrás y a la izquierda: modela el volumen de la boya y
+      // deja el camino de destellos sobre el mar.
+      sol: { x: -0.62, y: 0.6, z: -0.38 },
     };
-  },
-
-  marFondo(): number {
-    return 36;
   },
 
   construir(g: Grupo3D, ctx: ContextoEscena3D): ManijasEscena3D {
     const m = manijasVacias();
-    const mat = ctx.mat;
+    const B = ctx.calidadBaja;
+    const seg = B ? 20 : 48;
+    const pint = crearMatPintado;
 
-    // ---- Lecho de arena con dunas y rocas (sin caja) ----
-    const lecho = crearLechoArena(220, 180, -6.2, ctx.calidadBaja, {
-      amplitud: 0.5,
-      tono: 0.95,
-    });
+    // ---- Lecho y mar ----
+    const lecho = crearLechoArena(220, 180, Y_LECHO, B, { amplitud: 0.5 });
     lecho.position.z = -30;
     g.add(lecho);
-    g.add(crearRocasLecho(10, 120, 90, -6.2, 23));
+    g.add(crearRocasLecho(B ? 8 : 16, 120, 90, Y_LECHO, 23));
 
-    // ---- Superficie de mar ancha, sin volumen caja ----
-    // Llega más allá de la niebla: el horizonte no muestra el borde del plano.
-    const marInfo = crearSuperficieMar(220, 200, 0.15, ctx.calidadBaja, {
-      color: 0xa8c8da,
-      near: 40,
-      far: 140,
-    });
+    const marInfo = crearSuperficieMar(240, 220, NIVEL, B, { niebla: NIEBLA, focoZ: 40 });
     marInfo.malla.position.z = -40;
     g.add(marInfo.malla);
     m.mar = marInfo.malla;
-    m.marBase = marInfo.base;
-    m.marAncho = marInfo.ancho;
 
     // =====================================================================
-    // SPAR
+    // SPAR + PLACA DE ARFADA + TORRE (casi quietos)
     // =====================================================================
-    const sparAlto = 9.2;
-    const sparY = -2.0;
-    const spar = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.26, 0.3, sparAlto, ctx.calidadBaja ? 12 : 18),
-      mat(COL.spar, { metalness: 0.4, roughness: 0.4, envMapIntensity: 0.9 })
-    );
-    spar.position.set(0, sparY, 0);
-    spar.castShadow = true;
+    const spar = new THREE.Group();
     g.add(spar);
-    m.mastil = spar;
+    m.estado.spar = spar;
 
-    for (const [y, r, h] of [
-      [1.55, 0.38, 0.22],
-      [-0.4, 0.34, 0.18],
-      [-3.6, 0.34, 0.18],
-      [-5.9, 0.4, 0.28],
-    ] as const) {
-      const collar = new THREE.Mesh(
-        new THREE.CylinderGeometry(r, r, h, 14),
-        mat(COL.sparClaro, { metalness: 0.35, roughness: 0.42, envMapIntensity: 0.9 })
-      );
-      collar.position.set(0, y, 0);
-      g.add(collar);
-    }
-
-    const gorjon = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.26, 0.55, 0.55, 14),
-      mat(COL.sparClaro, { metalness: 0.35, roughness: 0.42 })
+    const matSpar = pint(COL.spar, { roughness: 0.5, metalness: 0.35 });
+    const fuste = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.34, 0.34, 7.3, B ? 14 : 28),
+      matSpar
     );
-    gorjon.position.set(0, -1.15, 0);
-    g.add(gorjon);
+    fuste.position.y = Y_PLACA + 3.65;
+    fuste.castShadow = true;
+    fuste.receiveShadow = true;
+    spar.add(fuste);
 
-    // ---- Heave plate ----
-    const yPlaca = -4.85;
-    const rPlaca = 2.55;
-    const placa = new THREE.Mesh(
-      new THREE.CylinderGeometry(rPlaca, rPlaca * 0.96, 0.22, ctx.calidadBaja ? 16 : 32),
-      mat(COL.placa, { metalness: 0.3, roughness: 0.5, envMapIntensity: 0.8 })
-    );
-    placa.position.set(0, yPlaca, 0);
-    placa.castShadow = true;
-    g.add(placa);
-
-    const aro = new THREE.Mesh(
-      new THREE.TorusGeometry(rPlaca * 0.97, 0.1, 8, ctx.calidadBaja ? 16 : 36),
-      mat(COL.placaNervio, { metalness: 0.32, roughness: 0.5 })
-    );
-    aro.rotation.x = Math.PI / 2;
-    aro.position.set(0, yPlaca, 0);
-    g.add(aro);
-
-    const nNerv = ctx.calidadBaja ? 4 : 8;
-    for (let i = 0; i < nNerv; i++) {
-      const ang = (i * Math.PI * 2) / nNerv;
-      const nerv = new THREE.Mesh(
-        new THREE.BoxGeometry(rPlaca * 1.7, 0.1, 0.16),
-        mat(COL.placaNervio, { metalness: 0.28, roughness: 0.52 })
-      );
-      nerv.position.set(0, yPlaca + 0.14, 0);
-      nerv.rotation.y = -ang;
-      g.add(nerv);
-    }
-
-    const bocel = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.55, 0.62, 0.38, 14),
-      mat(COL.placaNervio, { metalness: 0.35, roughness: 0.42 })
-    );
-    bocel.position.set(0, yPlaca + 0.05, 0);
-    g.add(bocel);
-
-    // =====================================================================
-    // FLOTADOR PowerBuoy
-    // =====================================================================
-    const amarillo = mat(COL.amarillo, {
-      roughness: 0.4,
-      metalness: 0.1,
-      envMapIntensity: 0.85,
-    });
-    const amarilloOsc = mat(COL.amarilloOscuro, {
-      roughness: 0.45,
-      metalness: 0.1,
-    });
-
-    const cuerpo = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.15, 1.05, 1.15, ctx.calidadBaja ? 16 : 28),
-      amarillo
-    );
-    cuerpo.castShadow = true;
-    cuerpo.receiveShadow = true;
-    g.add(cuerpo);
-    const flot: Malla3D = cuerpo;
-    m.flotador = flot;
-
-    const casquete = new THREE.Mesh(
-      new THREE.SphereGeometry(1.05, ctx.calidadBaja ? 12 : 24, ctx.calidadBaja ? 6 : 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
-      amarillo
-    );
-    casquete.scale.set(1, 0.55, 1);
-    casquete.position.y = 0.56;
-    casquete.castShadow = true;
-    flot.add(casquete);
-
-    const cubierta = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.95, 0.95, 0.1, 20),
-      amarilloOsc
-    );
-    cubierta.position.y = 0.68;
-    flot.add(cubierta);
-
-    const collarFlot = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.62, 1.48, 0.42, ctx.calidadBaja ? 16 : 32),
-      amarillo
-    );
-    collarFlot.position.y = -0.52;
-    collarFlot.castShadow = true;
-    flot.add(collarFlot);
-
-    const bisel = new THREE.Mesh(
-      new THREE.TorusGeometry(1.55, 0.09, 8, ctx.calidadBaja ? 16 : 32),
-      amarilloOsc
-    );
-    bisel.rotation.x = Math.PI / 2;
-    bisel.position.y = -0.72;
-    flot.add(bisel);
-
-    const faja = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.64, 1.64, 0.16, ctx.calidadBaja ? 16 : 32),
-      mat(COL.naranja, { roughness: 0.42, metalness: 0.08 })
-    );
-    faja.position.y = -0.38;
-    flot.add(faja);
-
-    const pataLargo = 1.15;
+    // Guías verticales por las que desliza el flotador.
     for (let i = 0; i < 4; i++) {
       const ang = (i * Math.PI) / 2 + Math.PI / 4;
-      const pata = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.045, 0.055, pataLargo, 8),
-        amarilloOsc
-      );
-      const rBase = 0.55;
-      const rAlto = 0.18;
-      pata.position.set(
-        Math.cos(ang) * (rBase + rAlto) * 0.5,
-        0.72 + pataLargo * 0.45,
-        Math.sin(ang) * (rBase + rAlto) * 0.5
-      );
-      pata.lookAt(new THREE.Vector3(0, 0.72 + pataLargo, 0));
-      pata.rotateX(Math.PI / 2);
-      flot.add(pata);
+      const guia = new THREE.Mesh(new THREE.BoxGeometry(0.07, 4.6, 0.1), matSpar);
+      guia.position.set(Math.cos(ang) * 0.36, 0.1, Math.sin(ang) * 0.36);
+      guia.rotation.y = -ang;
+      spar.add(guia);
     }
-    const travesano = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.16, 0.16, 0.1, 12),
-      amarilloOsc
-    );
-    travesano.position.y = 0.72 + pataLargo;
-    flot.add(travesano);
+    for (const y of [2.4, -2.2, -3.6]) {
+      const brida = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.42, 0.12, B ? 14 : 28),
+        matSpar
+      );
+      brida.position.y = y;
+      spar.add(brida);
+    }
 
-    const caja = new THREE.Mesh(
-      new THREE.BoxGeometry(0.55, 0.28, 0.4),
-      mat(0x5a6570, { metalness: 0.3, roughness: 0.5 })
+    // Torre de señalización: tramo blanco con banda roja, plataforma y mástil.
+    const matTorre = pint(COL.torre, { roughness: 0.45, metalness: 0.15 });
+    const torre = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.26, 0.32, 1.5, B ? 14 : 28),
+      matTorre
     );
-    caja.position.set(0.15, 0.82, 0);
-    caja.castShadow = true;
-    flot.add(caja);
-
-    const mastilBaliza = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.035, 0.04, 0.85, 8),
-      mat(0xc8ced4, { metalness: 0.4, roughness: 0.32, envMapIntensity: 1.1 })
+    torre.position.y = 2.9;
+    torre.castShadow = true;
+    spar.add(torre);
+    const banda = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.31, 0.32, B ? 14 : 28),
+      pint(COL.rojo, { roughness: 0.5, metalness: 0.1 })
     );
-    mastilBaliza.position.y = 0.72 + pataLargo + 0.45;
-    flot.add(mastilBaliza);
-
-    const antena = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.02, 0.55, 6),
-      mat(0xd0d6dc, { metalness: 0.4, roughness: 0.3, envMapIntensity: 1.1 })
+    banda.position.y = 2.75;
+    spar.add(banda);
+    const plataforma = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.62, 0.62, 0.06, B ? 14 : 28),
+      matSpar
     );
-    antena.position.set(0.08, 0.72 + pataLargo + 0.95, 0);
-    flot.add(antena);
-
+    plataforma.position.y = 3.66;
+    plataforma.castShadow = true;
+    spar.add(plataforma);
+    const baranda = new THREE.Mesh(
+      new THREE.TorusGeometry(0.6, 0.02, 6, B ? 14 : 28),
+      matTorre
+    );
+    baranda.rotation.x = Math.PI / 2;
+    baranda.position.y = 4.02;
+    spar.add(baranda);
+    for (let i = 0; i < 6; i++) {
+      const ang = (i * Math.PI) / 3;
+      const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.36, 5), matTorre);
+      poste.position.set(Math.cos(ang) * 0.6, 3.84, Math.sin(ang) * 0.6);
+      spar.add(poste);
+    }
+    const mastil = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.8, 8), matTorre);
+    mastil.position.y = 4.08;
+    spar.add(mastil);
+    // Paneles solares de la electrónica de a bordo.
+    for (const s of [-1, 1]) {
+      const panel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.03, 0.36),
+        ctx.mat(0x14233a, { roughness: 0.18, metalness: 0.6, envMapIntensity: 1.4 })
+      );
+      panel.position.set(s * 0.33, 4.12, 0);
+      panel.rotation.z = -s * 0.6;
+      panel.castShadow = true;
+      spar.add(panel);
+    }
+    const antena = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.6, 5), matSpar);
+    antena.position.set(0.1, 4.75, 0);
+    spar.add(antena);
     const luzBaliza = new THREE.Mesh(
-      new THREE.SphereGeometry(0.14, 12, 10),
+      new THREE.SphereGeometry(0.1, 12, 10),
       new THREE.MeshBasicMaterial({ color: COL.balizaOff })
     );
-    luzBaliza.position.y = 0.72 + pataLargo + 0.88;
-    flot.add(luzBaliza);
-    (flot.userData as Record<string, unknown>).luzBaliza = luzBaliza;
+    luzBaliza.position.y = 4.56;
+    spar.add(luzBaliza);
+    m.estado.luzBaliza = luzBaliza;
 
-    const grillete = new THREE.Mesh(
-      new THREE.TorusGeometry(0.22, 0.045, 6, 14),
-      mat(COL.sparClaro, { metalness: 0.4, roughness: 0.35 })
+    // Placa de arfada: disco ancho que "se agarra" al agua quieta del fondo.
+    const rPlaca = 2.55;
+    const matPlaca = pint(COL.placa, { roughness: 0.6, metalness: 0.3 });
+    const placa = new THREE.Mesh(
+      new THREE.CylinderGeometry(rPlaca, rPlaca, 0.16, seg),
+      matPlaca
     );
-    grillete.position.y = -0.95;
-    flot.add(grillete);
-
-    // Espuma en la línea de flotación del spar.
-    const espuma = new THREE.Mesh(
-      new THREE.TorusGeometry(0.42, 0.05, 6, 18),
-      mat(0xf2f8fa, { roughness: 0.55, metalness: 0, transparent: true, opacity: 0.5 })
+    placa.position.y = Y_PLACA;
+    placa.castShadow = true;
+    placa.receiveShadow = true;
+    spar.add(placa);
+    const canto = new THREE.Mesh(
+      new THREE.TorusGeometry(rPlaca, 0.11, 8, seg),
+      matPlaca
     );
-    espuma.rotation.x = Math.PI / 2;
-    espuma.position.set(0, 0.15, 0);
-    g.add(espuma);
+    canto.rotation.x = Math.PI / 2;
+    canto.position.y = Y_PLACA;
+    spar.add(canto);
+    const nNerv = B ? 6 : 12;
+    for (let i = 0; i < nNerv; i++) {
+      const ang = (i * Math.PI * 2) / nNerv;
+      const nerv = new THREE.Mesh(new THREE.BoxGeometry(rPlaca - 0.4, 0.2, 0.05), matPlaca);
+      nerv.position.set(
+        Math.cos(ang) * (rPlaca + 0.4) * 0.5,
+        Y_PLACA + 0.18,
+        Math.sin(ang) * (rPlaca + 0.4) * 0.5
+      );
+      nerv.rotation.y = -ang;
+      spar.add(nerv);
+      if (i % 3 === 0) {
+        // Tornapuntas del spar al borde de la placa.
+        const largo = Math.hypot(rPlaca - 0.7, 1.7);
+        const punta = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, largo, 6), matSpar);
+        punta.position.set(
+          Math.cos(ang) * (rPlaca * 0.5 + 0.02),
+          Y_PLACA + 0.95,
+          Math.sin(ang) * (rPlaca * 0.5 + 0.02)
+        );
+        punta.rotation.y = -ang;
+        punta.rotation.z = Math.atan2(rPlaca - 0.7, 1.7);
+        spar.add(punta);
+      }
+    }
 
     // =====================================================================
-    // POD submarino
+    // FLOTADOR anular (se mueve con la serie del motor)
+    // =====================================================================
+    const amarillo = pint(COL.amarillo, { roughness: 0.42, metalness: 0.12, envMapIntensity: 0.9 });
+    const amarilloOsc = pint(COL.amarilloOscuro, { roughness: 0.5, metalness: 0.12 });
+    const perfil = [
+      [0.46, -0.52],
+      [1.3, -0.56],
+      [1.56, -0.44],
+      [1.66, -0.2],
+      [1.66, 0.16],
+      [1.58, 0.36],
+      [1.3, 0.47],
+      [0.46, 0.52],
+      [0.46, -0.52],
+    ].map(([r, y]) => new THREE.Vector2(r, y));
+    const flotador = new THREE.Mesh(new THREE.LatheGeometry(perfil, seg), amarillo);
+    flotador.castShadow = true;
+    flotador.receiveShadow = true;
+    g.add(flotador);
+    m.flotador = flotador;
+
+    const defensa = new THREE.Mesh(
+      new THREE.TorusGeometry(1.66, 0.085, 8, seg),
+      ctx.mat(COL.goma, { roughness: 0.9, metalness: 0 })
+    );
+    defensa.rotation.x = Math.PI / 2;
+    defensa.position.y = -0.02;
+    flotador.add(defensa);
+    // Casquillo guía alrededor del spar.
+    const casquillo = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.5, 1.3, B ? 14 : 28, 1, true),
+      amarilloOsc
+    );
+    casquillo.position.y = 0.05;
+    flotador.add(casquillo);
+    // Barandilla y escotillas de cubierta.
+    const rail = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.022, 6, seg), amarilloOsc);
+    rail.rotation.x = Math.PI / 2;
+    rail.position.y = 0.92;
+    flotador.add(rail);
+    const nPostes = B ? 6 : 12;
+    for (let i = 0; i < nPostes; i++) {
+      const ang = (i * Math.PI * 2) / nPostes;
+      const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.48, 5), amarilloOsc);
+      poste.position.set(Math.cos(ang) * 1.42, 0.69, Math.sin(ang) * 1.42);
+      flotador.add(poste);
+    }
+    for (let i = 0; i < 3; i++) {
+      const ang = (i * Math.PI * 2) / 3 + 0.5;
+      const escotilla = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.2, 0.2, 0.06, 14),
+        amarilloOsc
+      );
+      escotilla.position.set(Math.cos(ang) * 0.98, 0.5, Math.sin(ang) * 0.98);
+      flotador.add(escotilla);
+    }
+
+    // =====================================================================
+    // FONDEO: tres líneas con boyarín intermedio
+    // =====================================================================
+    const matLinea = ctx.mat(0x23292d, { roughness: 0.8, metalness: 0.2 });
+    for (let i = 0; i < 3; i++) {
+      const ang = (i * Math.PI * 2) / 3 - Math.PI / 2;
+      const origen = new THREE.Vector3(Math.cos(ang) * 0.4, -2.2, Math.sin(ang) * 0.4);
+      const medio = new THREE.Vector3(Math.cos(ang) * 5.2, -2.9, Math.sin(ang) * 5.2);
+      const ancla = new THREE.Vector3(Math.cos(ang) * 12.5, Y_LECHO + 0.1, Math.sin(ang) * 12.5);
+      for (const c of [catenaria(origen, medio, 0.9), catenaria(medio, ancla, 1.2)]) {
+        const linea = new THREE.Mesh(new THREE.TubeGeometry(c, B ? 12 : 24, 0.03, 5, false), matLinea);
+        g.add(linea);
+      }
+      const boyarin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.3, B ? 10 : 18, B ? 8 : 12),
+        pint(COL.boyarin, { roughness: 0.5, metalness: 0.05 })
+      );
+      boyarin.position.copy(medio).y += 0.24;
+      boyarin.castShadow = true;
+      g.add(boyarin);
+    }
+
+    // =====================================================================
+    // SUBESTACIÓN SUBMARINA + CABLE
     // =====================================================================
     const xPod = 5.4;
     const zPod = -0.8;
-    const yPod = -5.9;
-
+    const yPod = Y_LECHO + 0.3;
+    const matPod = pint(COL.pod, { roughness: 0.5, metalness: 0.35 });
     const losa = new THREE.Mesh(
-      new THREE.BoxGeometry(2.4, 0.18, 1.7),
-      mat(0x4a555e, { metalness: 0.2, roughness: 0.55 })
+      new THREE.BoxGeometry(2.6, 0.2, 1.9),
+      ctx.mat(0x8b8d86, { roughness: 0.95, metalness: 0 })
     );
     losa.position.set(xPod, yPod, zPod);
     losa.castShadow = true;
     losa.receiveShadow = true;
     g.add(losa);
-
-    const podCuerpo = new THREE.Mesh(
-      new THREE.BoxGeometry(1.7, 0.7, 1.15),
-      mat(COL.pod, { metalness: 0.3, roughness: 0.42, envMapIntensity: 0.85 })
-    );
-    podCuerpo.position.set(xPod, yPod + 0.44, zPod);
+    const podCuerpo = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.75, 1.15), matPod);
+    podCuerpo.position.set(xPod, yPod + 0.48, zPod);
     podCuerpo.castShadow = true;
     g.add(podCuerpo);
-
-    const podTapa = new THREE.Mesh(
-      new THREE.BoxGeometry(1.5, 0.14, 1.0),
-      mat(COL.podClaro, { metalness: 0.35, roughness: 0.35, envMapIntensity: 1 })
-    );
-    podTapa.position.set(xPod, yPod + 0.86, zPod);
-    g.add(podTapa);
-
     for (const s of [-1, 1]) {
-      const tanque = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.18, 0.18, 0.95, 12),
-        mat(COL.podTanque, { metalness: 0.4, roughness: 0.3, envMapIntensity: 1.1 })
-      );
+      const tanque = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.8, 4, B ? 8 : 14), matPod);
       tanque.rotation.z = Math.PI / 2;
-      tanque.position.set(xPod + s * 0.35, yPod + 1.05, zPod);
+      tanque.position.set(xPod, yPod + 1.06, zPod + s * 0.3);
       tanque.castShadow = true;
       g.add(tanque);
-      for (const e of [-1, 1]) {
-        const tapaT = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.19, 0.19, 0.06, 12),
-          mat(0x6a757e, { metalness: 0.35 })
-        );
-        tapaT.rotation.z = Math.PI / 2;
-        tapaT.position.set(xPod + s * 0.35 + e * 0.48, yPod + 1.05, zPod);
-        g.add(tapaT);
-      }
     }
-
+    // Bastidor de protección contra artes de pesca.
+    const matBastidor = pint(COL.amarillo, { roughness: 0.55, metalness: 0.1 });
     for (const [dx, dz] of [
-      [-1.05, -0.7],
-      [1.05, -0.7],
-      [-1.05, 0.7],
-      [1.05, 0.7],
+      [-1.15, -0.8],
+      [1.15, -0.8],
+      [-1.15, 0.8],
+      [1.15, 0.8],
     ] as const) {
-      const poste = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.03, 0.03, 0.55, 6),
-        mat(COL.podClaro, { metalness: 0.35 })
-      );
-      poste.position.set(xPod + dx, yPod + 0.4, zPod + dz);
+      const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6), matBastidor);
+      poste.position.set(xPod + dx, yPod + 0.75, zPod + dz);
       g.add(poste);
     }
+    for (const dz of [-0.8, 0.8]) {
+      const larguero = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.3, 6), matBastidor);
+      larguero.rotation.z = Math.PI / 2;
+      larguero.position.set(xPod, yPod + 1.45, zPod + dz);
+      g.add(larguero);
+    }
+    for (const dx of [-1.15, 1.15]) {
+      const travesano = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.6, 6), matBastidor);
+      travesano.rotation.x = Math.PI / 2;
+      travesano.position.set(xPod + dx, yPod + 1.45, zPod);
+      g.add(travesano);
+    }
 
-    // ---- Cable ----
+    // Umbilical en "lazy wave" del spar al lecho, y cable de evacuación.
     const { cable, curva, pulso } = crearCableConPulso(
       [
-        new THREE.Vector3(0, yPlaca - 0.15, 0),
-        new THREE.Vector3(2.2, -5.7, 0.3),
-        new THREE.Vector3(xPod - 1.3, yPod + 0.3, zPod),
-        new THREE.Vector3(xPod + 1.5, yPod + 0.2, zPod),
-        new THREE.Vector3(12, -5.5, -2),
+        new THREE.Vector3(0, Y_PLACA - 0.1, 0),
+        new THREE.Vector3(0.9, Y_PLACA - 0.75, 0.25),
+        new THREE.Vector3(2.4, Y_LECHO + 0.5, 0.2),
+        new THREE.Vector3(xPod - 1.25, yPod + 0.25, zPod),
+        new THREE.Vector3(xPod + 1.4, yPod + 0.12, zPod),
+        new THREE.Vector3(9, Y_LECHO + 0.1, -1.6),
+        new THREE.Vector3(16, Y_LECHO + 0.08, -3),
       ],
-      0.085
+      0.07
     );
     g.add(cable);
     m.pulsoCurva = curva;
     m.pulso = pulso;
     g.add(pulso);
 
-    const cableInterno = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.06, 0.9, 8),
-      mat(COL.cable)
-    );
-    cableInterno.position.set(0, yPlaca + 0.55, 0);
-    g.add(cableInterno);
+    // ---- Partículas: órbitas de la ola, cada vez menores hacia el fondo ----
+    const particulas = crearParticulas({
+      cantidad: B ? 140 : 420,
+      min: { x: -10, y: Y_LECHO + 0.5, z: -6 },
+      max: { x: 10, y: -0.5, z: 5 },
+      orbital: true,
+      tam: 0.085,
+      opacidad: 0.6,
+    });
+    g.add(particulas);
+    m.estado.particulas = particulas;
 
+    // ---- Rótulos ----
     m.etiquetaDispositivo = crearEtiqueta("Absorbedor puntual");
-    m.etiquetaDispositivo.position.set(0, 3.6, 0);
-    g.add(m.etiquetaDispositivo as Sprite3D);
+    m.etiquetaDispositivo.position.set(0, 5.4, 0);
+    m.etiquetaDispositivo.userData.prioridad = 2;
+    g.add(m.etiquetaDispositivo);
+    const rotFlot = crearEtiqueta("Flotador: sube y baja con la ola");
+    rotFlot.position.set(-3.6, 1.3, 0);
+    rotFlot.userData.prioridad = 1;
+    g.add(rotFlot);
+    m.estado.rotFlot = rotFlot;
+    const rotPlaca = crearEtiqueta("Placa de arfada: casi quieta");
+    rotPlaca.position.set(-3.4, Y_PLACA + 0.9, 0);
+    rotPlaca.userData.prioridad = 3;
+    g.add(rotPlaca);
 
     return m;
   },
@@ -397,41 +409,46 @@ export const escenaAbsorbedor: Escena3D = {
   animar(t: number, ctx: ContextoEscena3D, m: ManijasEscena3D): void {
     const omega = (2 * Math.PI) / (ctx.Te > 0 ? ctx.Te : 7);
     const k = ctx.k > 0 ? ctx.k : 0.08;
+    // Misma escala vertical que la ola: el flotador sube lo que diga la serie
+    // del motor (ya incluye Hm0, Te y el amortiguamiento del PTO).
     const zSerie = ctx.muestrearSerie(t);
-    const z = zSerie !== null ? zSerie : ctx.eta(0, t, omega, k) * 0.6;
-    const freno = Math.max(0.3, Math.min(1.6, 80_000 / Math.max(10_000, ctx.Bpto)));
-    const escala =
-      Math.max(0.4, Math.min(2.2, ctx.Hm0 / Math.max(0.5, ctx.Te / 4))) * freno;
+    const eta0 = ctx.eta(0, t, omega, k);
+    const z = zSerie !== null ? zSerie : eta0 * 0.6;
 
     if (m.flotador) {
-      m.flotador.position.y = z * escala * 1.35;
-      m.flotador.rotation.z = Math.sin(t * omega * 0.5) * 0.025 * escala;
-      m.flotador.rotation.x = Math.cos(t * omega * 0.43) * 0.02 * escala;
+      m.flotador.position.y = NIVEL + z;
+      // Cabeceo leve: el flotador se acomoda a la pendiente de la ola.
+      const pendiente = (ctx.Hm0 / 2) * 0.22 * Math.sin(omega * t);
+      m.flotador.rotation.z = Math.atan(pendiente) * 0.3;
     }
-    if (m.mastil) {
-      m.mastil.position.y = -2.0 + Math.sin(t * 0.37) * 0.04;
+    const spar = m.estado.spar as THREE.Group | undefined;
+    // La placa de arfada deja al spar un resto pequeño del movimiento.
+    if (spar) spar.position.y = eta0 * 0.05;
+
+    const luz = m.estado.luzBaliza as THREE.Mesh | undefined;
+    if (luz) {
+      const on = Math.sin(t * 2.4) > 0.35;
+      (luz.material as THREE.MeshBasicMaterial).color.setHex(
+        on ? COL.balizaOn : COL.balizaOff
+      );
+      luz.scale.setScalar(on ? 1.5 : 1.0);
     }
-    if (m.flotador) {
-      const luz = (m.flotador.userData as Record<string, unknown>).luzBaliza as
-        | THREE.Mesh
-        | undefined;
-      if (luz && luz.material) {
-        const on = Math.sin(t * 2.4) > 0.35;
-        (luz.material as THREE.MeshBasicMaterial).color.setHex(
-          on ? COL.balizaOn : COL.balizaOff
-        );
-        const s = on ? 1.25 : 1.0;
-        luz.scale.set(s, s, s);
-      }
+
+    const part = m.estado.particulas as THREE.Points | undefined;
+    if (part) {
+      (part.material as THREE.ShaderMaterial).uniforms.uDecae.value = k * M_POR_UNIDAD_V;
     }
-    if (m.pulso && m.pulsoCurva) {
-      const f = (t * 0.2) % 1;
-      m.pulsoCurva.getPointAt(f, m.pulso.position);
-      const matP = m.pulso.material as THREE.MeshStandardMaterial;
-      if (matP && matP.emissive) {
-        matP.emissive.setHex(0x6a8a10);
-        matP.emissiveIntensity = 0.55 + 0.45 * Math.sin(f * Math.PI);
-      }
+
+    // Espuma en la flotación: más viva cuanto más se mueve el flotador
+    // respecto al agua que lo rodea.
+    if (m.mar) {
+      const relativo = Math.min(1, Math.abs(z - eta0) / 0.8);
+      fijarEstelas(m.mar, [
+        { x: 0, z: 0, radio: 1.66, fuerza: 0.3 + 0.6 * relativo },
+      ]);
     }
+    const anclaFlot = (m.estado.rotFlot as THREE.Sprite | undefined)?.userData
+      .ancla as THREE.Vector3 | undefined;
+    anclaFlot?.set(-3.6, 1.3 + z, 0);
   },
 };

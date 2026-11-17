@@ -151,7 +151,9 @@ void main() {
   vec3 r = reflect(-v, n);
   vec3 reflejo;
   if (uUsaEnv > 0.5) {
-    reflejo = textureCube(uEnv, r).rgb;
+    // Reflejo contenido: el cielo cubierto entero aclara el mar hasta dejar
+    // sin contraste el texto de la portada.
+    reflejo = textureCube(uEnv, r).rgb * 0.13;
   } else {
     float hh = clamp(r.y, 0.0, 1.0);
     reflejo = mix(vec3(0.55, 0.68, 0.78), vec3(0.22, 0.42, 0.62), hh);
@@ -191,7 +193,7 @@ export class MarRealista {
   private material: THREE.ShaderMaterial | null = null;
   private sky: InstanceType<typeof Sky> | null = null;
   private sol = new THREE.Vector3();
-  private pmrem: THREE.PMREMGenerator | null = null;
+  private cubo: THREE.WebGLCubeRenderTarget | null = null;
   private rafId: number | null = null;
   private tSim = 0;
   private inicioMs = 0;
@@ -233,8 +235,6 @@ export class MarRealista {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(52, ancho / alto, 0.5, 25000);
 
-    this.pmrem = new THREE.PMREMGenerator(this.renderer);
-
     try {
       this.construir();
     } catch (e) {
@@ -265,17 +265,20 @@ export class MarRealista {
     u.sunPosition.value.copy(this.sol);
     this.sky = sky;
 
-    let envMap: THREE.Texture | null = null;
-    if (this.pmrem && this.sky) {
-      const sceneEnv = new THREE.Scene();
-      sceneEnv.add(this.sky);
-      const target = this.pmrem.fromScene(sceneEnv as never);
-      envMap = target.texture;
-      this.scene.environment = envMap;
-      this.scene.add(this.sky);
-    } else {
-      this.scene.add(sky);
-    }
+    // El agua muestrea un samplerCube: el cielo se hornea una vez en un cubo.
+    // (La textura PMREM es 2D; enlazarla a un samplerCube dejaba el reflejo
+    // sin textura y un aviso de WebGL en cada programa.)
+    const sceneEnv = new THREE.Scene();
+    sceneEnv.add(sky);
+    const cubo = new THREE.WebGLCubeRenderTarget(256, {
+      type: THREE.HalfFloatType,
+      generateMipmaps: true,
+      minFilter: THREE.LinearMipmapLinearFilter,
+    });
+    new THREE.CubeCamera(1, 60000, cubo).update(this.renderer, sceneEnv);
+    this.cubo = cubo;
+    const envMap: THREE.Texture = cubo.texture;
+    this.scene.add(sky);
 
     // La silueta de las olas grandes necesita densidad; el sombreado ya no
     // depende de la malla (normales analíticas en el vertex shader).
@@ -293,7 +296,7 @@ export class MarRealista {
         uColorSomero: { value: new THREE.Color(0x0e7380) },
         uColorSol: { value: new THREE.Color(0xffe6b0) },
         uEnv: { value: envMap },
-        uUsaEnv: { value: envMap ? 1 : 0 },
+        uUsaEnv: { value: 1 },
       },
       side: THREE.FrontSide,
     });
@@ -374,8 +377,8 @@ export class MarRealista {
     }
     this.material?.dispose();
     this.material = null;
-    this.pmrem?.dispose();
-    this.pmrem = null;
+    this.cubo?.dispose();
+    this.cubo = null;
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.contenedor) {
       this.contenedor.removeChild(this.renderer.domElement);
