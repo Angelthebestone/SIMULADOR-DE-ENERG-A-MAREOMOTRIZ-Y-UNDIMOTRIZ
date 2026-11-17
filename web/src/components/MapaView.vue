@@ -103,6 +103,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, computed, watch } from "vue";
+import maplibregl from "maplibre-gl";
 import { crearMapa, flyToSitio, actualizarSitios, fijarTecnologiaActiva, MENSAJE_DIQUE_LEJOS, type SitioMapa } from "../map/mapa";
 import { consultarOleaje, consultarMarea, consultarRangoMareal, consultarCorriente } from "../datos/marino";
 import { cargarPlantas, type PlantaMundial, type TecnologiaActiva, type TecnologiaPlanta } from "../map/plantas";
@@ -116,6 +117,7 @@ const props = defineProps<{
   dispositivo?: string;
   /** Caja flotante mínima (mapa de la simulación). Oculta la ficha. */
   compacto?: boolean;
+  centro?: [number, number] | null;
 }>();
 
 const emit = defineEmits<{
@@ -232,7 +234,14 @@ onMounted(() => {
   if (map) fijarTecnologiaActiva(map, tecnologiaActiva.value);
   // El mapa compacto enseña dónde se está simulando, no el mundo entero.
   const activo = sitios.value.find((s) => s.id === props.sitioActivo);
-  if (props.compacto && activo) map.jumpTo({ center: [activo.lon, activo.lat], zoom: 4 });
+  const centro = props.centro ?? (activo ? ([activo.lon, activo.lat] as [number, number]) : null);
+  if (props.compacto && centro) {
+    map.jumpTo({ center: centro, zoom: 3 });
+    const marca = document.createElement("div");
+    marca.style.cssText =
+      "inline-size:14px;block-size:14px;border-radius:50%;background:var(--marco-captado);border:2px solid var(--marco);box-shadow:0 0 0 4px oklch(0.85 0.17 118 / 0.35)";
+    new maplibregl.Marker({ element: marca }).setLngLat(centro).addTo(map);
+  }
   void cargarPlantas().then((ps) => (plantas.value = ps));
 
   map.on("sitio_seleccionado" as never, (e: { id: string }) => alSeleccionar(e.id));

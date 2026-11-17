@@ -136,6 +136,7 @@ const PLANTILLA = `
               <div v-if="!mapaReplegado" class="mapa-flotante-caja">
                 <MapaView
                   compacto
+                  :centro="centroSitio"
                   :sitio-activo="params.sitio_id"
                   :dispositivo="params.dispositivo"
                   @seleccionar-sitio="alSeleccionarSitioMapa"
@@ -167,6 +168,7 @@ const app = createApp({
       sustentacion: false,
       offline: false,
       mapaReplegado: window.innerWidth < 768,
+      centroSitio: null as [number, number] | null,
       paso: 1 as Paso,
       familia: 'undimotriz' as Familia,
       origen: 'lugar' as Origen,
@@ -202,6 +204,7 @@ const app = createApp({
       this.familia = familiaDeDispositivo(id)
       const inicio = SITIO_INICIAL[id]
       if (inicio) {
+        this.centroSitio = null
         this.nombreSitio = inicio.nombre
         this.fuenteSitio = inicio.fuente
       }
@@ -227,6 +230,7 @@ const app = createApp({
       if (s.tipo === 'mareomotriz') cambios.dispositivo = 'turbina_corriente'
       else if (s.tipo === 'undimotriz') cambios.dispositivo = 'absorbedor_puntual'
       this.origen = 'lugar'
+      this.centroSitio = Number.isFinite(s.lon) && Number.isFinite(s.lat) ? [s.lon, s.lat] : null
       this.nombreSitio = s.nombre || this.nombreSitio
       this.fuenteSitio = s.fuente || this.fuenteSitio
       this.aplicarParams(cambios)
