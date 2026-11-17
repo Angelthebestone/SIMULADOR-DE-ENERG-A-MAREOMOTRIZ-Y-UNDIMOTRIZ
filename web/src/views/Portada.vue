@@ -1,17 +1,14 @@
 <template>
-  <section class="portada" aria-labelledby="titulo-portada" data-testid="vista-portada">
-    <canvas
-      ref="canvasRef"
-      class="oleaje mar"
-      width="1200"
-      height="600"
-      aria-label="Mar en movimiento con el dispositivo de captura"
-    ></canvas>
+  <section
+    class="portada"
+    aria-label="Simulador de energía marina"
+    data-testid="vista-portada"
+  >
+    <div ref="marRef" class="mar-realista" aria-hidden="true"></div>
+    <div class="velo" aria-hidden="true"></div>
 
     <div class="portada-contenido">
       <p class="marca">Simulador de energía marina</p>
-      <h1 id="titulo-portada">El mar, a pantalla completa</h1>
-      <p class="bajada">Elige por dónde entra la energía: la marea o la ola. Nada más que elegir.</p>
 
       <div class="entradas">
         <button
@@ -41,54 +38,78 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { AnimacionCanvas } from '../components/AnimacionCanvas'
+import { MarRealista } from '../components/MarRealista'
 import Icono from '../components/Icono.vue'
 import type { Familia } from '../flujo/estado'
 
 const emit = defineEmits<{ (e: 'elegir-familia', f: Familia): void }>()
 
-const canvasRef = ref<HTMLCanvasElement | null>(null)
-let animacion: AnimacionCanvas | null = null
+const marRef = ref<HTMLElement | null>(null)
+let mar: MarRealista | null = null
 
 onMounted(() => {
-  if (!canvasRef.value) return
-  animacion = new AnimacionCanvas(canvasRef.value)
-  animacion.pie = 0
-  // Misma superficie del simulador, sin serie de cálculo: la ola se dibuja
-  // con altura 1,5 m y periodo 7,0 s, como en Isla Fuerte.
-  animacion.cargarSimulacion({
-    series: null,
-    k: 0.083,
-    Hm0: 1.5,
-    Te: 7.0,
-    Bpto: 80_000,
-    dispositivo: 'absorbedor_puntual',
-    profundidad_m: 30,
-    modoEnergia: 'undimotriz',
-    potenciaCaptadaW: null,
-  })
-  animacion.arrancar()
+  if (!marRef.value) return
+  try {
+    mar = new MarRealista(marRef.value)
+    mar.arrancar()
+  } catch {
+    // Sin WebGL la portada mantiene el degradado CSS del contenedor.
+    mar = null
+  }
 })
 
-onBeforeUnmount(() => animacion?.detener())
+onBeforeUnmount(() => {
+  mar?.detener()
+  mar = null
+})
 </script>
 
 <style scoped>
 .portada {
   position: relative;
   display: flex;
-  min-block-size: calc(100dvh - 12rem);
+  inline-size: 100%;
+  block-size: 100%;
+  min-block-size: 100dvh;
   overflow: hidden;
-  border-radius: var(--radio-escena);
-  background: var(--map-oceano);
+  border-radius: 0;
+  /* Respaldo si WebGL no arranca: mar profundo en degradado. */
+  background:
+    linear-gradient(
+      180deg,
+      oklch(0.78 0.06 220) 0%,
+      oklch(0.55 0.09 210) 28%,
+      oklch(0.38 0.08 200) 52%,
+      oklch(0.28 0.05 200) 100%
+    );
 }
 
-.mar {
+.mar-realista {
   position: absolute;
   inset: 0;
   inline-size: 100%;
   block-size: 100%;
+}
+
+.mar-realista :deep(canvas) {
   display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+/* Velo para que el texto se lea sobre el cielo y el brillo especular. */
+.velo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 48%, oklch(0.1 0.02 240 / 0.18) 0%, transparent 70%),
+    linear-gradient(
+      180deg,
+      oklch(0.12 0.03 240 / 0.35) 0%,
+      oklch(0.12 0.03 240 / 0.12) 35%,
+      oklch(0.08 0.02 240 / 0.28) 100%
+    );
 }
 
 .portada-contenido {
@@ -99,40 +120,26 @@ onBeforeUnmount(() => animacion?.detener())
   align-content: center;
   justify-items: center;
   inline-size: 100%;
-  padding: var(--s-9) var(--s-4);
+  padding: var(--s-8) var(--s-4) var(--s-9);
   text-align: center;
-  color: oklch(0.97 0.004 106);
+  color: oklch(0.98 0.005 106);
+  text-shadow: 0 1px 12px oklch(0.1 0.02 240 / 0.55);
 }
 
 .marca {
   margin: 0;
   font-size: var(--text-meta);
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.9;
-}
-
-.portada-contenido h1 {
-  margin: 0;
-  font-size: var(--text-cifra);
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-
-.bajada {
-  margin: 0;
-  max-inline-size: 34rem;
-  font-size: var(--text-cuerpo);
   opacity: 0.92;
-  text-wrap: pretty;
 }
 
 .entradas {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 17rem));
   gap: var(--s-4);
-  margin-block-start: var(--s-4);
+  margin-block-start: var(--s-3);
 }
 
 .entrada {
@@ -140,16 +147,25 @@ onBeforeUnmount(() => animacion?.detener())
   gap: var(--s-1);
   justify-items: center;
   padding: var(--s-6) var(--s-4);
-  border: 1px solid oklch(1 0 0 / 0.35);
+  border: 1px solid oklch(1 0 0 / 0.32);
   border-radius: var(--radio-caja);
-  background: oklch(0.24 0.02 238 / 0.82);
-  color: var(--marco-tinta);
+  background: oklch(0.18 0.03 230 / 0.55);
+  color: oklch(0.98 0.004 106);
   cursor: pointer;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: 0 8px 32px oklch(0.1 0.02 240 / 0.28);
+  transition:
+    background-color var(--dur-rapida) var(--ease-salida),
+    border-color var(--dur-rapida) var(--ease-salida),
+    transform var(--dur-rapida) var(--ease-salida);
+  text-shadow: none;
 }
 
 .entrada:hover {
-  background: oklch(0.24 0.02 238 / 0.95);
+  background: oklch(0.2 0.035 230 / 0.78);
+  border-color: oklch(1 0 0 / 0.55);
+  transform: translateY(-2px);
 }
 
 .entrada-nombre {
@@ -160,12 +176,12 @@ onBeforeUnmount(() => animacion?.detener())
 
 .entrada-detalle {
   font-size: var(--text-meta);
-  color: var(--marco-tenue);
+  color: oklch(0.88 0.01 220);
 }
 
 .portada :focus-visible {
   outline: 2px solid var(--foco);
-  outline-offset: 2px;
+  outline-offset: 3px;
   border-radius: 4px;
 }
 
@@ -174,8 +190,8 @@ onBeforeUnmount(() => animacion?.detener())
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .portada-contenido h1 {
-    font-size: var(--text-seccion);
+  .portada-contenido {
+    padding-block: var(--s-6);
   }
 }
 </style>

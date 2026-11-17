@@ -6,9 +6,6 @@ import './styles/app.css'
 import './flujo/flujo.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import Ver from './views/Ver.vue'
-import Calcular from './views/Calcular.vue'
-import Comparar from './views/Comparar.vue'
-import Disenar from './views/Disenar.vue'
 import Portada from './views/Portada.vue'
 import Tecnologia from './views/Tecnologia.vue'
 import OrigenDatos from './views/OrigenDatos.vue'
@@ -19,7 +16,6 @@ import type { SitioMapa } from './map/mapa'
 import { simular, cancelar, type Params } from './api'
 import { formatearNumero } from './utils/formato'
 import {
-  PASOS,
   PARAMS_INICIALES,
   dispositivoPorDefecto,
   familiaDeDispositivo,
@@ -33,31 +29,17 @@ Ortega et al. (2013) · 8,9 kW/m en Isla Fuerte frente a 40 kW/m de umbral de gr
 ERA5-Ocean vía Open-Meteo Marine · GMRT Lamont-Doherty · RUNAP · XM
 Natural Earth para el contorno de tierra. Repositorio público con datos reproducibles.`
 
-// Decisión de arranque (lote a): la app arranca en el paso 4 con los valores
-// de siempre (isla_fuerte / absorbedor_puntual) para que la escena, la carta
-// y la barra de cifras estén montadas al cargar. La portada queda a un toque
-// en la ruta de pasos, no como bloqueo inicial.
+// La portada es la puerta de entrada: mar realista a pantalla completa, sin
+// barra de pasos ni cadena de lectura. Al elegir familia se entra al flujo.
+// Los pasos siguientes también van a pantalla completa: sin barra superior.
 const PLANTILLA = `
-  <div id="app" :data-sustentacion="sustentacion ? '' : null" style="--escala:1">
+  <div
+    id="app"
+    :class="claseModo"
+    :data-sustentacion="sustentacion ? '' : null"
+    style="--escala:1"
+  >
     <main class="tablero flujo">
-      <header class="flujo-cabecera" aria-label="Ruta del recorrido">
-        <ol class="flujo-lista">
-          <li v-for="(p, i) in pasos" :key="p.id" class="flujo-paso-item">
-            <button
-              type="button"
-              class="flujo-paso"
-              :data-testid="'paso-' + p.id"
-              :aria-current="paso === p.id ? 'step' : undefined"
-              @click="irA(p.id)"
-            >
-              <span class="flujo-num" aria-hidden="true">{{ p.id }}</span>
-              <span>{{ p.nombre }}</span>
-            </button>
-            <span v-if="i < pasos.length - 1" class="flujo-separador" aria-hidden="true">›</span>
-          </li>
-        </ol>
-      </header>
-
       <div class="etapa">
         <Portada v-if="paso === 1" @elegir-familia="alElegirFamilia" />
 
@@ -77,6 +59,7 @@ const PLANTILLA = `
           :sitio-id="params.sitio_id"
           :sitio-nombre="nombreSitio"
           :sitio-fuente="fuenteSitio"
+          :dispositivo="params.dispositivo"
           @elegir-origen="alElegirOrigen"
           @update:params="aplicarParams"
           @seleccionar-sitio="alSeleccionarSitioMapa"
@@ -95,46 +78,35 @@ const PLANTILLA = `
             Resultado hipotético: estos números se escribieron a mano y no pertenecen a ningún punto del mapa.
           </p>
 
-          <div class="bloque-mapa">
-            <h2>Emplazamiento</h2>
-            <div class="mapa-caja">
-              <MapaView
-                :sitio-activo="params.sitio_id"
-                @seleccionar-sitio="alSeleccionarSitioMapa"
-                @ir-a-simulador="alIrASimulador" />
+          <!-- Mapa flotante: el estudiante cambia de punto sin salir de la escena. -->
+          <aside class="mapa-flotante" :class="{ replegado: mapaReplegado }" aria-label="Emplazamiento">
+            <div class="mapa-flotante-barra">
+              <span class="mapa-flotante-titulo">Emplazamiento</span>
+              <button
+                type="button"
+                class="mapa-flotante-toggle"
+                :aria-expanded="mapaReplegado ? 'false' : 'true'"
+                data-testid="alternar-mapa-mini"
+                @click="mapaReplegado = !mapaReplegado"
+              >
+                <Icono :icono="mapaReplegado ? 'eslabon' : 'marca'" tamano="sm" />
+                <span>{{ mapaReplegado ? 'Ver mapa' : 'Ocultar' }}</span>
+              </button>
             </div>
-          </div>
-
-          <nav class="subvistas" aria-label="Lecturas de la simulación">
-            <button
-              v-for="s in subvistas"
-              :key="s.id"
-              type="button"
-              class="subvista-btn"
-              :data-testid="'subvista-' + s.id"
-              :aria-selected="subvista === s.id ? 'true' : 'false'"
-              @click="subvista = s.id"
-            >
-              <span>{{ s.nombre }}</span>
-            </button>
-          </nav>
-
-          <Calcular v-if="subvista === 'calcular'" :formulas="formulas" :resultado="resultado" :cargando="cargando" />
-          <Comparar v-else-if="subvista === 'comparar'" :resultado="resultado" :cargando="cargando" />
-          <Disenar
-            v-else-if="subvista === 'disenar'"
-            :figuras="figuras"
-            :resultado="resultado"
-            :panel-sitio="panelSitio"
-            :sitio-id="params.sitio_id"
-            :params="params"
-            @update:params="aplicarParams"
-          />
+            <div v-show="!mapaReplegado" class="mapa-flotante-caja">
+              <MapaView
+                compacto
+                :sitio-activo="params.sitio_id"
+                :dispositivo="params.dispositivo"
+                @seleccionar-sitio="alSeleccionarSitioMapa"
+                @ir-a-simulador="alSeleccionarSitioMapa" />
+            </div>
+          </aside>
         </div>
       </div>
     </main>
 
-    <footer class="lectura" role="status" aria-live="polite" data-testid="barra-kpis">
+    <footer v-if="paso !== 1" class="lectura" role="status" aria-live="polite" data-testid="barra-kpis">
       <div class="cadena">
         <template v-for="(k, i) in kpis" :key="k.id">
           <Icono v-if="i > 0" icono="eslabon" tamano="sm" class="eslabon" />
@@ -177,25 +149,16 @@ const PLANTILLA = `
 
 const app = createApp({
   template: PLANTILLA,
-  components: { Ver, Calcular, Comparar, Disenar, Portada, Tecnologia, OrigenDatos, MapaView, Icono, DialogoFuentes },
+  components: { Ver, Portada, Tecnologia, OrigenDatos, MapaView, Icono, DialogoFuentes },
   data() {
     return {
       sustentacion: false,
       offline: false,
-      paso: 4 as Paso,
+      mapaReplegado: false,
+      paso: 1 as Paso,
       familia: 'undimotriz' as Familia,
       origen: 'lugar' as Origen,
-      subvista: 'calcular' as 'calcular' | 'comparar' | 'disenar',
-      pasos: PASOS,
-      subvistas: [
-        { id: 'calcular' as const, nombre: 'Calcular' },
-        { id: 'comparar' as const, nombre: 'Comparar' },
-        { id: 'disenar' as const, nombre: 'Diseñar' },
-      ],
       resultado: null as Record<string, any> | null,
-      formulas: {} as Record<string, unknown>,
-      figuras: null as Record<string, unknown> | null,
-      panelSitio: null as Record<string, unknown> | null,
       viviendas: null as number | null,
       error: '' as string,
       cargando: false,
@@ -207,6 +170,12 @@ const app = createApp({
     }
   },
   computed: {
+    claseModo(): string {
+      if (this.paso === 1) return 'modo-portada'
+      if (this.paso === 2) return 'modo-tecnologia'
+      if (this.paso === 3) return 'modo-origen'
+      return 'modo-simulacion'
+    },
     kpis(): Array<{ id: string; etiqueta: string; valor: string; unidad: string; pendiente: boolean }> {
       const r = this.resultado
       const kwm = Number(r?.eslabones?.[0]?.detalle?.j_w_m ?? NaN) / 1000
@@ -275,12 +244,6 @@ const app = createApp({
         const respuesta = (await simular({ ...this.params })) as Record<string, any>
         if (respuesta?.error) this.error = String(respuesta.error)
         this.resultado = respuesta?.resultado ?? null
-        const f = respuesta?.formulas
-        this.formulas = f && typeof f === 'object' ? (f as Record<string, unknown>) : {}
-        const figs = respuesta?.figuras ?? respuesta?.resultado?.figuras ?? null
-        this.figuras = figs && typeof figs === 'object' ? (figs as Record<string, unknown>) : null
-        const panel = respuesta?.extras?.panel_sitio ?? null
-        this.panelSitio = panel && typeof panel === 'object' ? (panel as Record<string, unknown>) : null
         const v = respuesta?.extras?.viviendas
         this.viviendas = typeof v === 'number' ? v : (v?.viviendas ?? null)
       } catch (e) {

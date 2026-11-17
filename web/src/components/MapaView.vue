@@ -1,5 +1,5 @@
 <template>
-  <section class="mapa-seccion" aria-labelledby="titulo-mapa">
+  <section class="mapa-seccion" :class="{ compacto }" aria-labelledby="titulo-mapa">
     <h1 id="titulo-mapa" class="rotulo-oculto">Carta mundial de recurso marino</h1>
 
     <!-- Carta: arriba, con la leyenda del recurso encima y nada más. -->
@@ -28,24 +28,9 @@
       </p>
     </div>
 
-    <!-- Ficha del emplazamiento activo: la selección se hace en la carta, así
-         que la lista y los filtros de región desaparecieron. -->
-    <div class="barra-tecnologia" role="group" aria-label="Capa de potencial por tecnología">
-      <span class="barra-tecnologia-rotulo">Recurso</span>
-      <button
-        v-for="t in TECNOLOGIAS"
-        :key="t.id"
-        type="button"
-        class="tec-btn"
-        :class="{ activo: tecnologiaActiva === t.id }"
-        :aria-pressed="tecnologiaActiva === t.id ? 'true' : 'false'"
-        @click="cambiarTecnologia(t.id)"
-      >
-        {{ t.nombre }}
-      </button>
-    </div>
-
-    <div v-if="plantaActual" class="ficha-sitio ficha-planta" aria-label="Ficha de la planta">
+    <!-- Ficha del emplazamiento activo: la capa de potencial la decide el
+         dispositivo del flujo; aquí ya no se conmuta a mano. -->
+    <div v-if="plantaActual && !compacto" class="ficha-sitio ficha-planta" aria-label="Ficha de la planta">
       <div class="ficha-cabecera">
         <div>
           <span class="ficha-tag">{{ etiquetaTecnologia(plantaActual.tecnologia) }}</span>
@@ -84,7 +69,7 @@
       </button>
     </div>
 
-    <div v-else-if="sitioActual" class="ficha-sitio">
+    <div v-else-if="sitioActual && !compacto" class="ficha-sitio">
       <div class="ficha-cabecera">
         <div>
           <span class="ficha-tag">{{ sitioActual.pais || "Océano global" }}</span>
@@ -129,6 +114,8 @@ const props = defineProps<{
   sitioActivo?: string;
   /** Dispositivo que el flujo tiene activo: decide qué capa de potencial se pinta. */
   dispositivo?: string;
+  /** Caja flotante mínima (mapa de la simulación). Oculta la ficha. */
+  compacto?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -143,15 +130,7 @@ const consultando = ref(false);
 const avisoTierra = ref("");
 let temporizadorAviso = 0 as unknown as ReturnType<typeof setTimeout>;
 
-/** Capa de potencial visible: una sola tecnología a la vez, nunca todas.
- *  El flujo la conmuta con la prop `dispositivo`; el conmutador local la
- *  cambia a mano sin tocar el cálculo. */
-const TECNOLOGIAS: { id: TecnologiaActiva; nombre: string }[] = [
-  { id: "undimotriz", nombre: "Oleaje" },
-  { id: "dique", nombre: "Dique" },
-  { id: "turbina", nombre: "Turbina" },
-];
-
+/** Capa de potencial visible: la decide el dispositivo del flujo (sin conmutador). */
 function tecnologiaDeDispositivo(d?: string): TecnologiaActiva {
   if (d === "embalse") return "dique";
   if (d === "turbina_corriente") return "turbina";
@@ -169,7 +148,8 @@ const leyenda = computed(() => {
   return { titulo: "Frente de ola", topes: ["0", "20", "45", "80+ kW/m"], fuente: "Open-Meteo Marine (ERA5-Ocean / MFWAM)" };
 });
 
-function cambiarTecnologia(t: TecnologiaActiva) {
+function sincronizarTecnologia(t: TecnologiaActiva) {
+  if (tecnologiaActiva.value === t) return;
   tecnologiaActiva.value = t;
   plantaActual.value = null;
   if (map) fijarTecnologiaActiva(map, t);
@@ -286,8 +266,7 @@ watch(
 watch(
   () => props.dispositivo,
   (d) => {
-    const t = tecnologiaDeDispositivo(d);
-    if (t !== tecnologiaActiva.value) cambiarTecnologia(t);
+    sincronizarTecnologia(tecnologiaDeDispositivo(d));
   }
 );
 
@@ -437,48 +416,16 @@ function confirmarSeleccionYSimular() {
   color: var(--tenue);
 }
 
-/* Conmutador de capa de potencial: una tecnología a la vez. */
-.barra-tecnologia {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin: var(--s-2) var(--s-3) 0;
-  padding: 6px var(--s-2);
-  border: 1px solid var(--borde-suave);
-  border-radius: var(--radio-caja);
-  background: var(--panel);
+/* Caja mínima de la simulación: sólo la carta y la leyenda. */
+.mapa-seccion.compacto .escala {
+  inline-size: 9rem;
+  inset-block-end: 4px;
+  inset-inline-start: 4px;
+  padding: 4px 8px;
 }
 
-.barra-tecnologia-rotulo {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--tenue);
-}
-
-.tec-btn {
-  padding: 4px 10px;
-  border: 1px solid var(--borde-suave);
-  border-radius: var(--radio);
-  background: transparent;
-  color: var(--tinta);
-  font-size: var(--text-meta);
-  cursor: pointer;
-}
-
-.tec-btn.activo {
-  border-color: var(--rol-mar-profundo);
-  background: var(--rol-mar-profundo);
-  color: var(--panel);
-  font-weight: 600;
-}
-
-.tec-btn:focus-visible {
-  outline: 2px solid var(--foco);
-  outline-offset: 2px;
+.mapa-seccion.compacto .escala-fuente {
+  display: none;
 }
 
 .ficha-enlace {

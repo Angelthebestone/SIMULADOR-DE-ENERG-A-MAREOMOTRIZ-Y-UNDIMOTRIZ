@@ -1,4 +1,5 @@
 // AnimacionCanvas — transfiere series UNA vez por simulación, muestreo sin recalcular física.
+// Dispositivos 2D hiperrealistas: ./animacion2d (granja, absorbedor PowerBuoy, dique bulbo).
 // D4/Movimiento: superficie eta(x,t) = (Hm0/2)*cos(k*x - omega*t), omega=2*pi/Te, k de nucleo.olas.numero_onda
 // PROFUNDIDAD_M = 30 usada para k y lambda = 2*pi/k. Amplitud boya disminuye si Bpto aumenta (m*z''+b*z'+k*z = F).
 // lambda = 2 * Math.PI / k — 2*Math.PI/k
@@ -10,6 +11,12 @@
 // (EXAGERACION_VERTICAL) porque una ola de 1,5 m sobre 30 m de agua sería una
 // arruga de tres píxeles. La exageración se rotula en pantalla en vez de
 // dejar que el dibujo mienta sobre la proporción.
+
+// Rutas con extensión .ts: el runner de tests (node --experimental-strip-types)
+// no resuelve imports de directorio ni sin extensión. Vite los acepta igual.
+import { dibujarGranja2D } from "./animacion2d/granja2d.ts";
+import { dibujarAbsorbedor2D } from "./animacion2d/absorbedor2d.ts";
+import { dibujarDique2D } from "./animacion2d/dique2d.ts";
 
 export const PROFUNDIDAD_M = 30;
 const EXAGERACION_VERTICAL = 3;
@@ -67,6 +74,9 @@ export class AnimacionCanvas {
   /** Potencia que devuelve el cálculo. Si llega, es la que se rotula; el canvas
    *  no pinta una cifra propia cuando hay una calculada. */
   potenciaCaptadaW: number | null = null;
+
+  /** Miniatura de la pantalla de tecnología: sin rótulos ni chips, sólo la escena. */
+  modoPrevia = false;
 
   /** Alto en píxeles de la cota de Hm0 tal como se acaba de pintar. Lo publica
    *  el dibujo para que se pueda comprobar sin reconstruirlo desde las
@@ -261,6 +271,11 @@ export class AnimacionCanvas {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, w, h);
 
+    if (this.modoPrevia) {
+      this.dibujarPrevia(t, w, h);
+      return;
+    }
+
     // La tira de lectura de la carcasa se superpone al pie del lienzo: nada
     // que haya que leer se dibuja dentro de esa banda.
     const pie = this.pie;
@@ -356,15 +371,54 @@ export class AnimacionCanvas {
 
     if (this.modoEnergia === "mareomotriz") {
       if (this.dispositivo === "embalse") {
-        this.dibujarPresaMareal(ctx, xDispositivo, nivelMarMedio, yApoyo, t, escalaOla, xOrilla, terrenoY, apoyoHuella);
+        // Dique 2D: presa trapecio + bulbo + flechas de ciclo (capa animacion2d).
+        dibujarDique2D(ctx, {
+          cx: xDispositivo,
+          yMedio: nivelMarMedio,
+          yFondo: yApoyo,
+          t,
+          rangoMarea: this.rangoMarea,
+          escalaV: escalaOla,
+          sinRotulo: this.modoPrevia,
+        });
       } else {
-        this.dibujarTurbinaCorriente(ctx, xDispositivo, nivelMarMedio, yApoyo, t, superficieY);
+        // Granja / turbina de corriente: rotor tripala rojo-naranja (capa animacion2d).
+        dibujarGranja2D(ctx, {
+          x: xDispositivo,
+          ySuperficie: nivelMarMedio,
+          yFondo: yApoyo,
+          t,
+          velocidadCorriente: this.velocidadCorriente,
+          cantidadUnidades: this.cantidadUnidades,
+          cimentacion: this.cimentacion,
+          sinRotulo: this.modoPrevia,
+        });
+        if (!this.modoPrevia) {
+          this.rotulo(
+            ctx,
+            `Corriente ${this.velocidadCorriente.toFixed(1).replace(".", ",")} m/s`,
+            xDispositivo + 66,
+            nivelMarMedio + (yApoyo - nivelMarMedio) * 0.52 + 4,
+            "left",
+            C.espuma,
+            10
+          );
+        }
       }
     } else if (this.dispositivo === "owc") {
       this.dibujarOWC(ctx, xDispositivo, nivelMarMedio, yApoyo, t, omega, escalaOla, apoyoHuella, terrenoY);
     } else {
       const boyaZ = this.muestrearSerie(t) ?? this.eta((xDispositivo / w) * dominioM, t, omega, k) * 0.6;
-      this.dibujarBoya(ctx, xDispositivo, nivelMarMedio, yApoyo, boyaZ, t, escalaOla, superficieY);
+      // PowerBuoy 2D: flotador amarillo + spar + placa de reactancia + pod.
+      dibujarAbsorbedor2D(ctx, {
+        x: xDispositivo,
+        ySuperficie: nivelMarMedio,
+        yFondo: yApoyo,
+        t,
+        zRelativo: boyaZ * escalaOla,
+        Hm0: this.Hm0,
+        sinRotulo: this.modoPrevia,
+      });
     }
 
     this.dibujarRedElectrica(ctx, w, xCosta, terrenoY, t);
@@ -374,6 +428,111 @@ export class AnimacionCanvas {
     if (w >= 460) {
       this.dibujarHUD(ctx, w, h, nivelMarMedio, fondoMarY, dominioM, escalaOla, xPieTalud, pie);
     }
+  }
+
+  /** Miniatura de la pantalla de tecnología: corte centrado en el dispositivo,
+   *  sin costa, cable ni red. El dique y las turbinas necesitan calado real;
+   *  en la tarjeta pequeña el diorama completo se sale del encuadre. */
+  private dibujarPrevia(t: number, w: number, h: number) {
+    const ctx = this.ctx;
+    // El dique y la torreta de las turbinas sobresalen mucho del agua: en la
+    // tarjeta hay que dejar cielo arriba y calado abajo, o se cortan.
+    const esDique = this.modoEnergia === "mareomotriz" && this.dispositivo === "embalse";
+    const esGranja = this.modoEnergia === "mareomotriz" && !esDique;
+    const horizonteY = h * (esDique ? 0.12 : 0.16);
+    const nivelMarMedio = h * (esDique ? 0.48 : esGranja ? 0.44 : 0.40);
+    const fondoMarY = h * 0.90;
+    const omega = (2 * Math.PI) / this.Te;
+    const k = this.k > 0 ? this.k : 0.08;
+    const dominioM = this.lambda > 0 ? 2.2 * this.lambda : 120;
+    const pxPorM = ((fondoMarY - nivelMarMedio) / this.profundidad) * EXAGERACION_VERTICAL;
+    const escalaOla = Math.min(pxPorM, (nivelMarMedio - horizonteY) / HM0_TOPE_M);
+    const superficieY = (px: number) =>
+      nivelMarMedio - this.eta((px / w) * dominioM, t, omega, k) * escalaOla;
+
+    this.dibujarCielo(ctx, w, horizonteY, nivelMarMedio);
+
+    // Agua: columna abierta de borde a borde, sin talud de costa.
+    const agua = ctx.createLinearGradient(0, nivelMarMedio, 0, fondoMarY);
+    agua.addColorStop(0, C.aguaSuperficie);
+    agua.addColorStop(0.45, C.aguaMedia);
+    agua.addColorStop(1, C.aguaFondo);
+    ctx.fillStyle = agua;
+    ctx.beginPath();
+    ctx.moveTo(0, nivelMarMedio + 2);
+    for (let px = 0; px <= w; px += 4) ctx.lineTo(px, superficieY(px));
+    ctx.lineTo(w, fondoMarY);
+    ctx.lineTo(0, fondoMarY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Lecho plano arenoso.
+    const lecho = ctx.createLinearGradient(0, fondoMarY - 8, 0, h);
+    lecho.addColorStop(0, C.arenaAlta);
+    lecho.addColorStop(1, C.arenaBaja);
+    ctx.fillStyle = lecho;
+    ctx.beginPath();
+    ctx.moveTo(0, fondoMarY + Math.sin(t * 0.2) * 0.5);
+    for (let px = 0; px <= w; px += 8) {
+      ctx.lineTo(px, fondoMarY + Math.sin(px * 0.04) * 2.2);
+    }
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Línea de espuma en la superficie.
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let px = 0; px <= w; px += 3) {
+      const y = superficieY(px);
+      if (px === 0) ctx.moveTo(px, y);
+      else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+
+    const xCentro = w * 0.48;
+    const yFondo = fondoMarY + 2;
+
+    if (this.modoEnergia === "mareomotriz" && this.dispositivo === "embalse") {
+      dibujarDique2D(ctx, {
+        cx: xCentro,
+        yMedio: nivelMarMedio,
+        yFondo,
+        t,
+        rangoMarea: this.rangoMarea,
+        escalaV: escalaOla,
+        sinRotulo: true,
+      });
+      return;
+    }
+
+    if (this.modoEnergia === "mareomotriz") {
+      dibujarGranja2D(ctx, {
+        x: xCentro,
+        ySuperficie: nivelMarMedio,
+        yFondo,
+        t,
+        velocidadCorriente: this.velocidadCorriente,
+        cantidadUnidades: this.cantidadUnidades,
+        cimentacion: this.cimentacion,
+        sinRotulo: true,
+      });
+      return;
+    }
+
+    const boyaZ =
+      this.muestrearSerie(t) ?? this.eta((xCentro / w) * dominioM, t, omega, k) * 0.6;
+    dibujarAbsorbedor2D(ctx, {
+      x: xCentro,
+      ySuperficie: nivelMarMedio,
+      yFondo,
+      t,
+      zRelativo: boyaZ * escalaOla,
+      Hm0: this.Hm0,
+      sinRotulo: true,
+    });
   }
 
   // ---- Escenario -----------------------------------------------------------

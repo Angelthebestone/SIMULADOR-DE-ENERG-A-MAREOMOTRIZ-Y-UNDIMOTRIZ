@@ -246,8 +246,11 @@ def pagina(browser, dev_server):
     page = context.new_page()
     try:
         page.goto(dev_server, wait_until="domcontentloaded")
-        # Espera a que la app Vue monte: el tablero de dos columnas con su
-        # escena y la cadena de lectura al pie.
+        # La app abre en la portada: se recorre el flujo guiado hasta la
+        # simulación (familia → tecnología → origen de datos → simulación).
+        page.get_by_test_id("entrada-undimotriz").click(timeout=15_000)
+        page.get_by_test_id("seguir-origen").click()
+        page.get_by_test_id("seguir-simulacion").click()
         page.wait_for_selector("main.tablero section.ver", state="visible", timeout=15_000)
         page.wait_for_selector('[data-testid="barra-kpis"]', state="visible", timeout=10_000)
         yield page

@@ -1,45 +1,62 @@
 <template>
   <section class="origen" aria-labelledby="titulo-origen" data-testid="vista-origen">
-    <p class="paso-marca">Paso 3 de 4 · Origen de datos</p>
-    <h1 id="titulo-origen">Elige el origen de los datos</h1>
-    <p class="bajada">Solo un camino sigue: un punto con datos medidos o unos valores libres para jugar.</p>
+    <header class="origen-cabecera">
+      <div class="origen-texto">
+        <p class="marca">Origen de datos</p>
+        <h1 id="titulo-origen">Elige el origen de los datos</h1>
+        <p class="bajada">
+          Solo un camino sigue: un punto con datos medidos o unos valores libres para jugar.
+        </p>
+      </div>
 
-    <div class="caminos" role="group" aria-label="Caminos de datos">
-      <button
-        type="button"
-        class="camino"
-        :class="{ activo: origen === 'lugar' }"
-        :aria-pressed="origen === 'lugar' ? 'true' : 'false'"
-        data-testid="origen-lugar"
-        @click="emit('elegir-origen', 'lugar')"
-      >
-        <span class="camino-nombre">Lugar real</span>
-        <span class="camino-detalle">Punto en el mapa con datos del mar (m, s, m)</span>
-      </button>
-      <button
-        type="button"
-        class="camino"
-        :class="{ activo: origen === 'personalizado' }"
-        :aria-pressed="origen === 'personalizado' ? 'true' : 'false'"
-        data-testid="origen-personalizado"
-        @click="emit('elegir-origen', 'personalizado')"
-      >
-        <span class="camino-nombre">Valores libres</span>
-        <span class="camino-detalle">Números a mano sin punto en el mapa</span>
-      </button>
-    </div>
+      <div class="caminos" role="group" aria-label="Caminos de datos">
+        <button
+          type="button"
+          class="camino"
+          :class="{ activo: origen === 'lugar' }"
+          :aria-pressed="origen === 'lugar' ? 'true' : 'false'"
+          data-testid="origen-lugar"
+          @click="emit('elegir-origen', 'lugar')"
+        >
+          <span class="camino-nombre">Lugar real</span>
+          <span class="camino-detalle">Punto en el mapa con datos del mar</span>
+        </button>
+        <button
+          type="button"
+          class="camino"
+          :class="{ activo: origen === 'personalizado' }"
+          :aria-pressed="origen === 'personalizado' ? 'true' : 'false'"
+          data-testid="origen-personalizado"
+          @click="emit('elegir-origen', 'personalizado')"
+        >
+          <span class="camino-nombre">Valores libres</span>
+          <span class="camino-detalle">Números a mano sin punto en el mapa</span>
+        </button>
+      </div>
+
+      <div class="navegacion">
+        <button type="button" class="btn-atras" data-testid="volver-tecnologia" @click="emit('volver')">
+          Volver a tecnología
+        </button>
+        <button type="button" class="btn-seguir" data-testid="seguir-simulacion" @click="emit('continuar')">
+          Seguir a la simulación
+        </button>
+      </div>
+    </header>
 
     <div v-if="origen === 'lugar'" class="panel-lugar">
-      <p class="nota">Los números llegan del punto elegido; la ficha del mapa muestra la fuente y el periodo.</p>
-      <p v-if="sitioNombre" class="fuente-linea" data-testid="origen-fuente">
-        Punto: {{ sitioNombre }} · Fuente: {{ sitioFuente || 'ver ficha del mapa' }} · Periodo 2015-2024
-      </p>
-      <p v-else class="fuente-linea" data-testid="origen-fuente">
-        Elige un punto en el mapa; la ficha muestra la fuente y el periodo.
+      <p class="fuente-linea" data-testid="origen-fuente">
+        <template v-if="sitioNombre">
+          Punto: {{ sitioNombre }} · Fuente: {{ sitioFuente || 'ver ficha del mapa' }} · Periodo 2015-2024
+        </template>
+        <template v-else>
+          Elige un punto en el mapa; la ficha muestra la fuente y el periodo.
+        </template>
       </p>
       <div class="mapa-caja">
         <MapaView
           :sitio-activo="sitioId"
+          :dispositivo="dispositivo"
           @seleccionar-sitio="alSeleccionarSitio"
           @ir-a-simulador="alIrASimulador"
         />
@@ -97,15 +114,6 @@
         {{ formatearNumero(params.profundidad_m, 0) }} m
       </p>
     </div>
-
-    <div class="navegacion">
-      <button type="button" class="btn-atras" data-testid="volver-tecnologia" @click="emit('volver')">
-        Volver a tecnología
-      </button>
-      <button type="button" class="btn-seguir" data-testid="seguir-simulacion" @click="emit('continuar')">
-        Seguir a la simulación
-      </button>
-    </div>
   </section>
 </template>
 
@@ -116,12 +124,13 @@ import type { Params } from '../api'
 import type { SitioMapa } from '../map/mapa'
 import type { Origen } from '../flujo/estado'
 
-const props = defineProps<{
+defineProps<{
   origen: Origen
   params: Params
   sitioId: string
   sitioNombre: string
   sitioFuente: string
+  dispositivo?: string
 }>()
 
 const emit = defineEmits<{
@@ -152,97 +161,173 @@ function alIrASimulador(s: SitioMapa) {
 
 <style scoped>
 .origen {
-  display: grid;
-  gap: var(--s-3);
-  align-content: start;
-  max-inline-size: 64rem;
-  margin: 0 auto;
-  padding: var(--s-6) var(--s-4);
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  block-size: 100%;
+  min-block-size: 0;
+  overflow: hidden;
+  background: var(--marco);
 }
 
-.paso-marca {
+.origen-cabecera {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--s-3) var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  color: var(--marco-tinta);
+  background: var(--marco);
+  border-block-end: 1px solid var(--marco-linea);
+}
+
+.origen-texto {
+  display: grid;
+  gap: 2px;
+  min-inline-size: 14rem;
+  flex: 1 1 16rem;
+}
+
+.marca {
   margin: 0;
   font-size: var(--text-meta);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--tenue);
+  color: var(--marco-tenue);
 }
 
 .origen h1 {
   margin: 0;
-  font-size: var(--text-nivel);
+  font-size: var(--text-seccion);
   letter-spacing: -0.01em;
+  color: var(--marco-tinta);
 }
 
 .bajada {
   margin: 0;
-  color: var(--tenue);
-  font-size: var(--text-cuerpo);
+  color: var(--marco-tenue);
+  font-size: var(--text-meta);
 }
 
 .caminos {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: var(--s-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
 }
 
 .camino {
   display: grid;
-  gap: var(--s-1);
+  gap: 2px;
   justify-items: start;
   text-align: start;
-  padding: var(--s-4);
-  border: 1px solid var(--borde-suave);
-  border-radius: var(--radio-caja);
-  background: var(--panel);
-  box-shadow: var(--sombra-caja);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--marco-linea);
+  border-radius: var(--radio);
+  background: var(--marco-alto);
+  color: var(--marco-tinta);
   cursor: pointer;
 }
 
 .camino:hover {
-  border-color: var(--borde);
+  border-color: var(--marco-recurso);
 }
 
 .camino.activo {
-  border-color: var(--rol-mar-profundo);
-  background: var(--acento-suave);
+  border-color: var(--marco-captado);
+  background: oklch(0.3 0.06 160 / 0.35);
 }
 
 .camino-nombre {
-  font-family: var(--font-display);
-  font-size: var(--text-seccion);
   font-weight: 700;
-  color: var(--tinta);
+  font-size: var(--text-meta);
 }
 
 .camino-detalle {
-  font-size: var(--text-meta);
-  color: var(--tenue);
+  font-size: 11px;
+  color: var(--marco-tenue);
 }
 
-.nota,
-.fuente-linea,
-.ahora {
-  margin: 0;
-  font-size: var(--text-cuerpo);
-  color: var(--tenue);
+.navegacion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-inline-start: auto;
+}
+
+.btn-atras,
+.btn-seguir {
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--radio);
+  font-weight: 600;
+  font-size: var(--text-meta);
+  cursor: pointer;
+}
+
+.btn-atras {
+  border: 1px solid var(--marco-linea);
+  background: var(--marco-alto);
+  color: var(--marco-tinta);
+}
+
+.btn-seguir {
+  border: 1px solid var(--rol-mar-profundo);
+  background: var(--rol-mar-profundo);
+  color: var(--panel);
+}
+
+.btn-seguir:hover {
+  background: var(--rol-mar-medio);
+  border-color: var(--rol-mar-medio);
+}
+
+.panel-lugar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-block-size: 0;
 }
 
 .fuente-linea {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: var(--s-2);
+  inset-inline-start: var(--s-2);
+  margin: 0;
+  max-inline-size: min(28rem, calc(100% - 2rem));
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radio);
+  background: oklch(1 0 0 / 0.9);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--sombra-caja);
   font-size: var(--text-meta);
+  color: var(--tinta);
+  pointer-events: none;
 }
 
 .mapa-caja {
-  min-block-size: 22rem;
-  border: 1px solid var(--borde-suave);
-  border-radius: var(--radio-caja);
+  flex: 1 1 auto;
+  min-block-size: 0;
   overflow: hidden;
-  background: var(--panel);
+  background: var(--map-oceano);
+}
+
+.panel-libre {
+  flex: 1 1 auto;
+  display: grid;
+  align-content: start;
+  gap: var(--s-4);
+  padding: var(--s-6) var(--s-4);
+  overflow: auto;
+  background: var(--lienzo);
+  color: var(--tinta);
 }
 
 .aviso-hipotetico {
   margin: 0;
+  max-inline-size: 40rem;
   padding: var(--s-3);
   border-radius: var(--radio);
   border-inline-start: 3px solid var(--conf-pendiente);
@@ -254,6 +339,7 @@ function alIrASimulador(s: SitioMapa) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: var(--s-3);
+  max-inline-size: 40rem;
 }
 
 .campo {
@@ -274,36 +360,10 @@ function alIrASimulador(s: SitioMapa) {
   font-size: var(--text-cuerpo);
 }
 
-.navegacion {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-2);
-  margin-block-start: var(--s-3);
-}
-
-.btn-atras,
-.btn-seguir {
-  padding: var(--s-2) var(--s-4);
-  border-radius: var(--radio);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-atras {
-  border: 1px solid var(--borde);
-  background: var(--panel);
-  color: var(--tinta);
-}
-
-.btn-seguir {
-  border: 1px solid var(--rol-mar-profundo);
-  background: var(--rol-mar-profundo);
-  color: var(--panel);
-}
-
-.btn-seguir:hover {
-  background: var(--rol-mar-medio);
-  border-color: var(--rol-mar-medio);
+.ahora {
+  margin: 0;
+  font-size: var(--text-cuerpo);
+  color: var(--tenue);
 }
 
 .origen :focus-visible {
@@ -312,9 +372,14 @@ function alIrASimulador(s: SitioMapa) {
   border-radius: 4px;
 }
 
-@media (width <= 40rem) {
-  .origen {
-    padding: var(--s-4) var(--s-3);
+@media (width <= 48rem) {
+  .origen-cabecera {
+    padding: var(--s-2) var(--s-3);
+  }
+
+  .navegacion {
+    margin-inline-start: 0;
+    inline-size: 100%;
   }
 }
 </style>

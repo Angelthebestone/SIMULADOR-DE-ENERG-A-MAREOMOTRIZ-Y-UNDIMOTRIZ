@@ -69,6 +69,45 @@
     min-inline-size: 0;
   }
 
+  /* Portada y tecnología: una sola celda a pantalla completa, sin marco de rejilla. */
+  #app.modo-portada,
+  #app.modo-tecnologia {
+    grid-template-rows: minmax(0, 1fr) auto;
+    background: var(--marco);
+  }
+
+  #app.modo-portada {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  #app.modo-portada main.tablero.flujo,
+  #app.modo-tecnologia main.tablero.flujo,
+  #app.modo-origen main.tablero.flujo,
+  #app.modo-simulacion main.tablero.flujo {
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  #app.modo-portada .etapa,
+  #app.modo-tecnologia .etapa,
+  #app.modo-origen .etapa,
+  #app.modo-simulacion .etapa {
+    block-size: 100%;
+    min-block-size: 0;
+  }
+
+  #app.modo-origen,
+  #app.modo-simulacion {
+    background: var(--marco);
+  }
+
+  #app.modo-tecnologia .lectura {
+    background: oklch(0.16 0.03 230 / 0.72);
+    border-block-start-color: oklch(1 0 0 / 0.12);
+    backdrop-filter: blur(10px);
+  }
+
   /* Acciones de la aplicación, al pie junto a la cadena de lectura. */
   .acciones-barra {
     display: flex;
