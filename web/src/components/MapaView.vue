@@ -234,7 +234,7 @@ const metricasSitio = computed(() => {
   if (tecnologiaActiva.value === "dique")
     return [{ rotulo: "Rango de marea", valor: cifra(s.rango_m, 1), unidad: "m" }, profundidad];
   if (tecnologiaActiva.value === "turbina")
-    return [{ rotulo: "Corriente de marea", valor: cifra(s.velocidad_ms, 1), unidad: "m/s" }, profundidad];
+    return [{ rotulo: "Corriente de pico", valor: cifra(s.velocidad_ms, 1), unidad: "m/s" }, profundidad];
   return [
     { rotulo: "Potencia del oleaje", valor: cifra(potenciaOleaje(s.hm0_m, s.te_s), 1), unidad: "kW/m" },
     { rotulo: "Altura de ola Hm0", valor: cifra(s.hm0_m, 1), unidad: "m" },
@@ -352,7 +352,12 @@ async function puntoLibre(lon: number, lat: number) {
       lat,
       valor: potenciaOleaje(hm0 ?? undefined, te ?? undefined),
       unidad: "kW/m",
-      fuente: delGlobal && global ? global.fuente : fuenteLocal,
+      fuente:
+        delGlobal && global
+          ? global.fuente
+          : dato === null && global
+            ? `La celda de mar con dato más próxima está a ${global.distancia_km} km`
+            : fuenteLocal,
       estado: dato === null ? "pendiente" : "inferido",
       tipo: tec === "undimotriz" ? "undimotriz" : "mareomotriz",
       hm0_m: hm0 ?? undefined,
