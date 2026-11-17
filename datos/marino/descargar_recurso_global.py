@@ -20,10 +20,11 @@ celda; se guarda la celda devuelta, no la pedida.
 
 Ventana
 -------
-15 dias seguidos (2024-03-01 a 2024-03-15): cubre un ciclo completo de mareas
-vivas y muertas (14,77 dias), que es lo que deciden el rango y el pico de corriente.
-Una sola quincena no describe el clima de oleaje del ano entero: se declara
-`inferido` y la ficha lo dice.
+Marea y corriente: 15 dias seguidos (2024-03-01 a 2024-03-15), un ciclo completo de
+mareas vivas y muertas (14,77 dias), que es lo que deciden el rango y el pico.
+Oleaje: una quincena de marzo es invierno en el norte y daba el doble de la media
+anual, asi que `oleaje_anual()` lo rehace con cuatro ventanas estacionales de 2023
+(`--solo-oleaje` repite solo esa fase). Todo se declara `inferido`.
 
 Que se guarda por punto
 -----------------------
@@ -198,9 +199,104 @@ def descargar() -> None:
         "puntos": sorted(unicas.values()),
     }
     DESTINO.write_text(json.dumps(salida, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    PARCIAL.unlink()
+    PARCIAL.unlink(missing_ok=True)
     print(f"{len(unicas)} celdas en {DESTINO.name}")
 
 
+VENTANAS_OLEAJE = [
+    ("2023-01-14", "2023-01-17"),
+    ("2023-04-14", "2023-04-17"),
+    ("2023-07-14", "2023-07-17"),
+    ("2023-10-14", "2023-10-17"),
+]
+PASO_OLEAJE = 3
+MAX_KM_RELLENO = 400.0
+PARCIAL_OLEAJE = AQUI / "recurso_global.oleaje.parcial.json"
+
+
+def oleaje_anual() -> None:
+    """Rehace hm0_m, te_s y kw_m con cuatro ventanas estacionales.
+
+    La quincena de marzo basta para la marea, pero en el Atlántico norte es
+    pleno invierno y daba el doble de la potencia media anual. Las mismas
+    celdas se piden de nuevo (ya son de mar, la API devuelve la misma).
+    """
+    salida = json.loads(DESTINO.read_text(encoding="utf-8"))
+    # Una celda de cada tres: la ola cambia despacio y asi caben las cuatro
+    # ventanas en el cupo diario gratuito de la API (10 000 llamadas).
+    puntos = [(p[0], p[1]) for p in salida["puntos"]][::PASO_OLEAJE]
+    hecho = (
+        json.loads(PARCIAL_OLEAJE.read_text(encoding="utf-8"))
+        if PARCIAL_OLEAJE.exists()
+        else {"siguiente": 0, "muestras": {}}
+    )
+    for desde in range(hecho["siguiente"], len(puntos), LOTE):
+        lote = puntos[desde : desde + LOTE]
+        for inicio, fin in VENTANAS_OLEAJE:
+            consulta = {
+                "latitude": ",".join(str(p[1]) for p in lote),
+                "longitude": ",".join(str(p[0]) for p in lote),
+                "hourly": "wave_height,wave_period",
+                "start_date": inicio,
+                "end_date": fin,
+                "timezone": "UTC",
+            }
+            url = f"{API}?{urllib.parse.urlencode(consulta)}"
+            for intento in range(5):
+                try:
+                    peticion = urllib.request.Request(url, headers={"User-Agent": "simulador-energia-marina/1.0"})
+                    with urllib.request.urlopen(peticion, timeout=180) as respuesta:
+                        cuerpo = json.loads(respuesta.read().decode("utf-8"))
+                    break
+                except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as fallo:
+                    if intento == 4:
+                        raise
+                    print(f"  reintento {intento + 1} ({fallo})")
+                    time.sleep(30 * (intento + 1))
+            bloques = cuerpo if isinstance(cuerpo, list) else [cuerpo]
+            for (lon, lat), bloque in zip(lote, bloques):
+                h = bloque.get("hourly") or {}
+                pares = [
+                    [a, t]
+                    for a, t in zip(h.get("wave_height") or [], h.get("wave_period") or [])
+                    if a is not None and t is not None and t > 0
+                ]
+                hecho["muestras"].setdefault(f"{lon},{lat}", []).extend(pares)
+            time.sleep(PAUSA_S / 2)
+        hecho["siguiente"] = desde + len(lote)
+        PARCIAL_OLEAJE.write_text(json.dumps(hecho), encoding="utf-8")
+        print(f"oleaje {hecho['siguiente']}/{len(puntos)}")
+
+    medidos = []
+    for clave, olas in hecho["muestras"].items():
+        if len(olas) < 48:
+            continue
+        lon, lat = map(float, clave.split(","))
+        kw = sum(RHO * G * G * a * a * t / (64 * math.pi) for a, t in olas) / len(olas) / 1000.0
+        te = sum(t for _, t in olas) / len(olas)
+        medidos.append((lon, lat, round(math.sqrt(kw / (0.49 * te)), 2), round(te, 1), round(kw, 1)))
+    for p in salida["puntos"]:
+        cerca = min(medidos, key=lambda m: distancia_km(p[0], p[1], m[0], m[1]), default=None)
+        if cerca is None or distancia_km(p[0], p[1], cerca[0], cerca[1]) > MAX_KM_RELLENO:
+            p[2] = p[3] = p[4] = None
+        else:
+            p[2], p[3], p[4] = cerca[2], cerca[3], cerca[4]
+    salida["metodo"] = (
+        "Marea y corriente: 15 dias horarios de marzo de 2024 (un ciclo vivas-muertas); rango_m es la "
+        "media diaria de max-min del nivel del mar y pico_ms la maxima corriente. Oleaje: cuatro "
+        "ventanas estacionales de 4 dias en 2023; hm0_m y te_s son el estado de mar equivalente en "
+        "energia (0,49 hm0^2 te = J media), medidos en una celda de cada tres y asignados a las demas "
+        "desde la medida mas proxima (como mucho a 400 km)."
+    )
+    salida["periodo"] = "marea 2024-03-01 a 2024-03-15; oleaje 4 estaciones de 2023"
+    DESTINO.write_text(json.dumps(salida, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    PARCIAL_OLEAJE.unlink(missing_ok=True)
+    print("oleaje anual escrito")
+
+
 if __name__ == "__main__":
-    descargar()
+    import sys
+
+    if "--solo-oleaje" not in sys.argv:
+        descargar()
+    oleaje_anual()
