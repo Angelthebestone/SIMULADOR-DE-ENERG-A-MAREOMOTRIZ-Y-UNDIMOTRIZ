@@ -1,8 +1,13 @@
-// Absorbedor puntual undimotriz tipo PowerBuoy — capa 2D hiperrealista.
-// Alineada con undimotriz_powerbuoy_partes.jpg y animacion3d/escenas/absorbedor.ts:
-// flotador amarillo (tambor + collar + casquete + faja naranja + baliza + antena),
-// spar metálico oscuro, placa de reactancia con nervaduras, pod/subestación en el
-// lecho y cable a costa con pulso. Autocontenida: sin estado de AnimacionCanvas.
+// Absorbedor puntual undimotriz tipo PowerBuoy — capa 2D.
+// Alineada con undimotriz_powerbuoy_partes.jpg y animacion3d/escenas/absorbedor.ts.
+//
+// Cómo trabaja, y por eso cómo se dibuja: el flotador amarillo sube y baja con
+// la ola; el mástil (spar) con la placa de reactancia en el pie apenas se
+// mueve, porque la placa arrastra una gran masa de agua. El PTO convierte la
+// carrera relativa entre los dos cuerpos en electricidad. En el dibujo esa
+// carrera se ve: el vástago que asoma entre el flotador y la cabeza del mástil
+// se alarga y se acorta. El flotador va semisumergido, con su calado.
+// Autocontenida: sin estado de AnimacionCanvas.
 
 export interface OptsAbsorbedor2D {
   /** Centro horizontal del dispositivo. */
@@ -15,8 +20,17 @@ export interface OptsAbsorbedor2D {
   t: number;
   /** Desplazamiento vertical del flotador en **píxeles** (positivo = hacia arriba). */
   zRelativo?: number;
-  /** Altura significativa de ola en metros (afina el calado visual). */
+  /** Desplazamiento del mástil en píxeles. Por defecto, una fracción pequeña
+   *  del flotador: la placa de reactancia lo frena. */
+  zMastil?: number;
+  /** Altura significativa de ola en metros (sin uso geométrico; se conserva
+   *  por compatibilidad del contrato). */
   Hm0?: number;
+  /** Cabeceo del flotador (rad, + horario): sigue la pendiente de la ola. */
+  inclinacion?: number;
+  /** Subida máxima esperable del flotador (px). La cabeza del mástil se
+   *  coloca por encima, para que el flotador nunca la atraviese. */
+  alcancePx?: number;
   /** Omite el chip del nombre (previstas de la pantalla de tecnología). */
   sinRotulo?: boolean;
   /** Omite el cable a costa: la escena ya dibuja el suyo hasta la subestación. */
@@ -26,331 +40,353 @@ export interface OptsAbsorbedor2D {
 /** Paleta PowerBuoy alineada con la escena 3D. */
 const P = {
   amarillo: "rgb(245 196 0)",
-  amarilloAlto: "rgb(255 224 102)",
-  amarilloOsc: "rgb(201 150 0)",
+  amarilloAlto: "rgb(255 226 110)",
+  amarilloOsc: "rgb(196 146 0)",
+  amarilloSombra: "rgb(150 108 0)",
   naranja: "rgb(224 120 32)",
   spar: "rgb(42 50 58)",
-  sparClaro: "rgb(61 72 82)",
+  sparClaro: "rgb(78 90 101)",
+  sparBrillo: "rgb(112 124 135)",
   placa: "rgb(58 66 74)",
   placaNervio: "rgb(37 43 49)",
   pod: "rgb(106 117 126)",
   podClaro: "rgb(154 163 171)",
   podTanque: "rgb(184 192 198)",
   cable: "rgb(26 34 40)",
+  flotadorCable: "rgb(236 134 40)",
+  vastago: "rgb(214 222 228)",
   balizaOn: "rgb(255 59 48)",
   balizaOff: "rgb(122 24 18)",
   acento: "rgb(199 225 74)",
   metal: "rgb(200 206 212)",
+  cadena: "rgba(28,36,44,0.8)",
 };
 
+/** Geometría del absorbedor, publicada para que la escena pueda colocar el
+ *  cable y la espuma sin adivinar. */
+export function geometriaAbsorbedor(x: number, ySuperficie: number, yFondo: number) {
+  const calado = yFondo - ySuperficie;
+  return {
+    semiFlotador: 40,
+    /** Calado del flotador bajo su línea de flotación (px). */
+    caladoFlotador: 17,
+    /** Francobordo sobre la línea de flotación (px). */
+    francobordo: 13,
+    yPlaca: ySuperficie + calado * 0.6,
+    xPod: x + 58,
+    yPod: yFondo - 12,
+    /** Punto donde el cable de evacuación sale del pod hacia costa. */
+    salidaCable: { x: x + 84, y: yFondo - 4 },
+  };
+}
+
+/** Curva de cadena entre dos puntos con flecha `seno` (px). Una parábola es
+ *  la aproximación de la catenaria con poca flecha. */
+function linea(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, seno: number) {
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.quadraticCurveTo((x0 + x1) / 2, Math.max(y0, y1) + seno, x1, y1);
+  ctx.stroke();
+}
+
 /**
- * Dibuja un PowerBuoy: flotador amarillo con heave, spar, placa de reactancia,
- * pod submarino y cable de evacuación.
+ * Dibuja un PowerBuoy: flotador amarillo con heave, mástil casi fijo con
+ * placa de reactancia, PTO visible, fondeo, umbilical y pod submarino.
  */
 export function dibujarAbsorbedor2D(ctx: CanvasRenderingContext2D, opts: OptsAbsorbedor2D): void {
   const { x, ySuperficie, yFondo, t, sinRotulo = false, sinCable = false } = opts;
-  const z = opts.zRelativo ?? 0;
-  const hm0 = opts.Hm0 ?? 1.5;
   if (!(yFondo > ySuperficie + 30)) return;
+  const g = geometriaAbsorbedor(x, ySuperficie, yFondo);
+  const alcance = Math.max(14, opts.alcancePx ?? 30);
+  // Topes de carrera: el flotador no puede atravesar la cabeza del mástil ni
+  // hundirse hasta la placa, como en la máquina real.
+  const zCrudo = Number.isFinite(opts.zRelativo) ? (opts.zRelativo as number) : 0;
+  const z = Math.max(-alcance * 1.3, Math.min(alcance, zCrudo));
+  const zs = Number.isFinite(opts.zMastil) ? (opts.zMastil as number) : z * 0.12;
 
-  // El flotador se eleva con la serie; el spar queda casi fijo (referencia inercial).
+  // Mástil: referencia casi inercial. Su cota se desplaza poco.
+  const ySparTop = ySuperficie - g.francobordo - alcance - 26 - zs;
+  const yPlaca = g.yPlaca - zs;
+  // Flotador: su línea de flotación de proyecto va con la serie.
   const yFlot = ySuperficie - z;
-  const yPlaca = ySuperficie + (yFondo - ySuperficie) * 0.62;
-  const yPod = yFondo - 8;
+  const semi = g.semiFlotador;
+  const yTope = yFlot - g.francobordo;
+  const yQuilla = yFlot + g.caladoFlotador;
 
-  // ---- Cable a costa + pulso de energía ------------------------------------
+  // ---- Fondeo: tres líneas de cadena al lecho ------------------------------
+  // Salen del collar inferior del mástil; la que va a sotavento queda más
+  // tensa y la de barlovento más floja, porque el mar empuja hacia la costa.
+  ctx.strokeStyle = P.cadena;
+  ctx.lineWidth = 1.4;
+  const yFair = yPlaca - 14;
+  for (const [dx, seno] of [
+    [-96, 26],
+    [-58, 14],
+    [92, 10],
+  ] as const) {
+    const xa = x + dx;
+    linea(ctx, x + Math.sign(dx) * 5, yFair, xa, yFondo - 2, seno);
+    // Ancla de succión enterrada: sólo asoma la cabeza.
+    ctx.fillStyle = "rgb(74 83 90)";
+    ctx.beginPath();
+    ctx.ellipse(xa, yFondo - 1, 7, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---- Pod / subestación submarina ----------------------------------------
+  const xp = g.xPod;
+  const yp = g.yPod;
+  ctx.fillStyle = "rgba(15,25,32,0.3)";
+  ctx.beginPath();
+  ctx.ellipse(xp + 4, yFondo + 3, 30, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgb(74 85 94)";
+  ctx.fillRect(xp - 26, yp + 8, 52, 5);
+  const gPod = ctx.createLinearGradient(0, yp - 8, 0, yp + 10);
+  gPod.addColorStop(0, P.podClaro);
+  gPod.addColorStop(1, P.pod);
+  ctx.fillStyle = gPod;
+  ctx.beginPath();
+  ctx.roundRect(xp - 21, yp - 8, 42, 17, 4);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(20,28,32,0.5)";
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  ctx.fillStyle = P.podTanque;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(xp + s * 9, yp - 9, 7, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Conectores húmedos a ambos lados.
+  ctx.fillStyle = "rgb(60 68 76)";
+  ctx.fillRect(xp - 25, yp - 2, 4, 6);
+  ctx.fillRect(xp + 21, yp - 2, 4, 6);
+
+  // ---- Umbilical en «onda perezosa» ----------------------------------------
+  // Del pie del mástil baja, sube sobre los flotadores de cable y cae al pod:
+  // esa joroba absorbe el movimiento del mástil sin tirar del conector.
+  const u0x = x + 4;
+  const u0y = yPlaca + 6;
+  const jorobaX = x + 26;
+  const jorobaY = Math.min(yp - 26, u0y + (yp - u0y) * 0.45);
+  ctx.strokeStyle = P.cable;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(u0x, u0y);
+  ctx.bezierCurveTo(x + 6, jorobaY + 30, jorobaX - 14, jorobaY, jorobaX, jorobaY);
+  ctx.bezierCurveTo(jorobaX + 12, jorobaY, xp - 32, yp + 2, xp - 25, yp + 1);
+  ctx.stroke();
+  // Módulos de flotación sobre la joroba.
+  ctx.fillStyle = P.flotadorCable;
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.ellipse(jorobaX + i * 5, jorobaY + Math.abs(i) * 0.9, 2.4, 3.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---- Cable a costa (sólo si la escena no dibuja el suyo) ------------------
   if (!sinCable) {
-    const xCosta = x + 220;
-    const yCosta = ySuperficie + (yFondo - ySuperficie) * 0.15;
+    const x0c = g.salidaCable.x;
+    const y0c = g.salidaCable.y;
+    const xCosta = x + 240;
+    const yCosta = ySuperficie + (yFondo - ySuperficie) * 0.2;
+    const cpX = x + 150;
+    const cpY = yFondo + 2;
     ctx.strokeStyle = P.cable;
     ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.moveTo(x + 18, yPod + 4);
-    ctx.quadraticCurveTo(x + 100, yPod + 10, xCosta, yCosta);
+    ctx.moveTo(xp + 25, yp + 1);
+    ctx.lineTo(x0c, y0c);
+    ctx.quadraticCurveTo(cpX, cpY, xCosta, yCosta);
     ctx.stroke();
-    const frac = (t * 0.2) % 1;
-    const cpX = x + 100;
-    const cpY = yPod + 10;
-    const x0c = x + 18;
-    const y0c = yPod + 4;
+    const frac = (((t * 0.2) % 1) + 1) % 1;
     const px = (1 - frac) * (1 - frac) * x0c + 2 * (1 - frac) * frac * cpX + frac * frac * xCosta;
     const py = (1 - frac) * (1 - frac) * y0c + 2 * (1 - frac) * frac * cpY + frac * frac * yCosta;
     ctx.fillStyle = P.acento;
-    ctx.globalAlpha = 0.55 + 0.45 * Math.sin(frac * Math.PI);
+    ctx.globalAlpha = Math.sin(frac * Math.PI);
     ctx.beginPath();
     ctx.arc(px, py, 2.8, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
 
-  // ---- Pod / subestación submarina (USP) -----------------------------------
-  ctx.fillStyle = "rgba(15,25,32,0.3)";
+  // ---- Placa de reactancia --------------------------------------------------
+  ctx.fillStyle = "rgba(10,18,24,0.22)";
   ctx.beginPath();
-  ctx.ellipse(x + 48, yFondo + 4, 28, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 3, yPlaca + 9, 40, 7, 0, 0, Math.PI * 2);
   ctx.fill();
-
-  const gPod = ctx.createLinearGradient(0, yPod - 4, 0, yPod + 18);
-  gPod.addColorStop(0, P.podClaro);
-  gPod.addColorStop(1, P.pod);
-  ctx.fillStyle = gPod;
-  ctx.beginPath();
-  ctx.roundRect(x + 28, yPod, 42, 18, 3);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(20,28,32,0.5)";
-  ctx.lineWidth = 1.1;
-  ctx.stroke();
-  // Cofia.
-  ctx.fillStyle = P.podClaro;
-  ctx.fillRect(x + 32, yPod - 4, 34, 5);
-  // Tanques.
-  ctx.fillStyle = P.podTanque;
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.ellipse(x + 49 + s * 8, yPod - 8, 7, 3.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillRect(x + 49 + s * 8 - 7, yPod - 8, 14, 5);
-  }
-  // Losa base.
-  ctx.fillStyle = "rgb(74 85 94)";
-  ctx.fillRect(x + 24, yPod + 18, 50, 4);
-
-  // ---- Spar (casi fijo) ----------------------------------------------------
-  const ySparTop = yFlot + 8;
-  const gSpar = ctx.createLinearGradient(x - 5, 0, x + 5, 0);
-  gSpar.addColorStop(0, "rgb(26 34 40)");
-  gSpar.addColorStop(0.4, P.sparClaro);
-  gSpar.addColorStop(1, P.spar);
-  ctx.fillStyle = gSpar;
-  ctx.fillRect(x - 4, ySparTop, 8, yPlaca - ySparTop + 4);
-  // Collarines.
-  ctx.fillStyle = P.sparClaro;
-  for (const [fracY, h] of [
-    [0.12, 4],
-    [0.35, 3],
-    [0.72, 4],
-  ] as const) {
-    const yc = ySparTop + (yPlaca - ySparTop) * fracY;
-    ctx.fillRect(x - 6, yc, 12, h);
-  }
-
-  // ---- Placa de reactancia -------------------------------------------------
-  ctx.fillStyle = "rgba(10,18,24,0.25)";
-  ctx.beginPath();
-  ctx.ellipse(x + 3, yPlaca + 8, 36, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  const gPlaca = ctx.createLinearGradient(0, yPlaca - 5, 0, yPlaca + 8);
-  gPlaca.addColorStop(0, "rgb(74 84 94)");
+  const gPlaca = ctx.createLinearGradient(0, yPlaca - 6, 0, yPlaca + 8);
+  gPlaca.addColorStop(0, "rgb(84 94 104)");
   gPlaca.addColorStop(1, P.placa);
   ctx.fillStyle = gPlaca;
   ctx.beginPath();
-  ctx.ellipse(x, yPlaca, 34, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, yPlaca, 36, 8, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = P.placaNervio;
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 1.6;
   ctx.stroke();
-  // Aro exterior.
-  ctx.strokeStyle = P.placaNervio;
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.ellipse(x, yPlaca, 31, 6.5, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  // Nervaduras radiales.
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1.1;
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
     ctx.beginPath();
     ctx.moveTo(x, yPlaca);
-    ctx.lineTo(x + Math.cos(a) * 30, yPlaca + Math.sin(a) * 6.5);
+    ctx.lineTo(x + Math.cos(a) * 32, yPlaca + Math.sin(a) * 6.8);
     ctx.stroke();
   }
-  // Bocel central.
+  // Canto de la placa: tiene espesor.
   ctx.fillStyle = P.placaNervio;
   ctx.beginPath();
-  ctx.ellipse(x, yPlaca, 7, 3.5, 0, 0, Math.PI * 2);
+  ctx.moveTo(x - 36, yPlaca);
+  ctx.lineTo(x - 36, yPlaca + 3);
+  ctx.ellipse(x, yPlaca + 3, 36, 8, 0, Math.PI, 0, true);
+  ctx.lineTo(x + 36, yPlaca);
+  ctx.ellipse(x, yPlaca, 36, 8, 0, 0, Math.PI, false);
+  ctx.closePath();
   ctx.fill();
 
-  // Cable interno placa → pod.
-  ctx.strokeStyle = P.cable;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x, yPlaca + 6);
-  ctx.quadraticCurveTo(x + 14, yPlaca + 20, x + 36, yPod);
-  ctx.stroke();
+  // ---- Mástil ---------------------------------------------------------------
+  const semiSpar = 5.5;
+  const gSpar = ctx.createLinearGradient(x - semiSpar, 0, x + semiSpar, 0);
+  gSpar.addColorStop(0, "rgb(22 28 34)");
+  gSpar.addColorStop(0.35, P.sparBrillo);
+  gSpar.addColorStop(0.6, P.sparClaro);
+  gSpar.addColorStop(1, P.spar);
+  ctx.fillStyle = gSpar;
+  ctx.fillRect(x - semiSpar, ySparTop, semiSpar * 2, yPlaca - ySparTop);
+  // Collarines del mástil.
+  ctx.fillStyle = P.sparClaro;
+  for (const fr of [0.55, 0.78]) {
+    const yc = ySparTop + (yPlaca - ySparTop) * fr;
+    ctx.fillRect(x - semiSpar - 1.5, yc, semiSpar * 2 + 3, 3);
+  }
+  ctx.fillRect(x - 8, yFair - 3, 16, 6);
 
-  // ---- Flotador amarillo (se mueve en heave) -------------------------------
-  const radio = 28;
-  const collarR = 38;
-  const yCuerpoTop = yFlot - 22;
-  const yCuerpoBot = yFlot + 16;
-  const yCollar = yFlot + 4;
-
-  // Sombra en el agua bajo el collar.
-  ctx.fillStyle = "rgba(10,25,30,0.2)";
-  ctx.beginPath();
-  ctx.ellipse(x, yCollar + 14, collarR + 4, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cuerpo / tambor principal.
-  const gCuerpo = ctx.createLinearGradient(x - radio, 0, x + radio, 0);
-  gCuerpo.addColorStop(0, P.amarilloOsc);
-  gCuerpo.addColorStop(0.35, P.amarilloAlto);
-  gCuerpo.addColorStop(0.7, P.amarillo);
-  gCuerpo.addColorStop(1, P.amarilloOsc);
+  // ---- Flotador -------------------------------------------------------------
+  // El flotador cabecea con la pendiente de la ola alrededor de su línea de
+  // flotación; el mástil, más pesado y anclado, se queda vertical.
+  const cabeceo = Math.max(-0.14, Math.min(0.14, opts.inclinacion ?? 0));
+  ctx.save();
+  ctx.translate(x, yFlot);
+  ctx.rotate(cabeceo);
+  ctx.translate(-x, -yFlot);
+  // Toroide visto de lado: casco con pantoque redondeado y quilla plana.
+  const gCuerpo = ctx.createLinearGradient(x - semi, 0, x + semi, 0);
+  gCuerpo.addColorStop(0, P.amarilloSombra);
+  gCuerpo.addColorStop(0.28, P.amarilloAlto);
+  gCuerpo.addColorStop(0.55, P.amarillo);
+  gCuerpo.addColorStop(1, P.amarilloSombra);
   ctx.fillStyle = gCuerpo;
   ctx.beginPath();
-  ctx.moveTo(x - radio, yCuerpoTop);
-  ctx.lineTo(x - radio + 2, yCuerpoBot - 6);
-  ctx.quadraticCurveTo(x, yCuerpoBot + 4, x + radio - 2, yCuerpoBot - 6);
-  ctx.lineTo(x + radio, yCuerpoTop);
+  ctx.moveTo(x - semi, yTope + 3);
+  ctx.lineTo(x - semi, yQuilla - 9);
+  ctx.quadraticCurveTo(x - semi, yQuilla, x - semi + 12, yQuilla);
+  ctx.lineTo(x + semi - 12, yQuilla);
+  ctx.quadraticCurveTo(x + semi, yQuilla, x + semi, yQuilla - 9);
+  ctx.lineTo(x + semi, yTope + 3);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(120,80,0,0.45)";
+  ctx.strokeStyle = "rgba(110,72,0,0.5)";
   ctx.lineWidth = 1.1;
   ctx.stroke();
-
-  // Casquete superior abombado.
-  const gDome = ctx.createLinearGradient(0, yCuerpoTop - 14, 0, yCuerpoTop);
-  gDome.addColorStop(0, P.amarilloAlto);
-  gDome.addColorStop(1, P.amarillo);
-  ctx.fillStyle = gDome;
-  ctx.beginPath();
-  ctx.ellipse(x, yCuerpoTop, radio - 2, 10, 0, Math.PI, 0, true);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(120,80,0,0.35)";
-  ctx.stroke();
-
-  // Cubierta plana.
-  ctx.fillStyle = P.amarilloOsc;
-  ctx.beginPath();
-  ctx.ellipse(x, yCuerpoTop - 2, radio - 6, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Collar de flotación ancho (rasgo reconocible).
-  const gCollar = ctx.createLinearGradient(x - collarR, 0, x + collarR, 0);
-  gCollar.addColorStop(0, P.amarilloOsc);
-  gCollar.addColorStop(0.4, P.amarilloAlto);
-  gCollar.addColorStop(1, P.amarilloOsc);
-  ctx.fillStyle = gCollar;
-  ctx.beginPath();
-  ctx.moveTo(x - collarR, yCollar - 8);
-  ctx.lineTo(x - collarR + 3, yCollar + 10);
-  ctx.quadraticCurveTo(x, yCollar + 16, x + collarR - 3, yCollar + 10);
-  ctx.lineTo(x + collarR, yCollar - 8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(120,80,0,0.4)";
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-  // Borde superior del collar.
+  // Cubierta del toroide vista desde arriba en ligero picado.
   ctx.fillStyle = P.amarillo;
   ctx.beginPath();
-  ctx.ellipse(x, yCollar - 8, collarR, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, yTope + 3, semi, 6, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = P.amarilloOsc;
   ctx.stroke();
-
-  // Faja naranja en la línea de flotación.
+  // Hueco central por donde pasa el mástil.
+  ctx.fillStyle = "rgb(70 56 10)";
+  ctx.beginPath();
+  ctx.ellipse(x, yTope + 3, 10, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Faja naranja de flotación: la marca que debería quedar a ras de agua.
   ctx.fillStyle = P.naranja;
-  ctx.fillRect(x - collarR + 2, yCollar + 1, (collarR - 2) * 2, 5);
-  // Brillo de oleaje sobre la faja.
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.fillRect(x - collarR + 4, yCollar + 1, (collarR - 6) * 2, 2);
-  // Pequeña marca de ola animada.
-  const onda = Math.sin(t * 2.2) * 2;
-  ctx.fillStyle = "rgba(255,255,255,0.25)";
-  ctx.fillRect(x - 8 + onda, yCollar + 3, 16, 1.5);
-
-  // ---- Torre tipo A + caja de equipos --------------------------------------
-  const yTorre = yCuerpoTop - 2;
-  const yCima = yTorre - 28;
-  ctx.strokeStyle = P.amarilloOsc;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x - 12, yTorre);
-  ctx.lineTo(x - 3, yCima);
-  ctx.moveTo(x + 12, yTorre);
-  ctx.lineTo(x + 3, yCima);
-  ctx.stroke();
-  // Travesaño.
+  ctx.fillRect(x - semi, yFlot - 2, semi * 2, 5);
+  ctx.fillStyle = "rgba(255,255,255,0.28)";
+  ctx.fillRect(x - semi + 3, yFlot - 2, semi * 2 - 6, 1.5);
+  // Cáncamos de izado.
   ctx.fillStyle = P.amarilloOsc;
-  ctx.fillRect(x - 4, yCima - 3, 8, 5);
-  // Caja de equipos.
-  ctx.fillStyle = "rgb(90 101 112)";
-  ctx.beginPath();
-  ctx.roundRect(x + 4, yTorre - 10, 12, 8, 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(20,28,32,0.4)";
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
+  for (const s of [-1, 1]) ctx.fillRect(x + s * (semi - 9) - 2, yTope - 1, 4, 4);
 
-  // ---- Mástil + antena + baliza --------------------------------------------
+  ctx.restore();
+
+  // ---- PTO a la vista ---------------------------------------------------------
+  // El vástago une el flotador con la cabeza del mástil: su largo visible es la
+  // carrera relativa, que es la que produce energía.
+  const yCabeza = ySparTop + 16;
+  const yCollarFlot = yTope;
+  if (yCollarFlot > yCabeza + 2) {
+    ctx.fillStyle = P.vastago;
+    ctx.fillRect(x - 3, yCabeza, 6, yCollarFlot - yCabeza);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(x - 1.5, yCabeza, 1.2, yCollarFlot - yCabeza);
+  }
+  // Cabeza del mástil: alojamiento del generador lineal.
+  const gCab = ctx.createLinearGradient(x - 10, 0, x + 10, 0);
+  gCab.addColorStop(0, "rgb(30 38 46)");
+  gCab.addColorStop(0.4, P.sparBrillo);
+  gCab.addColorStop(1, P.spar);
+  ctx.fillStyle = gCab;
+  ctx.beginPath();
+  ctx.roundRect(x - 10, ySparTop, 20, 16, 3);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(10,14,18,0.5)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Junta lima: aquí está la conversión a electricidad.
+  ctx.fillStyle = P.acento;
+  ctx.fillRect(x - 10, ySparTop + 12, 20, 2.5);
+
+  // ---- Mástil de señales: baliza y antena ------------------------------------
   ctx.strokeStyle = P.metal;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.moveTo(x, yCima);
-  ctx.lineTo(x, yCima - 14);
+  ctx.moveTo(x, ySparTop);
+  ctx.lineTo(x, ySparTop - 16);
+  ctx.moveTo(x + 5, ySparTop);
+  ctx.lineTo(x + 6, ySparTop - 26);
   ctx.stroke();
-  ctx.strokeStyle = "rgb(208 214 220)";
-  ctx.lineWidth = 1;
+  // Marca de tope: aspa amarilla de marca especial.
+  ctx.strokeStyle = P.amarilloOsc;
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(x + 3, yCima - 14);
-  ctx.lineTo(x + 4, yCima - 26);
+  ctx.moveTo(x - 5, ySparTop - 24);
+  ctx.lineTo(x + 3, ySparTop - 16);
+  ctx.moveTo(x + 3, ySparTop - 24);
+  ctx.lineTo(x - 5, ySparTop - 16);
   ctx.stroke();
-
   const on = Math.sin(t * 2.4) > 0.35;
-  const yLuz = yCima - 16;
+  const yLuz = ySparTop - 19;
   if (on) {
-    const halo = ctx.createRadialGradient(x, yLuz, 0, x, yLuz, 14);
+    const halo = ctx.createRadialGradient(x - 1, yLuz, 0, x - 1, yLuz, 14);
     halo.addColorStop(0, "rgba(255,60,48,0.55)");
     halo.addColorStop(1, "rgba(255,60,48,0)");
     ctx.fillStyle = halo;
     ctx.beginPath();
-    ctx.arc(x, yLuz, 14, 0, Math.PI * 2);
+    ctx.arc(x - 1, yLuz, 14, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.fillStyle = on ? P.balizaOn : P.balizaOff;
   ctx.beginPath();
-  ctx.arc(x, yLuz, on ? 3.6 : 2.8, 0, Math.PI * 2);
+  ctx.arc(x - 1, yLuz, on ? 3.4 : 2.6, 0, Math.PI * 2);
   ctx.fill();
-
-  // Grillete de amarre bajo el collar.
-  ctx.strokeStyle = P.sparClaro;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.ellipse(x, yCollar + 18, 5, 3, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Amarres al lecho (catenaria suave).
-  ctx.strokeStyle = "rgba(20,30,40,0.65)";
-  ctx.lineWidth = 1.3;
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.moveTo(x + s * 10, yCollar + 16);
-    ctx.quadraticCurveTo(x + s * 50, yFondo - 20, x + s * 78, yFondo - 2);
-    ctx.stroke();
-    ctx.fillStyle = "rgb(74 83 90)";
-    ctx.beginPath();
-    ctx.ellipse(x + s * 78, yFondo - 1, 7, 3.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
 
   // Rótulo.
   if (sinRotulo) return;
   const texto = "Absorbedor puntual";
   ctx.font = "600 12px system-ui, sans-serif";
-  ctx.textAlign = "center";
+  ctx.textAlign = "left";
   const ancho = (ctx.measureText?.(texto)?.width ?? texto.length * 6.5) + 16;
-  // El chip no sube con el heave: si sigue al flotador acaba pisando la regla
-  // de Te cuando la boya está en la cresta.
-  const yEt = ySuperficie - 96;
+  // A la derecha de la cabeza del mástil, que apenas se mueve: encima chocaba
+  // con la regla de Te, que vive en el cielo sobre la cresta más alta.
+  const xEt = x + 22;
+  const yEt = ySuperficie - g.francobordo - alcance - 14;
   ctx.fillStyle = "rgba(15,26,36,0.8)";
   ctx.beginPath();
-  ctx.roundRect(x - ancho / 2, yEt - 14, ancho, 19, 3);
+  ctx.roundRect(xEt, yEt - 14, ancho, 19, 3);
   ctx.fill();
   ctx.fillStyle = "rgb(238 245 247)";
-  ctx.fillText(texto, x, yEt);
-
-  void hm0; // reservado: el calado visual se deriva de ySuperficie/yFondo
+  ctx.fillText(texto, xEt + 8, yEt);
 }
